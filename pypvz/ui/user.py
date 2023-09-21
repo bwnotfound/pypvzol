@@ -412,6 +412,7 @@ class UserSettings:
 
         self.challenge4Level = Challenge4Level(cfg, user, repo, lib, caveMan)
         self.challenge4Level_enabled = True
+        self.shop_enabled = False
 
         self.shop = Shop(cfg)
         self.plant_evolution = PlantEvolution(cfg, repo, lib)
@@ -420,10 +421,11 @@ class UserSettings:
         self, stop_channel: Queue, finished_trigger: Queue
     ):
         logger = self.io_logger.new_logger()
-        shop_info = self.shop.buy_default()
-        for good_p_id, amount in shop_info:
-            logger.log(f"购买了{amount}个{self.lib.get_tool_by_id(good_p_id).name}")
-        logger.log("购买完成")
+        if self.shop_enabled:
+            shop_info = self.shop.buy_default()
+            for good_p_id, amount in shop_info:
+                logger.log(f"购买了{amount}个{self.lib.get_tool_by_id(good_p_id).name}")
+            logger.log("购买完成")
         if self.challenge4Level_enabled:
             self.challenge4Level.auto_challenge(stop_channel, logger=logger)
         finished_trigger.emit()
@@ -456,6 +458,7 @@ class UserSettings:
             pickle.dump(
                 {
                     "challenge4Level_enabled": self.challenge4Level_enabled,
+                    "shop_enabled": self.shop_enabled,
                 },
                 f,
             )

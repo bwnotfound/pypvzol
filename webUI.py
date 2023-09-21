@@ -388,21 +388,32 @@ class SettingWindow(QMainWindow):
         menu_layout = QGridLayout()
         challenge4level_widget = QWidget()
         challenge4level_layout = QHBoxLayout()
-        challenge4level_checkbox = QCheckBox("练级")
+        self.challenge4level_checkbox = challenge4level_checkbox = QCheckBox("练级")
         challenge4level_checkbox.setFont(normal_font)
         challenge4level_checkbox.setChecked(self.usersettings.challenge4Level_enabled)
         challenge4level_checkbox.stateChanged.connect(
             self.challenge4level_checkbox_stateChanged
         )
         challenge4level_layout.addWidget(challenge4level_checkbox)
-        challenge4level_layout.addStretch(1)
         challenge4level_setting_btn = QPushButton("设置")
         challenge4level_setting_btn.clicked.connect(
             self.challenge4level_setting_btn_clicked
         )
         challenge4level_layout.addWidget(challenge4level_setting_btn)
+        challenge4level_layout.addStretch(1)
         challenge4level_widget.setLayout(challenge4level_layout)
         menu_layout.addWidget(challenge4level_widget, 0, 0)
+
+        shop_enable_widget = QWidget()
+        shop_enable_layout = QHBoxLayout()
+        self.shop_enable_checkbox = shop_enable_checkbox = QCheckBox("商店购买")
+        shop_enable_checkbox.setFont(normal_font)
+        shop_enable_checkbox.setChecked(self.usersettings.shop_enabled)
+        shop_enable_checkbox.stateChanged.connect(self.shop_enable_checkbox_stateChanged)
+        shop_enable_layout.addWidget(shop_enable_checkbox)
+        shop_enable_layout.addStretch(1)
+        shop_enable_widget.setLayout(shop_enable_layout)
+        menu_layout.addWidget(shop_enable_widget, 1, 0)
 
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
@@ -410,10 +421,11 @@ class SettingWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
+    def shop_enable_checkbox_stateChanged(self):
+        self.usersettings.shop_enabled = self.shop_enable_checkbox.isChecked()
+
     def challenge4level_checkbox_stateChanged(self):
-        self.usersettings.challenge4Level_enabled = (
-            not self.usersettings.challenge4Level_enabled
-        )
+        self.usersettings.challenge4Level_enabled = self.challenge4level_checkbox.isChecked()
 
     def challenge4level_setting_btn_clicked(self):
         self.challenge4level_setting_window = Challenge4level_setting_window(
