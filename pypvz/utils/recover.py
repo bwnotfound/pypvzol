@@ -4,9 +4,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pyamf
 from pyamf import remoting
 
-from ..config import Config
-from ..web import WebRequest
-from ..repository import Repository
+from .. import Config, WebRequest, Repository
+# from ..config import Config
+# from ..web import WebRequest
+# from ..repository import Repository
 from ..ui.message import Logger
 
 
@@ -22,7 +23,7 @@ class RecoverMan:
             "高级血瓶": 15,
         }
 
-    def recover(self, target_id, choice='低级血瓶'):
+    def recover(self, target_id, choice='中级血瓶'):
         body = [float(target_id), float(self.heal_dict[choice])]
         req = remoting.Request(target='api.apiorganism.refreshHp', body=body)
         ev = remoting.Envelope(pyamf.AMF0)
@@ -40,7 +41,7 @@ class RecoverMan:
         else:
             raise NotImplementedError
 
-    def recover_zero(self, need_refresh=True):
+    def recover_zero(self, need_refresh=True, choice='中级血瓶'):
         if need_refresh:
             self.repo.refresh_repository()
         hp_zeros = self.repo.hp_below(0, id_only=True)
@@ -49,7 +50,7 @@ class RecoverMan:
         success_list = [None] * len(hp_zeros)
         
         with ThreadPoolExecutor() as executor:
-            futures = [executor.submit(self.recover, id) for id in hp_zeros]
+            futures = [executor.submit(self.recover, id, choice) for id in hp_zeros]
         
         for i, future in enumerate(as_completed(futures)):
             result = future.result()
@@ -59,6 +60,7 @@ class RecoverMan:
             else:
                 fail_num += 1
         plant_list = [[self.repo.get_plant(id), success_list[i]] for i, id in enumerate(hp_zeros)]
+        plant_list = [item for item in plant_list if item[0] is not None]
         plant_list.sort(key=lambda x: (x[0].grade, -x[0].id), reverse=True)
         if self.logger is not None:
             message = "成功回复了{}个植物: ".format(success_num)

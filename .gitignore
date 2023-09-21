@@ -165,3 +165,5 @@ data/
 config/*
 !config/config.json
 /dev/
+/script.py
+/scripts/

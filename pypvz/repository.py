@@ -79,9 +79,9 @@ class Repository:
         return result
     
     def get_plant(self, id):
-        plant = self.id2plant.get(id)
+        plant = self.id2plant.get(id, None)
         return plant
     
     def get_tool(self, id):
-        tool = self.id2tool.get(id)
+        tool = self.id2tool.get(id, None)
         return tool

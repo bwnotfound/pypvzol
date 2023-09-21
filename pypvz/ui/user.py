@@ -7,11 +7,13 @@ import threading
 
 from pyamf import DecodeError
 
+from ..shop import Shop
+
 from ..cave import Cave
 from .. import Config, Repository, Library, User, CaveMan
-from .message import IOLogger
 from ..utils.recover import RecoverMan
-from .message import Logger
+from .message import IOLogger, Logger
+from ..utils.evolution import PlantEvolution
 
 
 class SingleCave:
@@ -54,6 +56,7 @@ class Challenge4Level:
         self.free_max = free_max
         self.friend_id2cave_id = {}
         self.stone_cave_challenge_max_attempts = stone_cave_challenge_max_attempts
+        self.hp_choice = "中级血瓶"
 
     def add_cave(self, cave: Cave, friend_ids=None, difficulty=1, enabled=True):
         # 这里的cave需要的是cave的id属性，不是cave_id
@@ -163,7 +166,8 @@ class Challenge4Level:
             self.repo.get_plant(int(plant_id['id']))
             for plant_id in result['assailants']
         ]
-        message = message + "\n\t\t出战植物: {}".format(
+        plant_list = list(filter(lambda x: x is not None, plant_list))
+        message = message + "\n\t出战植物: {}".format(
             ' '.join(
                 [
                     "{}({})".format(plant.name(self.lib), plant.grade)
@@ -177,6 +181,7 @@ class Challenge4Level:
             self.repo.get_plant(int(plant_id['id']))
             for plant_id in result['assailants']
         ]
+        plant_list = list(filter(lambda x: x is not None, plant_list))
         upgrade_list = [
             "{}({}->{})".format(
                 plant.name(self.lib),
@@ -187,8 +192,8 @@ class Challenge4Level:
             if plant.grade != grade_copy_list[i]
         ]
         if len(upgrade_list) > 0:
-            message = message + "\n\t\t升级植物: {}".format(' '.join(upgrade_list))
-        # message = message + "\n\t\t掉落: {}".format(
+            message = message + "\n\t升级植物: {}".format(' '.join(upgrade_list))
+        # message = message + "\n\t掉落: {}".format(
 
         # )
         logger.log(message)
@@ -199,31 +204,38 @@ class Challenge4Level:
         team_grid_amount = 0
         for plant_id in self.main_plant_list:
             plant = self.repo.get_plant(plant_id)
-            assert plant is not None
+            if plant is None:
+                continue
             width = plant.width(self.lib)
             if team_grid_amount + width > self.grid_amount:
                 break
             team.append(plant_id)
             team_grid_amount += width
-        for plant_id in reversed(self.trash_plant_list):
-            plant = self.repo.get_plant(plant_id)
-            assert plant is not None
+
+        trash_plant_list =[self.repo.get_plant(plant_id) for plant_id in self.trash_plant_list]
+        trash_plant_list = list(filter(lambda x: x is not None, trash_plant_list))
+        sorted_grade_trash_plant_list = sorted(
+            trash_plant_list,
+            key=lambda x: (x.grade, - x.width(self.lib)),
+            reverse=True,
+        )
+        for plant in sorted_grade_trash_plant_list:
             width = plant.width(self.lib)
             if team_grid_amount + width > self.grid_amount:
                 continue
             if cave.grade - plant.grade < 5:
                 continue
-            team.append(plant_id)
+            team.append(plant.id)
             team_grid_amount += width
         if team_grid_amount < self.grid_amount - self.free_max:
             return None
         return team
-    
+
     def _recover(self, logger: Logger = None):
         max_attempts = 5
         rest_attempts = max_attempts
         while rest_attempts > 0:
-            success_num, fail_num = self.recoverMan.recover_zero(need_refresh=False)
+            success_num, fail_num = self.recoverMan.recover_zero(need_refresh=False, choice=self.hp_choice)
             if fail_num == 0:
                 break
             self.repo.refresh_repository()
@@ -340,7 +352,9 @@ class Challenge4Level:
 
                 friend = self.friendman.id2friend[friend_id]
 
-                self._challenge(cave, team, difficulty, logger, friend=friend)
+                success = self._challenge(cave, team, difficulty, logger, friend=friend)
+                if not success:
+                    return
 
                 if stop_channel.qsize() > 0:
                     logger.log("stop auto challenge")
@@ -359,6 +373,7 @@ class Challenge4Level:
                     "free_max": self.free_max,
                     "friend_id2cave_id": self.friend_id2cave_id,
                     "stone_cave_challenge_max_attempts": self.stone_cave_challenge_max_attempts,
+                    "hp_choice": self.hp_choice,
                 },
                 f,
             )
@@ -372,6 +387,8 @@ class Challenge4Level:
                 setattr(self, k, v)
 
 
+
+
 class UserSettings:
     def __init__(
         self,
@@ -380,6 +397,7 @@ class UserSettings:
         lib: Library,
         user: User,
         caveMan: CaveMan,
+        logger: IOLogger,
         save_dir=None,
     ):
         self.cfg = cfg
@@ -389,23 +407,32 @@ class UserSettings:
         self.user = user
         self.caveMan = caveMan
         self.save_dir = save_dir
+        self.io_logger = logger
+        self.logger = logger.new_logger()
 
         self.challenge4Level = Challenge4Level(cfg, user, repo, lib, caveMan)
         self.challenge4Level_enabled = False
 
-    def _start(self, stop_channel: Queue, finished_trigger:Queue, logger: Logger = None):
-        # import time
-        # for i in range(5):
-        #     logger.log(i)
-        #     time.sleep(1)
+        self.shop = Shop(cfg)
+        self.plant_evolution = PlantEvolution(cfg, repo, lib)
+
+    def _start(
+        self, stop_channel: Queue, finished_trigger: Queue
+    ):
+        logger = self.io_logger.new_logger()
+        shop_info = self.shop.buy_default()
+        for good_p_id, amount in shop_info:
+            logger.log(f"购买了{amount}个{self.lib.get_tool_by_id(good_p_id).name}")
+        logger.log("购买完成")
         if self.challenge4Level_enabled:
             self.challenge4Level.auto_challenge(stop_channel, logger=logger)
         finished_trigger.emit()
 
-    def start(self, stop_channel: Queue, finished_trigger, logger: Logger = None):
+    def start(self, stop_channel: Queue, finished_trigger):
         finish_channel = Queue(maxsize=1)
         threading.Thread(
-            target=self._start, args=(stop_channel, finished_trigger), kwargs={'logger': logger}
+            target=self._start,
+            args=(stop_channel, finished_trigger),
         ).start()
         return finish_channel
 
@@ -432,6 +459,7 @@ class UserSettings:
                 },
                 f,
             )
+        self.plant_evolution.save(self.save_dir)
 
     def load(self):
         self.challenge4Level.load(self.save_dir)
@@ -441,3 +469,4 @@ class UserSettings:
                 d = pickle.load(f)
             for k, v in d.items():
                 setattr(self, k, v)
+        self.plant_evolution.load(self.save_dir)

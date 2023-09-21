@@ -1,8 +1,8 @@
 import argparse
 import os
 
-from pypvz.utils.recover import RecoverMan
 from pypvz import Config, Repository, Library, GardenMan, User
+from pypvz.utils.recover import RecoverMan
 
 
 def challenge_garden(cfg, lib, friendMan):
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     abs_file_dir = os.path.dirname(os.path.abspath(__file__))
     cfg = Config(os.path.join(abs_file_dir, "config/config.json"))
-    # cfg = Config(os.path.join(abs_file_dir, "config/24config.json"))
+    cfg = Config(os.path.join(abs_file_dir, "config/24config.json"))
     lib = Library(cfg)
     user = User(cfg)
     repo = Repository(cfg)

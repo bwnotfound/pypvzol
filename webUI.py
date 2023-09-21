@@ -1,5 +1,6 @@
 import sys
 from io import BytesIO
+import typing
 from PyQt6 import QtGui
 import os
 import logging
@@ -22,213 +23,17 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QPlainTextEdit,
     QSpinBox,
+    QComboBox,
 )
 from PyQt6.QtGui import QImage, QPixmap, QFont, QTextCursor
 from PyQt6.QtCore import Qt, pyqtSignal
 from PIL import Image
 
 from pypvz import WebRequest, Config, User, CaveMan, Repository, Library
-from pypvz.ui import IOLogger
+from pypvz.ui.message import IOLogger
+from pypvz.ui.wrapped import QLabel, normal_font
+from pypvz.ui.windows import EvolutionPanelWindow, SetPlantListWindow, AddCaveWindow
 from pypvz.ui.user import SingleCave, UserSettings
-
-normal_font = QFont("Microsoft YaHei", pointSize=10)
-
-
-class QLabel(QLabel):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setFont(normal_font)
-
-    def setFont(self, a0) -> None:
-        super().setFont(a0)
-        return self
-
-    def setText(self, a0) -> None:
-        super().setText(a0)
-        return self
-
-    def setPixmap(self, a0: QPixmap) -> None:
-        super().setPixmap(a0)
-        return self
-
-    def setAlignment(self, a0: Qt.AlignmentFlag) -> None:
-        super().setAlignment(a0)
-        return self
-
-
-class AddCaveWindow(QMainWindow):
-    cave_add_update = pyqtSignal()
-
-    def __init__(self, usersettings: UserSettings, parent=None):
-        super().__init__(parent=parent)
-        self.usersettings = usersettings
-        self.init_ui()
-
-    def init_ui(self):
-        self.setWindowTitle("练级设置")
-
-        # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
-        screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.3), int(screen_size.height() * 0.5))
-        self.move(int(screen_size.width() * 0.35), int(screen_size.height() * 0.25))
-
-        main_widget = QWidget()
-        main_layout = QHBoxLayout()
-
-        cave_type_widget = QWidget()
-        cave_type_layout = QVBoxLayout()
-        cave_type_layout.addWidget(QLabel("洞口类型"))
-        cave_type_list_widget = QListWidget()
-        cave_type_layout.addWidget(cave_type_list_widget)
-        cave_type_widget.setLayout(cave_type_layout)
-        main_layout.addWidget(cave_type_widget)
-
-        cave_widget = QWidget()
-        cave_layout = QVBoxLayout()
-        cave_layout.addWidget(QLabel("洞口"))
-        cave_list_widget = QListWidget()
-        cave_layout.addWidget(cave_list_widget)
-        cave_widget.setLayout(cave_layout)
-        main_layout.addWidget(cave_widget)
-
-        main_widget.setLayout(main_layout)
-
-        self.setCentralWidget(main_widget)
-
-        self.cave_list_widget = cave_list_widget
-        self.cave_type_list_widget = cave_type_list_widget
-        for i in range(3):
-            item = QListWidgetItem("暗夜狩猎场-{}层".format(i + 1))
-            item.setData(Qt.ItemDataRole.UserRole, {"type": 1, "layer": i + 1})
-            cave_type_list_widget.addItem(item)
-        for i in range(3):
-            item = QListWidgetItem("僵尸狩猎场-{}层".format(i + 1))
-            item.setData(Qt.ItemDataRole.UserRole, {"type": 2, "layer": i + 1})
-            cave_type_list_widget.addItem(item)
-        for i in range(3):
-            item = QListWidgetItem("个人狩猎场-{}层".format(i + 1))
-            item.setData(Qt.ItemDataRole.UserRole, {"type": 3, "layer": i + 1})
-            cave_type_list_widget.addItem(item)
-        stone_chapter_name = [
-            '神秘洞穴',
-            '光明圣城',
-            '黑暗之塔',
-            '僵尸坟场',
-            '古老树屋',
-            '亡灵沼泽',
-            '冰岛',
-            '末日火山',
-            '天空之岛',
-        ]
-        for i, name in enumerate(stone_chapter_name):
-            item = QListWidgetItem("宝石副本-" + name)
-            item.setData(Qt.ItemDataRole.UserRole, {"type": 4, "layer": i + 1})
-            cave_type_list_widget.addItem(item)
-        cave_type_list_widget.itemClicked.connect(self.cave_type_list_widget_clicked)
-        cave_list_widget.itemClicked.connect(self.cave_list_widget_clicked)
-
-    def get_caves(self, cave_type, cave_layer):
-        if not hasattr(self, "_caves"):
-            self._caves = {}
-        format_name = "{}-{}".format(cave_type, cave_layer)
-        result = self._caves.get(format_name)
-        if result is None:
-            if cave_type <= 3:
-                caves = self.usersettings.caveMan.get_caves(
-                    self.usersettings.user.id, cave_type, cave_layer
-                )
-            elif cave_type == 4:
-                caves = self.usersettings.caveMan.get_caves(cave_layer, cave_type)
-            else:
-                raise NotImplementedError
-            result = self._caves[format_name] = caves
-        return result
-
-    def cave_type_list_widget_clicked(self, item: QListWidgetItem):
-        cave_type = item.data(Qt.ItemDataRole.UserRole)
-        cave_type, cave_layer = cave_type["type"], cave_type["layer"]
-        self.cave_list_widget.clear()
-        caves = self.get_caves(cave_type, cave_layer)
-        if cave_type <= 3:
-            for cave in caves:
-                if cave.cave_id is None:
-                    break
-                item = QListWidgetItem(cave.format_name())
-                item.setData(Qt.ItemDataRole.UserRole, cave)
-                self.cave_list_widget.addItem(item)
-        elif cave_type == 4:
-            for cave in caves:
-                item = QListWidgetItem(cave.format_name())
-                item.setData(Qt.ItemDataRole.UserRole, cave)
-                self.cave_list_widget.addItem(item)
-        else:
-            raise NotImplementedError
-
-    def cave_list_widget_clicked(self, item: QListWidgetItem):
-        cave = item.data(Qt.ItemDataRole.UserRole)
-        self.usersettings.add_cave_challenge4Level(cave)
-        self.cave_add_update.emit()
-
-
-class SetPlantListWindow(QMainWindow):
-    def __init__(
-        self,
-        repo: Repository,
-        lib: Library,
-        sign,
-        origin_plant_id_list=None,
-        parent=None,
-    ):
-        super().__init__(parent=parent)
-        self.repo = repo
-        self.lib = lib
-        self.sign = sign
-        self.origin_plant_id_list = origin_plant_id_list
-        self.init_ui()
-
-    def init_ui(self):
-        self.setWindowTitle("植物选择")
-
-        # 将窗口居中显示，宽度为显示器宽度的15%，高度为显示器高度的35%
-        screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.15), int(screen_size.height() * 0.35))
-        self.move(int(screen_size.width() * 0.425), int(screen_size.height() * 0.325))
-
-        main_widget = QWidget()
-        main_layout = QVBoxLayout()
-
-        origin_plant_id_set = set(self.origin_plant_id_list)
-        self.plant_list = plant_list = QListWidget()
-        for plant in self.repo.plants:
-            if plant.id in origin_plant_id_set:
-                continue
-            item = QListWidgetItem(f"{plant.name(self.lib)} ({plant.grade})")
-            item.setData(Qt.ItemDataRole.UserRole, plant)
-            plant_list.addItem(item)
-        # 设置plant_list的selectmode为多选
-        plant_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        main_layout.addWidget(plant_list)
-
-        button_widget = QWidget()
-        button_layout = QHBoxLayout()
-        ok_button = QPushButton("确定")
-        ok_button.clicked.connect(self.ok_button_clicked)
-        no_button = QPushButton("取消")
-        no_button.clicked.connect(self.close)
-        button_layout.addWidget(ok_button)
-        button_layout.addWidget(no_button)
-        button_widget.setLayout(button_layout)
-        main_layout.addWidget(button_widget)
-
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
-
-    def ok_button_clicked(self):
-        result = []
-        for item in self.plant_list.selectedItems():
-            result.append(item.data(Qt.ItemDataRole.UserRole).id)
-        self.sign.emit(result)
-        self.close()
 
 
 class Challenge4level_setting_window(QMainWindow):
@@ -379,11 +184,27 @@ class Challenge4level_setting_window(QMainWindow):
         )
         right_panel_layout.addWidget(stone_cave_challenge_max_attempts_widget)
 
+        hp_choice_widget = QWidget()
+        hp_choice_layout = QHBoxLayout()
+
+        hp_choice_layout.addWidget(QLabel("血瓶选择:"))
+        hp_choice_box = QComboBox()
+        self.hp_choice_list = ["低级血瓶", "中级血瓶", "高级血瓶"]
+        hp_choice_box.addItems(self.hp_choice_list)
+        hp_choice_box.setCurrentIndex(self.hp_choice_list.index(self.usersettings.challenge4Level.hp_choice))
+        hp_choice_box.currentIndexChanged.connect(self.hp_choice_box_currentIndexChanged)
+        hp_choice_layout.addWidget(hp_choice_box)
+        hp_choice_widget.setLayout(hp_choice_layout)
+
+        right_panel_layout.addWidget(hp_choice_widget)
         right_panel.setLayout(right_panel_layout)
         main_layout.addWidget(right_panel)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def hp_choice_box_currentIndexChanged(self, index):
+        self.usersettings.challenge4Level.hp_choice = self.hp_choice_list[index]
 
     def update_selectd_cave(self):
         self.update_friend_list()
@@ -429,7 +250,10 @@ class Challenge4level_setting_window(QMainWindow):
     def update_main_plant_list(self):
         self.main_plant_list.clear()
         for plant_id in self.usersettings.challenge4Level.main_plant_list:
-            plant = self.usersettings.repo.id2plant[plant_id]
+            plant = self.usersettings.repo.get_plant(plant_id)
+            if plant is None:
+                self.usersettings.challenge4Level.main_plant_list.remove(plant_id)
+                continue
             item = QListWidgetItem(
                 f"{plant.name(self.usersettings.lib)} ({plant.grade})"
             )
@@ -439,7 +263,10 @@ class Challenge4level_setting_window(QMainWindow):
     def update_trash_plant_list(self):
         self.trash_plant_list.clear()
         for plant_id in self.usersettings.challenge4Level.trash_plant_list:
-            plant = self.usersettings.repo.id2plant[plant_id]
+            plant = self.usersettings.repo.get_plant(plant_id)
+            if plant is None:
+                self.usersettings.challenge4Level.trash_plant_list.remove(plant_id)
+                continue
             item = QListWidgetItem(
                 f"{plant.name(self.usersettings.lib)} ({plant.grade})"
             )
@@ -447,7 +274,7 @@ class Challenge4level_setting_window(QMainWindow):
             self.trash_plant_list.addItem(item)
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Delete:
+        if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
             if self.delete_last_selected_list is not None:
                 select_items = self.delete_last_selected_list.selectedItems()
                 if self.delete_last_selected_list is self.cave_list:
@@ -488,9 +315,9 @@ class Challenge4level_setting_window(QMainWindow):
     def set_main_plant_btn_clicked(self):
         # 当set_plant_list_over有链接的槽函数时，将之前的槽函数disconnect
         try:
-            self.set_plant_list_over.disconnect()         
+            self.set_plant_list_over.disconnect()
         except TypeError:
-            pass   
+            pass
         self.set_plant_list_over.connect(self.add_main_plant)
         self.set_plant_list_window = SetPlantListWindow(
             self.usersettings.repo,
@@ -510,9 +337,9 @@ class Challenge4level_setting_window(QMainWindow):
 
     def set_trash_plant_btn_clicked(self):
         try:
-            self.set_plant_list_over.disconnect()         
+            self.set_plant_list_over.disconnect()
         except TypeError:
-            pass   
+            pass
         self.set_plant_list_over.connect(self.add_trash_plant)
         self.set_plant_list_window = SetPlantListWindow(
             self.usersettings.repo,
@@ -599,6 +426,62 @@ class SettingWindow(QMainWindow):
         return super().closeEvent(a0)
 
 
+class FunctionPanelWindow(QMainWindow):
+    def __init__(self, usersettings: UserSettings, parent=None):
+        super().__init__(parent=parent)
+        self.usersettings = usersettings
+        self.init_ui()
+
+    def init_ui(self):
+        # 将窗口居中显示，宽度为显示器宽度的50%，高度为显示器高度的70%
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.5), int(screen_size.height() * 0.7))
+        self.move(int(screen_size.width() * 0.25), int(screen_size.height() * 0.15))
+        self.setWindowTitle("功能面板")
+
+        main_widget = QWidget()
+        main_layout = QHBoxLayout()
+
+        left_panel = QWidget()
+        left_panel.setFixedWidth(int(self.width() * 0.2))
+        left_layout = QVBoxLayout()
+        left_layout.addWidget(QLabel("植物列表"))
+        self.plant_list = QListWidget()
+        self.plant_list.addItems(
+            [
+                f"{plant.name(self.usersettings.lib)}({plant.grade})"
+                for plant in self.usersettings.repo.plants
+            ]
+        )
+        left_layout.addWidget(self.plant_list)
+        left_panel.setLayout(left_layout)
+
+        main_layout.addWidget(left_panel)
+
+        menu_widget = QWidget()
+        menu_layout = QGridLayout()
+
+        evolution_panel_btn = QPushButton("进化路线面板")
+        evolution_panel_btn.clicked.connect(self.evolution_panel_btn_clicked)
+        menu_layout.addWidget(evolution_panel_btn, 0, 0)
+
+        menu_widget.setLayout(menu_layout)
+        main_layout.addWidget(menu_widget)
+
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+    def evolution_panel_btn_clicked(self):
+        self.evolution_panel_window = EvolutionPanelWindow(
+            self.usersettings, parent=self
+        )
+        self.evolution_panel_window.show()
+
+    def closeEvent(self, event):
+        self.usersettings.save()
+        return super().closeEvent(event)
+
+
 class CustomMainWindow(QMainWindow):
     logger_signal = pyqtSignal()
     finish_trigger = pyqtSignal()
@@ -630,6 +513,7 @@ class CustomMainWindow(QMainWindow):
             self.lib,
             self.user,
             self.caveMan,
+            logger,
             setting_dir,
         )
         if not os.path.exists(setting_dir):
@@ -732,6 +616,18 @@ class CustomMainWindow(QMainWindow):
         button_layout.addWidget(clear_button)
         left_layout.addLayout(button_layout)
 
+        # function button
+        function_panel_open_layout = QHBoxLayout()
+        function_panel_open_layout.setSpacing(10)
+        self.function_panel_open_button = function_panel_open_button = QPushButton(
+            "功能面板"
+        )
+        function_panel_open_button.clicked.connect(
+            self.function_panel_open_button_clicked
+        )
+        function_panel_open_layout.addWidget(function_panel_open_button)
+        left_layout.addLayout(function_panel_open_layout)
+
         # # List Widget
         # list_widget = QListWidget()
         # list_widget.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
@@ -782,34 +678,47 @@ class CustomMainWindow(QMainWindow):
     def open_setting_panel(self):
         self.settingWindow = SettingWindow(self.usersettings, parent=self)
         self.settingWindow.show()
-        
+
     def run_finished(self):
         self.process_button.setText("开始")
-        
+
     def process_button_clicked(self):
-        self.process_stop_channel = Queue(maxsize=1)
         if self.process_button.text() == "开始":
+            self.process_stop_channel = Queue(maxsize=1)
+            self.usersettings.repo.refresh_repository()
             self.process_button.setText("暂停")
             if self.process_stop_channel.qsize() > 0:
                 self.process_stop_channel.get()
-            self.usersettings.start(self.process_stop_channel, self.finish_trigger, self.logger.new_logger())
+            self.usersettings.start(self.process_stop_channel, self.finish_trigger)
         elif self.process_button.text() == "暂停":
             self.process_button.setText("开始")
             self.process_stop_channel.put(True)
         else:
             raise ValueError(f"Unknown button text: {self.process_button.text()}")
 
+    def function_panel_open_button_clicked(self):
+        self.function_panel_window = FunctionPanelWindow(self.usersettings, parent=self)
+        self.function_panel_window.show()
+
+
+import argparse
 
 if __name__ == "__main__":
     # 设置logging监听等级为INFO
     logging.basicConfig(level=logging.INFO)  # 如果不想让控制台输出那么多信息，可以将这一行注释掉
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-r", "--region", default="", help="region")
+    args = parser.parse_args()
+    region = args.region
+
     abs_file_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(abs_file_dir, "config/config.json")
-    # config_path = os.path.join(abs_file_dir, "config/24config.json")
-    data_dir = os.path.join(abs_file_dir, "data")
+    # config_path = os.path.join(abs_file_dir, "config/config.json")
+    config_path = os.path.join(abs_file_dir, f"config/{region}config.json")
+    # data_dir = os.path.join(abs_file_dir, "data")
+    data_dir = os.path.join(abs_file_dir, f"data/{region}")
     if not os.path.exists(data_dir):
-        os.mkdir(data_dir)
+        os.makedirs(data_dir)
     cache_dir = os.path.join(data_dir, "cache")
     if not os.path.exists(cache_dir):
         os.mkdir(cache_dir)

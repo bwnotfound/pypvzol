@@ -47,10 +47,6 @@ class Library:
         assert result.id == id
         return result
 
-    def get_evolutions(self, id):
-        src_plant = self.get_plant_by_id(id)
-        return src_plant.evolutions
-
 
 class Tool:
     def __init__(self, root: Element):
@@ -62,7 +58,24 @@ class Tool:
         self.describe = root.get("describe")
         self.rare = root.get("rare")
 
+class EvolutionLibPath:
+    # "http://s{region}.youkia.pvz.youkia.com/pvz/index.php/organism/evolution/id/{plant_id}/route/{evolution_path uid}/shortcut/2/sig/0"
+    def __init__(self, root: Element):
+        self.src_pid = int(root.get("id"))
+        self.evolutions = []
+        for item in root.find("evolutions"):
+            self.evolutions.append(
+                {
+                    "id": int(item.get("id")),  # evolution_path uid
+                    "grade": int(item.get("grade")),
+                    "target_id": int(item.get("target")),   # target_plant_pid
+                    "tool_id": int(item.get("tool_id")),
+                    "money": item.get("money"),
+                }
+            )
 
+
+     
 class Plant:
     def __init__(self, root: Element):
         self.id = int(root.get("id"))
@@ -72,14 +85,8 @@ class Plant:
         self.explanation = root.get("expl")
         self.img_id = root.get("img_id")
         self.width = int(root.get("width"))
-        self.evolutions = []
-        for item in root.find("evolutions"):
-            self.evolutions.append(
-                {
-                    "id": int(item.get("id")),
-                    "grade": int(item.get("grade")),
-                    "target_id": int(item.get("target")),
-                    "tool_id": int(item.get("tool_id")),
-                    "money": item.get("money"),
-                }
-            )
+        self.use_condition = root.get("use_condition")
+        self.evolution_path = EvolutionLibPath(root)
+        
+    
+        
