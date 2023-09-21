@@ -411,7 +411,7 @@ class UserSettings:
         self.logger = logger.new_logger()
 
         self.challenge4Level = Challenge4Level(cfg, user, repo, lib, caveMan)
-        self.challenge4Level_enabled = False
+        self.challenge4Level_enabled = True
 
         self.shop = Shop(cfg)
         self.plant_evolution = PlantEvolution(cfg, repo, lib)

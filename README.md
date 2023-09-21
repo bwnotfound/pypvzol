@@ -49,13 +49,9 @@
 ### 运行源码
 
 ```shell
-# 克隆仓库
-$ git clone  ; cd
 # 安装依赖。如果可以的话，建议使用虚拟环境venv
 $ pip install -r requirements.txt
 ```
-
-上述步骤中的“克隆仓库”可以替换为“点击右上角的绿色按钮，然后点击“Download ZIP”下载，然后解压到你想要的位置即可。”
 
 安装完环境后，打开根目录下的 config 文件夹，修改其中的 config.json 文件，将 region 改为你所在的区号，将 cookie 改为你的 cookie 值。cookie 获取可以在植物大战僵尸 ol 网页版登录后，按 F12 打开开发者工具，在上方工具栏中点击“控制台”，然后下方输入`document.cookie`，回车，即可获取到 cookie 值。如果你用了原有助手，那么把原有助手的 Config 文件夹下你对应区的 xml 文件打开，搜索`UserCookies`也能获取到 cookie 值。
 
