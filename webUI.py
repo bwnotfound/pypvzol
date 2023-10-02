@@ -767,7 +767,7 @@ class LoginWindow(QMainWindow):
         region_layout.addWidget(region_input)
         region_widget.setLayout(region_layout)
         main_layout.addWidget(region_widget)
-        
+
         cookie_widget = QWidget()
         cookie_layout = QHBoxLayout()
         cookie_layout.addWidget(QLabel("Cookie:"))
@@ -790,6 +790,10 @@ class LoginWindow(QMainWindow):
         username = self.username_input.text()
         region = int(self.region_input.currentText())
         cookie = self.cookie_input.text()
+        if (cookie[0] == '"' and cookie[-1] == '"') or (
+            cookie[0] == "'" and cookie[-1] == "'"
+        ):
+            cookie = cookie[1:-1]
         cfg = {
             "username": username,
             "region": region,
@@ -801,28 +805,30 @@ class LoginWindow(QMainWindow):
         # 强制重新渲染login窗口元素
         QApplication.processEvents()
         show_main_window(Config(cfg))
-        
+
     def login_list_item_double_clicked(self, item):
         cfg_index = item.data(Qt.ItemDataRole.UserRole)
         show_main_window(Config(self.configs[cfg_index]))
-        
+
     def refresh_login_user_list(self):
         self.login_user_list.clear()
         for i, cfg in enumerate(self.configs):
             item = QListWidgetItem("{}_{}".format(cfg["username"], cfg["region"]))
             item.setData(Qt.ItemDataRole.UserRole, i)
             self.login_user_list.addItem(item)
-        
+
     def save_config(self):
         with open(self.cfg_path, "w", encoding="utf-8") as f:
             json.dump(self.configs, f, indent=4, ensure_ascii=False)
-    
+
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Backspace or event.key() == Qt.Key.Key_Delete:
             if len(self.login_user_list.selectedItems()) == 0:
                 return
             assert len(self.login_user_list.selectedItems()) == 1
-            cfg_index = self.login_user_list.selectedItems()[0].data(Qt.ItemDataRole.UserRole)
+            cfg_index = self.login_user_list.selectedItems()[0].data(
+                Qt.ItemDataRole.UserRole
+            )
             self.configs.pop(cfg_index)
             self.save_config()
             self.refresh_login_user_list()
@@ -852,14 +858,15 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)  # 如果不想让控制台输出那么多信息，可以将这一行注释掉
     # 取root_dir为可执行文件的目录
     root_dir = os.getcwd()
+    os.makedirs(os.path.join(root_dir, "config"), exist_ok=True)
 
     app = QApplication(sys.argv)
     logger_list = []
     main_window_list = []
     login_window = LoginWindow()
     login_window.show()
-    try:
-        sys.exit(app.exec())
-    finally:
-        for log in logger_list:
-            log.close()
+    app_return = app.exec()
+    for log in logger_list:
+        log.close()
+    os.system("pause")
+    sys.exit(app_return)
