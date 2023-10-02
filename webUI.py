@@ -422,6 +422,19 @@ class SettingWindow(QMainWindow):
         shop_enable_layout.addStretch(1)
         shop_enable_widget.setLayout(shop_enable_layout)
         menu_layout.addWidget(shop_enable_widget, 1, 0)
+        
+        daily_task_widget = QWidget()
+        daily_task_layout = QHBoxLayout()
+        self.daily_task_checkbox = daily_task_checkbox = QCheckBox("日常任务领取")
+        daily_task_checkbox.setFont(normal_font)
+        daily_task_checkbox.setChecked(self.usersettings.daily_task_enabled)
+        daily_task_checkbox.stateChanged.connect(
+            self.daily_task_checkbox_stateChanged
+        )
+        daily_task_layout.addWidget(daily_task_checkbox)
+        daily_task_layout.addStretch(1)
+        daily_task_widget.setLayout(daily_task_layout)
+        menu_layout.addWidget(daily_task_widget, 2, 0)
 
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
@@ -431,6 +444,9 @@ class SettingWindow(QMainWindow):
 
     def shop_enable_checkbox_stateChanged(self):
         self.usersettings.shop_enabled = self.shop_enable_checkbox.isChecked()
+        
+    def daily_task_checkbox_stateChanged(self):
+        self.usersettings.daily_task_enabled = self.daily_task_checkbox.isChecked()
 
     def challenge4level_checkbox_stateChanged(self):
         self.usersettings.challenge4Level_enabled = (
@@ -548,13 +564,13 @@ class CustomMainWindow(QMainWindow):
             os.mkdir(cache_dir)
         self.wr_cache = WebRequest(cfg, cache_dir=cache_dir)
 
-        self.setup_ui()
+        self.init_ui()
 
         self.logger_signal.connect(self.update_text_box)
         self.logger.set_signal(self.logger_signal)
         self.finish_trigger.connect(self.run_finished)
 
-    def setup_ui(self):
+    def init_ui(self):
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
         self.resize(int(screen_size.width() * 0.7), int(screen_size.height() * 0.7))
         self.move(int(screen_size.width() * 0.15), int(screen_size.height() * 0.15))

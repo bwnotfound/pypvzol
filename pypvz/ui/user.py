@@ -10,7 +10,7 @@ from pyamf import DecodeError
 from ..shop import Shop
 
 from ..cave import Cave
-from .. import Config, Repository, Library, User, CaveMan
+from .. import Config, Repository, Library, User, CaveMan, Task
 from ..utils.recover import RecoverMan
 from .message import IOLogger, Logger
 from ..utils.evolution import PlantEvolution
@@ -422,6 +422,8 @@ class UserSettings:
 
         self.shop = Shop(cfg)
         self.plant_evolution = PlantEvolution(cfg, repo, lib)
+        self.task = Task(cfg)
+        self.daily_task_enabled = False
 
     def _start(
         self, stop_channel: Queue, finished_trigger: Queue
@@ -432,6 +434,12 @@ class UserSettings:
             for good_p_id, amount in shop_info:
                 logger.log(f"购买了{amount}个{self.lib.get_tool_by_id(good_p_id).name}")
             logger.log("购买完成")
+        if self.daily_task_enabled:
+            self.task.refresh_task()
+            for task in self.task.daily_task:
+                if task.state == 1:
+                    result = self.task.claim_reward(task)
+                    logger.log(result['result'])
         if self.challenge4Level_enabled:
             self.challenge4Level.auto_challenge(stop_channel, logger=logger)
         finished_trigger.emit()
@@ -465,6 +473,7 @@ class UserSettings:
                 {
                     "challenge4Level_enabled": self.challenge4Level_enabled,
                     "shop_enabled": self.shop_enabled,
+                    "daily_task_enabled": self.daily_task_enabled,
                 },
                 f,
             )
