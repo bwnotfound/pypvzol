@@ -162,8 +162,8 @@ cython_debug/
 .vscode/
 .venv
 data/
-config/*
-!config/config.json
+/config/*
+!/config/config_file_here
 /dev/
 /script.py
-/scripts/
+/scripts

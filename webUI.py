@@ -1,4 +1,5 @@
 import sys
+import json
 from io import BytesIO
 import typing
 from PyQt6 import QtGui
@@ -24,6 +25,7 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QSpinBox,
     QComboBox,
+    QLineEdit,
 )
 from PyQt6.QtGui import QImage, QPixmap, QFont, QTextCursor
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -191,8 +193,12 @@ class Challenge4level_setting_window(QMainWindow):
         hp_choice_box = QComboBox()
         self.hp_choice_list = ["低级血瓶", "中级血瓶", "高级血瓶"]
         hp_choice_box.addItems(self.hp_choice_list)
-        hp_choice_box.setCurrentIndex(self.hp_choice_list.index(self.usersettings.challenge4Level.hp_choice))
-        hp_choice_box.currentIndexChanged.connect(self.hp_choice_box_currentIndexChanged)
+        hp_choice_box.setCurrentIndex(
+            self.hp_choice_list.index(self.usersettings.challenge4Level.hp_choice)
+        )
+        hp_choice_box.currentIndexChanged.connect(
+            self.hp_choice_box_currentIndexChanged
+        )
         hp_choice_layout.addWidget(hp_choice_box)
         hp_choice_widget.setLayout(hp_choice_layout)
 
@@ -409,7 +415,9 @@ class SettingWindow(QMainWindow):
         self.shop_enable_checkbox = shop_enable_checkbox = QCheckBox("商店购买")
         shop_enable_checkbox.setFont(normal_font)
         shop_enable_checkbox.setChecked(self.usersettings.shop_enabled)
-        shop_enable_checkbox.stateChanged.connect(self.shop_enable_checkbox_stateChanged)
+        shop_enable_checkbox.stateChanged.connect(
+            self.shop_enable_checkbox_stateChanged
+        )
         shop_enable_layout.addWidget(shop_enable_checkbox)
         shop_enable_layout.addStretch(1)
         shop_enable_widget.setLayout(shop_enable_layout)
@@ -425,7 +433,9 @@ class SettingWindow(QMainWindow):
         self.usersettings.shop_enabled = self.shop_enable_checkbox.isChecked()
 
     def challenge4level_checkbox_stateChanged(self):
-        self.usersettings.challenge4Level_enabled = self.challenge4level_checkbox.isChecked()
+        self.usersettings.challenge4Level_enabled = (
+            self.challenge4level_checkbox.isChecked()
+        )
 
     def challenge4level_setting_btn_clicked(self):
         self.challenge4level_setting_window = Challenge4level_setting_window(
@@ -713,42 +723,143 @@ class CustomMainWindow(QMainWindow):
         self.function_panel_window.show()
 
 
-import argparse
+class LoginWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.configs = []
+        self.cfg_path = os.path.join(root_dir, "config/config.json")
+        if os.path.exists(self.cfg_path):
+            with open(self.cfg_path, "r", encoding="utf-8") as f:
+                self.configs = json.load(f)
+        self.init_ui()
 
-if __name__ == "__main__":
-    # 设置logging监听等级为INFO
-    logging.basicConfig(level=logging.INFO)  # 如果不想让控制台输出那么多信息，可以将这一行注释掉
+    def init_ui(self):
+        self.resize(500, 400)
+        self.setWindowTitle("登录")
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-r", "--region", default="", help="region")
-    args = parser.parse_args()
-    region = args.region
+        main_widget = QWidget()
+        main_layout = QVBoxLayout()
 
-    abs_file_dir = os.path.dirname(os.path.abspath(__file__))
-    # config_path = os.path.join(abs_file_dir, "config/config.json")
-    config_path = os.path.join(abs_file_dir, f"config/{region}config.json")
-    # data_dir = os.path.join(abs_file_dir, "data")
-    data_dir = os.path.join(abs_file_dir, f"data/{region}")
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+        login_user_widget = QWidget()
+        login_user_layout = QVBoxLayout()
+        login_user_layout.addWidget(QLabel("已登录的用户(双击登录，选中按delete或backspace删除)"))
+        self.login_user_list = login_user_list = QListWidget()
+        login_user_list.itemDoubleClicked.connect(self.login_list_item_double_clicked)
+        login_user_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.refresh_login_user_list()
+        login_user_layout.addWidget(login_user_list)
+        login_user_widget.setLayout(login_user_layout)
+        main_layout.addWidget(login_user_widget)
+
+        username_widget = QWidget()
+        username_layout = QHBoxLayout()
+        username_layout.addWidget(QLabel("用户名:"))
+        self.username_input = username_input = QLineEdit()
+        username_layout.addWidget(username_input)
+        username_widget.setLayout(username_layout)
+        main_layout.addWidget(username_widget)
+
+        region_widget = QWidget()
+        region_layout = QHBoxLayout()
+        region_layout.addWidget(QLabel("区服:"))
+        self.region_input = region_input = QComboBox()
+        region_input.addItems([str(i) for i in range(12, 46 + 1)])
+        region_layout.addWidget(region_input)
+        region_widget.setLayout(region_layout)
+        main_layout.addWidget(region_widget)
+        
+        cookie_widget = QWidget()
+        cookie_layout = QHBoxLayout()
+        cookie_layout.addWidget(QLabel("Cookie:"))
+        self.cookie_input = cookie_input = QLineEdit()
+        cookie_layout.addWidget(cookie_input)
+        cookie_widget.setLayout(cookie_layout)
+        main_layout.addWidget(cookie_widget)
+
+        login_btn = QPushButton("登录")
+        login_btn.clicked.connect(self.login_btn_clicked)
+        main_layout.addWidget(login_btn)
+
+        main_layout.addStretch(1)
+
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+    def login_btn_clicked(self):
+        # 取出当前选中的用户
+        username = self.username_input.text()
+        region = int(self.region_input.currentText())
+        cookie = self.cookie_input.text()
+        cfg = {
+            "username": username,
+            "region": region,
+            "cookie": cookie,
+        }
+        self.configs.append(cfg)
+        self.save_config()
+        self.refresh_login_user_list()
+        # 强制重新渲染login窗口元素
+        QApplication.processEvents()
+        show_main_window(Config(cfg))
+        
+    def login_list_item_double_clicked(self, item):
+        cfg_index = item.data(Qt.ItemDataRole.UserRole)
+        show_main_window(Config(self.configs[cfg_index]))
+        
+    def refresh_login_user_list(self):
+        self.login_user_list.clear()
+        for i, cfg in enumerate(self.configs):
+            item = QListWidgetItem("{}_{}".format(cfg["username"], cfg["region"]))
+            item.setData(Qt.ItemDataRole.UserRole, i)
+            self.login_user_list.addItem(item)
+        
+    def save_config(self):
+        with open(self.cfg_path, "w", encoding="utf-8") as f:
+            json.dump(self.configs, f, indent=4, ensure_ascii=False)
+    
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Backspace or event.key() == Qt.Key.Key_Delete:
+            if len(self.login_user_list.selectedItems()) == 0:
+                return
+            assert len(self.login_user_list.selectedItems()) == 1
+            cfg_index = self.login_user_list.selectedItems()[0].data(Qt.ItemDataRole.UserRole)
+            self.configs.pop(cfg_index)
+            self.save_config()
+            self.refresh_login_user_list()
+
+
+def show_main_window(cfg: Config):
+    data_dir = os.path.join(root_dir, f"data/{cfg.username}/{cfg.region}")
+    os.makedirs(data_dir, exist_ok=True)
     cache_dir = os.path.join(data_dir, "cache")
-    if not os.path.exists(cache_dir):
-        os.mkdir(cache_dir)
+    os.makedirs(cache_dir, exist_ok=True)
     log_dir = os.path.join(data_dir, "log")
-    if not os.path.exists(log_dir):
-        os.mkdir(log_dir)
+    os.makedirs(log_dir, exist_ok=True)
     setting_dir = os.path.join(data_dir, "usersettings")
-    if not os.path.exists(setting_dir):
-        os.mkdir(setting_dir)
+    os.makedirs(setting_dir, exist_ok=True)
 
     max_info_capacity = 10
     # TODO: 从配置文件中读取
     logger = IOLogger(log_dir, max_info_capacity=max_info_capacity)
-    cfg = Config(config_path)
-    app = QApplication(sys.argv)
+    logger_list.append(logger)
     window = CustomMainWindow(cfg, setting_dir, cache_dir, logger)
+    main_window_list.append(window)
     window.show()
+
+
+if __name__ == "__main__":
+    # 设置logging监听等级为INFO
+    logging.basicConfig(level=logging.INFO)  # 如果不想让控制台输出那么多信息，可以将这一行注释掉
+    # 取root_dir为可执行文件的目录
+    root_dir = os.getcwd()
+
+    app = QApplication(sys.argv)
+    logger_list = []
+    main_window_list = []
+    login_window = LoginWindow()
+    login_window.show()
     try:
         sys.exit(app.exec())
     finally:
-        logger.close()
+        for log in logger_list:
+            log.close()

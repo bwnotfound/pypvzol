@@ -385,6 +385,12 @@ class Challenge4Level:
                 d = pickle.load(f)
             for k, v in d.items():
                 setattr(self, k, v)
+        main_plant_list = [self.repo.get_plant(x) for x in self.main_plant_list]
+        main_plant_list.sort(key=lambda x: (x.grade, x.fight, x.name(self.lib)), reverse=True)
+        self.main_plant_list = [x.id for x in main_plant_list]
+        trash_plant_list = [self.repo.get_plant(x) for x in self.trash_plant_list]
+        trash_plant_list.sort(key=lambda x: (x.grade, x.fight, x.name(self.lib)), reverse=True)
+        self.trash_plant_list = [x.id for x in trash_plant_list]
 
 
 
