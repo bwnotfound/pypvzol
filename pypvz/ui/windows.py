@@ -1,4 +1,5 @@
 import logging
+import typing
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -7,6 +8,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QListWidget,
     QListWidgetItem,
+    QTabWidget,
 )
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -437,3 +439,148 @@ class EvolutionPathSetting(QMainWindow):
     def closeEvent(self, event):
         self.refresh_signal.emit()
         return super().closeEvent(event)
+
+
+class AutoUseItemSettingWindow(QMainWindow):
+    def __init__(self, usersettings: UserSettings, parent=None):
+        super().__init__(parent=parent)
+        self.usersettings = usersettings
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("自动使用道具设置")
+
+        # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.5), int(screen_size.height() * 0.5))
+        self.move(int(screen_size.width() * 0.25), int(screen_size.height() * 0.25))
+
+        main_widget = QWidget()
+        main_layout = QHBoxLayout()
+
+        item_list_widget = QWidget()
+        item_list_widget.setFixedWidth(int(self.width() * 0.35))
+        item_list_layout = QVBoxLayout()
+        item_list_layout.addWidget(QLabel("道具列表"))
+
+        self.item_list_tab = item_list_tab = QTabWidget()
+        self.item_list = QListWidget()
+        self.item_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        item_list_tab.addTab(self.item_list, "道具")
+        self.box_list = QListWidget()
+        self.box_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        item_list_tab.addTab(self.box_list, "宝箱")
+        item_list_layout.addWidget(item_list_tab)
+
+        item_list_widget.setLayout(item_list_layout)
+        main_layout.addWidget(item_list_widget)
+        self.refresh_item_list()
+
+        use_item_panel_widget = QWidget()
+        use_item_panel_layout = QVBoxLayout()
+        use_item_panel_layout.addStretch(1)
+
+        self.use_item_all_btn = use_item_all_btn = QPushButton("全部使用")
+        use_item_all_btn.clicked.connect(self.use_item_all_btn_clicked)
+        use_item_panel_layout.addWidget(use_item_all_btn)
+
+        self.auto_use_item_btn = auto_use_item_btn = QPushButton("设为自动使用")
+        auto_use_item_btn.clicked.connect(self.auto_use_item_btn_clicked)
+        use_item_panel_layout.addWidget(auto_use_item_btn)
+
+        use_item_panel_layout.addStretch(1)
+        use_item_panel_widget.setLayout(use_item_panel_layout)
+        main_layout.addWidget(use_item_panel_widget)
+
+        auto_use_item_list_widget = QWidget()
+        auto_use_item_list_widget.setFixedWidth(int(self.width() * 0.35))
+        auto_use_item_list_layout = QVBoxLayout()
+        auto_use_item_list_layout.addWidget(QLabel("自动使用道具列表"))
+        self.auto_use_item_list = QListWidget()
+        self.auto_use_item_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.refresh_auto_use_item_list()
+        auto_use_item_list_layout.addWidget(self.auto_use_item_list)
+        auto_use_item_list_widget.setLayout(auto_use_item_list_layout)
+        main_layout.addWidget(auto_use_item_list_widget)
+
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+    def refresh_item_list(self):
+        self.item_list.clear()
+        for tool in self.usersettings.repo.tools:
+            lib_tool = self.usersettings.lib.get_tool_by_id(tool['id'])
+            item = QListWidgetItem(f"{lib_tool.name}({tool['amount']})")
+            item.setData(Qt.ItemDataRole.UserRole, tool['id'])
+            self.item_list.addItem(item)
+            if lib_tool.type == 3:
+                item = QListWidgetItem(f"{lib_tool.name}({tool['amount']})")
+                item.setData(Qt.ItemDataRole.UserRole, tool['id'])
+                self.box_list.addItem(item)
+
+    def refresh_auto_use_item_list(self):
+        self.auto_use_item_list.clear()
+        for tool_id in self.usersettings.auto_use_item_list:
+            lib_tool = self.usersettings.lib.get_tool_by_id(tool_id)
+            item = QListWidgetItem(f"{lib_tool.name}")
+            item.setData(Qt.ItemDataRole.UserRole, tool_id)
+            self.auto_use_item_list.addItem(item)
+
+    def use_item_all_btn_clicked(self):
+        cur_index = self.item_list_tab.currentIndex()
+        if cur_index == 0:
+            selected_items = self.item_list.selectedItems()
+        elif cur_index == 1:
+            selected_items = self.box_list.selectedItems()
+        else:
+            raise NotImplementedError
+        for item in selected_items:
+            tool_id = item.data(Qt.ItemDataRole.UserRole)
+            repo_tool = self.usersettings.repo.get_tool(tool_id)
+            if repo_tool is None:
+                continue
+            tool_type = self.usersettings.lib.get_tool_by_id(tool_id).type
+            amount = repo_tool['amount']
+            if tool_type == 3:
+                while amount > 10:
+                    result = self.usersettings.repo.open_box(tool_id, 10, self.usersettings.lib)
+                    self.usersettings.logger.log(result['result'])
+                    amount -= 10
+                result = self.usersettings.repo.open_box(tool_id, amount, self.usersettings.lib)
+            else:
+                result = self.usersettings.repo.use_item(tool_id, amount, self.usersettings.lib)
+            self.usersettings.logger.log(result['result'])
+            for i in range(len(self.usersettings.repo.tools)):
+                if self.usersettings.repo.tools[i]['id'] == tool_id:
+                    break
+            else:
+                raise RuntimeError("tool not found")
+            self.usersettings.repo.tools.pop(i)
+        self.usersettings.repo.refresh_repository()
+        self.refresh_item_list()
+
+    def auto_use_item_btn_clicked(self):
+        cur_index = self.item_list_tab.currentIndex()
+        if cur_index == 0:
+            self.usersettings.logger.log("现在只支持自动打开宝箱")
+            return
+        elif cur_index == 1:
+            selected_items = self.box_list.selectedItems()
+        else:
+            raise NotImplementedError
+        for item in selected_items:
+            self.usersettings.auto_use_item_list.append(
+                item.data(Qt.ItemDataRole.UserRole)
+            )
+        self.refresh_auto_use_item_list()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
+            selected_item = self.auto_use_item_list.selectedItems()
+            tool_id_list = [item.data(Qt.ItemDataRole.UserRole) for item in selected_item]
+            self.usersettings.auto_use_item_list = [
+                tool_id
+                for tool_id in self.usersettings.auto_use_item_list
+                if tool_id not in tool_id_list
+            ]
+            self.refresh_auto_use_item_list()

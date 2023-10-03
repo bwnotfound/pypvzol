@@ -34,11 +34,11 @@ from PIL import Image
 from pypvz import WebRequest, Config, User, CaveMan, Repository, Library
 from pypvz.ui.message import IOLogger
 from pypvz.ui.wrapped import QLabel, normal_font
-from pypvz.ui.windows import EvolutionPanelWindow, SetPlantListWindow, AddCaveWindow
+from pypvz.ui.windows import EvolutionPanelWindow, SetPlantListWindow, AddCaveWindow, AutoUseItemSettingWindow
 from pypvz.ui.user import SingleCave, UserSettings
 
 
-class Challenge4level_setting_window(QMainWindow):
+class Challenge4levelSettingWindow(QMainWindow):
     selectd_cave_update = pyqtSignal()
 
     set_plant_list_over = pyqtSignal(list)
@@ -435,6 +435,23 @@ class SettingWindow(QMainWindow):
         daily_task_layout.addStretch(1)
         daily_task_widget.setLayout(daily_task_layout)
         menu_layout.addWidget(daily_task_widget, 2, 0)
+        
+        auto_use_item_widget = QWidget()
+        auto_use_item_layout = QHBoxLayout()
+        self.auto_use_item_checkbox = auto_use_item_checkbox = QCheckBox("自动使用道具")
+        auto_use_item_checkbox.setFont(normal_font)
+        auto_use_item_checkbox.setChecked(self.usersettings.auto_use_item_enabled)
+        auto_use_item_checkbox.stateChanged.connect(
+            self.auto_use_item_checkbox_stateChanged
+        )
+        auto_use_item_layout.addWidget(auto_use_item_checkbox)
+        
+        self.auto_use_item_setting_btn = auto_use_item_setting_btn = QPushButton("道具面板")
+        auto_use_item_setting_btn.clicked.connect(self.auto_use_item_setting_btn_clicked)
+        auto_use_item_layout.addWidget(auto_use_item_setting_btn)
+        auto_use_item_layout.addStretch(1)
+        auto_use_item_widget.setLayout(auto_use_item_layout)
+        menu_layout.addWidget(auto_use_item_widget, 3, 0)
 
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
@@ -447,6 +464,9 @@ class SettingWindow(QMainWindow):
         
     def daily_task_checkbox_stateChanged(self):
         self.usersettings.daily_task_enabled = self.daily_task_checkbox.isChecked()
+        
+    def auto_use_item_checkbox_stateChanged(self):
+        self.usersettings.auto_use_item_enabled = self.auto_use_item_checkbox.isChecked()
 
     def challenge4level_checkbox_stateChanged(self):
         self.usersettings.challenge4Level_enabled = (
@@ -454,10 +474,16 @@ class SettingWindow(QMainWindow):
         )
 
     def challenge4level_setting_btn_clicked(self):
-        self.challenge4level_setting_window = Challenge4level_setting_window(
+        self.challenge4level_setting_window = Challenge4levelSettingWindow(
             self.usersettings, parent=self
         )
         self.challenge4level_setting_window.show()
+        
+    def auto_use_item_setting_btn_clicked(self):
+        self.auto_use_item_setting_window = AutoUseItemSettingWindow(
+            self.usersettings, parent=self
+        )
+        self.auto_use_item_setting_window.show()
 
     def closeEvent(self, a0) -> None:
         self.usersettings.save()

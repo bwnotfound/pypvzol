@@ -212,11 +212,13 @@ class Challenge4Level:
             team.append(plant_id)
             team_grid_amount += width
 
-        trash_plant_list =[self.repo.get_plant(plant_id) for plant_id in self.trash_plant_list]
+        trash_plant_list = [
+            self.repo.get_plant(plant_id) for plant_id in self.trash_plant_list
+        ]
         trash_plant_list = list(filter(lambda x: x is not None, trash_plant_list))
         sorted_grade_trash_plant_list = sorted(
             trash_plant_list,
-            key=lambda x: (x.grade, - x.width(self.lib)),
+            key=lambda x: (x.grade, -x.width(self.lib)),
             reverse=True,
         )
         for plant in sorted_grade_trash_plant_list:
@@ -235,7 +237,9 @@ class Challenge4Level:
         max_attempts = 5
         rest_attempts = max_attempts
         while rest_attempts > 0:
-            success_num, fail_num = self.recoverMan.recover_zero(need_refresh=False, choice=self.hp_choice)
+            success_num, fail_num = self.recoverMan.recover_zero(
+                need_refresh=False, choice=self.hp_choice
+            )
             if fail_num == 0:
                 break
             self.repo.refresh_repository()
@@ -386,13 +390,15 @@ class Challenge4Level:
             for k, v in d.items():
                 setattr(self, k, v)
         main_plant_list = [self.repo.get_plant(x) for x in self.main_plant_list]
-        main_plant_list.sort(key=lambda x: (x.grade, x.fight, x.name(self.lib)), reverse=True)
+        main_plant_list.sort(
+            key=lambda x: (x.grade, x.fight, x.name(self.lib)), reverse=True
+        )
         self.main_plant_list = [x.id for x in main_plant_list]
         trash_plant_list = [self.repo.get_plant(x) for x in self.trash_plant_list]
-        trash_plant_list.sort(key=lambda x: (x.grade, x.fight, x.name(self.lib)), reverse=True)
+        trash_plant_list.sort(
+            key=lambda x: (x.grade, x.fight, x.name(self.lib)), reverse=True
+        )
         self.trash_plant_list = [x.id for x in trash_plant_list]
-
-
 
 
 class UserSettings:
@@ -424,10 +430,10 @@ class UserSettings:
         self.plant_evolution = PlantEvolution(cfg, repo, lib)
         self.task = Task(cfg)
         self.daily_task_enabled = False
+        self.auto_use_item_enabled = False
+        self.auto_use_item_list = []
 
-    def _start(
-        self, stop_channel: Queue, finished_trigger: Queue
-    ):
+    def _start(self, stop_channel: Queue, finished_trigger: Queue):
         logger = self.io_logger.new_logger()
         if self.shop_enabled:
             shop_info = self.shop.buy_default()
@@ -440,6 +446,8 @@ class UserSettings:
                 if task.state == 1:
                     result = self.task.claim_reward(task)
                     logger.log(result['result'])
+        if self.auto_use_item_enabled:
+            self.auto_use_item(stop_channel, logger)
         if self.challenge4Level_enabled:
             self.challenge4Level.auto_challenge(stop_channel, logger=logger)
         finished_trigger.emit()
@@ -464,6 +472,33 @@ class UserSettings:
 
     def remove_cave_challenge4Level(self, cave: Cave):
         self.challenge4Level.remove_cave(cave)
+
+    def auto_use_item(self, stop_channel: Queue, logger):
+        self.repo.refresh_repository()
+        for tool_id in self.auto_use_item_list:
+            if stop_channel.qsize() > 0:
+                break
+            repo_tool = self.repo.get_tool(tool_id)
+            if repo_tool is None:
+                continue
+            tool_type = self.lib.get_tool_by_id(tool_id).type
+            amount = repo_tool['amount']
+            if tool_type == 3:
+                while amount > 10:
+                    result = self.repo.open_box(tool_id, 10, self.lib)
+                    logger.log(result['result'])
+                    amount -= 10
+                result = self.repo.open_box(tool_id, amount, self.lib)
+            else:
+                raise RuntimeError("tool type not supported")
+                # result = self.repo.use_item(tool_id, amount)
+            logger.log(result['result'])
+            for i in range(len(self.repo.tools)):
+                if self.repo.tools[i]['id'] == tool_id:
+                    break
+            else:
+                raise RuntimeError("tool not found")
+            self.repo.tools.pop(i)
 
     def save(self):
         self.challenge4Level.save(self.save_dir)

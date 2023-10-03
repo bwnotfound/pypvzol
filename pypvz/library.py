@@ -36,12 +36,16 @@ class Library:
         self.plants.sort(key=lambda x: x.id)
 
     def get_plant_by_id(self, pid):
+        if isinstance(pid, str):
+            pid = int(pid)
         index = bisect.bisect_left(self.plants, pid, key=lambda x: x.id)
         result = self.plants[index]
         assert result.id == pid
         return result
 
     def get_tool_by_id(self, id):
+        if isinstance(id, str):
+            id = int(id)
         index = bisect.bisect_left(self.tools, id, key=lambda x: x.id)
         result = self.tools[index]
         assert result.id == id
@@ -52,6 +56,7 @@ class Tool:
     def __init__(self, root: Element):
         self.id = int(root.get("id"))
         self.name = root.get("name")
+        self.type = int(root.get("type"))
         self.type_name = root.get("type_name")
         self.sell_price = root.get("sell_price")
         self.use_result = root.get("use_result")
