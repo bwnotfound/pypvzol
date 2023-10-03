@@ -1,13 +1,13 @@
 import sys
 import json
 from io import BytesIO
-import typing
-from PyQt6 import QtGui
 import os
 import logging
 import concurrent.futures
 from queue import Queue
+import threading
 
+from PyQt6 import QtGui
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
 )
 from PyQt6.QtGui import QImage, QPixmap, QFont, QTextCursor
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PIL import Image
 
 from pypvz import WebRequest, Config, User, CaveMan, Repository, Library
@@ -550,50 +550,18 @@ class CustomMainWindow(QMainWindow):
     logger_signal = pyqtSignal()
     finish_trigger = pyqtSignal()
 
-    def __init__(self, cfg: Config, setting_dir, cache_dir, logger: IOLogger):
+    def __init__(self, usersettings: UserSettings, cache_dir):
         super().__init__()
-        self.cfg = cfg
-        self.logger = logger
-
-        results = []
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = []
-            futures.append(executor.submit(User, cfg))
-            futures.append(executor.submit(Library, cfg))
-            futures.append(executor.submit(Repository, cfg))
-
-            for future in futures:
-                results.append(future.result())
-
-        self.user: User = results[0]
-        self.lib: Library = results[1]
-        self.repo: Repository = results[2]
-
-        self.caveMan: CaveMan = CaveMan(cfg, self.lib)
-
-        self.usersettings = UserSettings(
-            cfg,
-            self.repo,
-            self.lib,
-            self.user,
-            self.caveMan,
-            logger,
-            setting_dir,
-        )
-        if not os.path.exists(setting_dir):
-            os.mkdir(setting_dir)
-            self.usersettings.save()
-        else:
-            self.usersettings.load()
-
+        self.usersettings = usersettings
+        
         if not os.path.exists(cache_dir):
             os.mkdir(cache_dir)
-        self.wr_cache = WebRequest(cfg, cache_dir=cache_dir)
+        self.wr_cache = WebRequest(self.usersettings.cfg, cache_dir=cache_dir)
 
         self.init_ui()
 
         self.logger_signal.connect(self.update_text_box)
-        self.logger.set_signal(self.logger_signal)
+        self.usersettings.io_logger.set_signal(self.logger_signal)
         self.finish_trigger.connect(self.run_finished)
 
     def init_ui(self):
@@ -613,7 +581,7 @@ class CustomMainWindow(QMainWindow):
         img = Image.open(
             BytesIO(
                 self.wr_cache.get(
-                    self.user.face_url,
+                    self.usersettings.user.face_url,
                     need_region=False,
                     use_cache=True,
                     init_header=False,
@@ -626,11 +594,11 @@ class CustomMainWindow(QMainWindow):
         user_show_layout.addWidget(QLabel().setPixmap(QPixmap.fromImage(user_face_img)))
 
         user_info_layout = QVBoxLayout()
-        user_info_layout.addWidget(QLabel(f"等级: {self.user.grade}"))
+        user_info_layout.addWidget(QLabel(f"等级: {self.usersettings.user.grade}"))
         user_info_layout.addWidget(
-            QLabel(f"经验值: {self.user.exp_now}/{self.user.exp_max}")
+            QLabel(f"经验值: {self.usersettings.user.exp_now}/{self.usersettings.user.exp_max}")
         )
-        user_info_layout.addWidget(QLabel(self.user.name))
+        user_info_layout.addWidget(QLabel(self.usersettings.user.name))
         user_show_layout.addLayout(user_info_layout)
 
         top_layout.addLayout(user_show_layout)
@@ -654,16 +622,16 @@ class CustomMainWindow(QMainWindow):
         left_layout = QVBoxLayout()
         left_text_layout = QVBoxLayout()
         left_text_layout.setSpacing(5)
-        left_text_layout.addWidget(QLabel(f"金币: {self.user.money}"))
+        left_text_layout.addWidget(QLabel(f"金币: {self.usersettings.user.money}"))
         left_text_layout.addWidget(
-            QLabel(f"今日经验: {self.user.today_exp} / {self.user.today_exp_max}")
+            QLabel(f"今日经验: {self.usersettings.user.today_exp} / {self.usersettings.user.today_exp_max}")
         )
         left_text_layout.addWidget(
-            QLabel(f"挑战次数: {self.user.cave_amount} / {self.user.cave_amount_max}")
+            QLabel(f"挑战次数: {self.usersettings.user.cave_amount} / {self.usersettings.user.cave_amount_max}")
         )
         left_text_layout.addWidget(
             QLabel(
-                f"领地次数: {self.user.territory_amount} / {self.user.territory_amount_max}"
+                f"领地次数: {self.usersettings.user.territory_amount} / {self.usersettings.user.territory_amount_max}"
             )
         )
 
@@ -727,7 +695,7 @@ class CustomMainWindow(QMainWindow):
         self.setWindowTitle("Custom Window")
 
     def update_text_box(self):
-        result = self.logger.get_new_infos()
+        result = self.usersettings.io_logger.get_new_infos()
         document = self.text_box.document()
         # 冻结text_box显示，直到document更新完毕后更新
         self.text_box.viewport().setUpdatesEnabled(False)
@@ -774,6 +742,7 @@ class LoginWindow(QMainWindow):
             with open(self.cfg_path, "r", encoding="utf-8") as f:
                 self.configs = json.load(f)
         self.init_ui()
+        self.main_window_thread = []
 
     def init_ui(self):
         self.resize(500, 400)
@@ -846,12 +815,23 @@ class LoginWindow(QMainWindow):
         self.refresh_login_user_list()
         # 强制重新渲染login窗口元素
         QApplication.processEvents()
-        show_main_window(Config(cfg))
+        self.create_main_window(Config(cfg))
 
     def login_list_item_double_clicked(self, item):
         cfg_index = item.data(Qt.ItemDataRole.UserRole)
-        show_main_window(Config(self.configs[cfg_index]))
-
+        self.create_main_window(Config(self.configs[cfg_index]))
+        
+    def create_main_window(self, cfg: Config):
+        thread = GetUsersettings(cfg, root_dir)
+        thread.finish_trigger.connect(self.get_usersettings_finished)
+        self.main_window_thread.append(thread)
+        thread.start()
+        
+    def get_usersettings_finished(self, args):
+        main_window = CustomMainWindow(*args)
+        main_window_list.append(main_window)
+        main_window.show()
+        
     def refresh_login_user_list(self):
         self.login_user_list.clear()
         for i, cfg in enumerate(self.configs):
@@ -875,24 +855,64 @@ class LoginWindow(QMainWindow):
             self.save_config()
             self.refresh_login_user_list()
 
+class GetUsersettings(QThread):
+    finish_trigger = pyqtSignal(tuple)
+    def __init__(self, cfg: Config, root_dir):
+        super().__init__()
+        self.cfg = cfg
+        self.root_dir = root_dir
+    
+    def run(self):
+        data_dir = os.path.join(self.root_dir, f"data/{self.cfg.username}/{self.cfg.region}")
+        os.makedirs(data_dir, exist_ok=True)
+        cache_dir = os.path.join(data_dir, "cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        log_dir = os.path.join(data_dir, "log")
+        os.makedirs(log_dir, exist_ok=True)
+        setting_dir = os.path.join(data_dir, "usersettings")
+        os.makedirs(setting_dir, exist_ok=True)
 
-def show_main_window(cfg: Config):
-    data_dir = os.path.join(root_dir, f"data/{cfg.username}/{cfg.region}")
-    os.makedirs(data_dir, exist_ok=True)
-    cache_dir = os.path.join(data_dir, "cache")
-    os.makedirs(cache_dir, exist_ok=True)
-    log_dir = os.path.join(data_dir, "log")
-    os.makedirs(log_dir, exist_ok=True)
-    setting_dir = os.path.join(data_dir, "usersettings")
-    os.makedirs(setting_dir, exist_ok=True)
+        max_info_capacity = 10
+        # TODO: 从配置文件中读取
+        logger = IOLogger(log_dir, max_info_capacity=max_info_capacity)
+        logger_list.append(logger)
+        usersettings = get_usersettings(self.cfg, logger, setting_dir)
+        self.finish_trigger.emit((usersettings, cache_dir))
 
-    max_info_capacity = 10
-    # TODO: 从配置文件中读取
-    logger = IOLogger(log_dir, max_info_capacity=max_info_capacity)
-    logger_list.append(logger)
-    window = CustomMainWindow(cfg, setting_dir, cache_dir, logger)
-    main_window_list.append(window)
-    window.show()
+
+def get_usersettings(cfg, logger: IOLogger, setting_dir):
+    results = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = []
+        futures.append(executor.submit(User, cfg))
+        futures.append(executor.submit(Library, cfg))
+        futures.append(executor.submit(Repository, cfg))
+
+        for future in futures:
+            results.append(future.result())
+
+    user: User = results[0]
+    lib: Library = results[1]
+    repo: Repository = results[2]
+
+    caveMan: CaveMan = CaveMan(cfg, lib)
+
+    usersettings = UserSettings(
+        cfg,
+        repo,
+        lib,
+        user,
+        caveMan,
+        logger,
+        setting_dir,
+    )
+    if not os.path.exists(setting_dir):
+        os.mkdir(setting_dir)
+        usersettings.save()
+    else:
+        usersettings.load()
+    
+    return usersettings
 
 
 if __name__ == "__main__":
