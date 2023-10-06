@@ -34,7 +34,14 @@ from PIL import Image
 from pypvz import WebRequest, Config, User, CaveMan, Repository, Library
 from pypvz.ui.message import IOLogger
 from pypvz.ui.wrapped import QLabel, normal_font
-from pypvz.ui.windows import EvolutionPanelWindow, SetPlantListWindow, AddCaveWindow, AutoUseItemSettingWindow
+from pypvz.ui.windows import (
+    EvolutionPanelWindow,
+    SetPlantListWindow,
+    AddCaveWindow,
+    AutoUseItemSettingWindow,
+    UpgradeQualityWindow,
+    ShopAutoBuySetting,
+)
 from pypvz.ui.user import SingleCave, UserSettings
 
 
@@ -419,23 +426,24 @@ class SettingWindow(QMainWindow):
             self.shop_enable_checkbox_stateChanged
         )
         shop_enable_layout.addWidget(shop_enable_checkbox)
+        shop_auto_buy_setting_btn = QPushButton("设置")
+        shop_auto_buy_setting_btn.clicked.connect(self.shop_auto_buy_setting_btn_clicked)
+        shop_enable_layout.addWidget(shop_auto_buy_setting_btn)
         shop_enable_layout.addStretch(1)
         shop_enable_widget.setLayout(shop_enable_layout)
         menu_layout.addWidget(shop_enable_widget, 1, 0)
-        
+
         daily_task_widget = QWidget()
         daily_task_layout = QHBoxLayout()
         self.daily_task_checkbox = daily_task_checkbox = QCheckBox("日常任务领取")
         daily_task_checkbox.setFont(normal_font)
         daily_task_checkbox.setChecked(self.usersettings.daily_task_enabled)
-        daily_task_checkbox.stateChanged.connect(
-            self.daily_task_checkbox_stateChanged
-        )
+        daily_task_checkbox.stateChanged.connect(self.daily_task_checkbox_stateChanged)
         daily_task_layout.addWidget(daily_task_checkbox)
         daily_task_layout.addStretch(1)
         daily_task_widget.setLayout(daily_task_layout)
         menu_layout.addWidget(daily_task_widget, 2, 0)
-        
+
         auto_use_item_widget = QWidget()
         auto_use_item_layout = QHBoxLayout()
         self.auto_use_item_checkbox = auto_use_item_checkbox = QCheckBox("自动使用道具")
@@ -445,9 +453,11 @@ class SettingWindow(QMainWindow):
             self.auto_use_item_checkbox_stateChanged
         )
         auto_use_item_layout.addWidget(auto_use_item_checkbox)
-        
+
         self.auto_use_item_setting_btn = auto_use_item_setting_btn = QPushButton("道具面板")
-        auto_use_item_setting_btn.clicked.connect(self.auto_use_item_setting_btn_clicked)
+        auto_use_item_setting_btn.clicked.connect(
+            self.auto_use_item_setting_btn_clicked
+        )
         auto_use_item_layout.addWidget(auto_use_item_setting_btn)
         auto_use_item_layout.addStretch(1)
         auto_use_item_widget.setLayout(auto_use_item_layout)
@@ -458,15 +468,21 @@ class SettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def shop_auto_buy_setting_btn_clicked(self):
+        self.shop_auto_buy_setting_window = ShopAutoBuySetting(self.usersettings, parent=self)
+        self.shop_auto_buy_setting_window.show()
 
     def shop_enable_checkbox_stateChanged(self):
         self.usersettings.shop_enabled = self.shop_enable_checkbox.isChecked()
-        
+
     def daily_task_checkbox_stateChanged(self):
         self.usersettings.daily_task_enabled = self.daily_task_checkbox.isChecked()
-        
+
     def auto_use_item_checkbox_stateChanged(self):
-        self.usersettings.auto_use_item_enabled = self.auto_use_item_checkbox.isChecked()
+        self.usersettings.auto_use_item_enabled = (
+            self.auto_use_item_checkbox.isChecked()
+        )
 
     def challenge4level_checkbox_stateChanged(self):
         self.usersettings.challenge4Level_enabled = (
@@ -478,7 +494,7 @@ class SettingWindow(QMainWindow):
             self.usersettings, parent=self
         )
         self.challenge4level_setting_window.show()
-        
+
     def auto_use_item_setting_btn_clicked(self):
         self.auto_use_item_setting_window = AutoUseItemSettingWindow(
             self.usersettings, parent=self
@@ -519,7 +535,6 @@ class FunctionPanelWindow(QMainWindow):
         )
         left_layout.addWidget(self.plant_list)
         left_panel.setLayout(left_layout)
-
         main_layout.addWidget(left_panel)
 
         menu_widget = QWidget()
@@ -529,11 +544,21 @@ class FunctionPanelWindow(QMainWindow):
         evolution_panel_btn.clicked.connect(self.evolution_panel_btn_clicked)
         menu_layout.addWidget(evolution_panel_btn, 0, 0)
 
+        upgrade_quality_btn = QPushButton("升品面板")
+        upgrade_quality_btn.clicked.connect(self.upgrade_quality_btn_clicked)
+        menu_layout.addWidget(upgrade_quality_btn, 1, 0)
+
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def upgrade_quality_btn_clicked(self):
+        self.upgrade_quality_window = UpgradeQualityWindow(
+            self.usersettings, parent=self
+        )
+        self.upgrade_quality_window.show()
 
     def evolution_panel_btn_clicked(self):
         self.evolution_panel_window = EvolutionPanelWindow(
@@ -553,7 +578,7 @@ class CustomMainWindow(QMainWindow):
     def __init__(self, usersettings: UserSettings, cache_dir):
         super().__init__()
         self.usersettings = usersettings
-        
+
         if not os.path.exists(cache_dir):
             os.mkdir(cache_dir)
         self.wr_cache = WebRequest(self.usersettings.cfg, cache_dir=cache_dir)
@@ -596,7 +621,9 @@ class CustomMainWindow(QMainWindow):
         user_info_layout = QVBoxLayout()
         user_info_layout.addWidget(QLabel(f"等级: {self.usersettings.user.grade}"))
         user_info_layout.addWidget(
-            QLabel(f"经验值: {self.usersettings.user.exp_now}/{self.usersettings.user.exp_max}")
+            QLabel(
+                f"经验值: {self.usersettings.user.exp_now}/{self.usersettings.user.exp_max}"
+            )
         )
         user_info_layout.addWidget(QLabel(self.usersettings.user.name))
         user_show_layout.addLayout(user_info_layout)
@@ -624,10 +651,14 @@ class CustomMainWindow(QMainWindow):
         left_text_layout.setSpacing(5)
         left_text_layout.addWidget(QLabel(f"金币: {self.usersettings.user.money}"))
         left_text_layout.addWidget(
-            QLabel(f"今日经验: {self.usersettings.user.today_exp} / {self.usersettings.user.today_exp_max}")
+            QLabel(
+                f"今日经验: {self.usersettings.user.today_exp} / {self.usersettings.user.today_exp_max}"
+            )
         )
         left_text_layout.addWidget(
-            QLabel(f"挑战次数: {self.usersettings.user.cave_amount} / {self.usersettings.user.cave_amount_max}")
+            QLabel(
+                f"挑战次数: {self.usersettings.user.cave_amount} / {self.usersettings.user.cave_amount_max}"
+            )
         )
         left_text_layout.addWidget(
             QLabel(
@@ -820,18 +851,18 @@ class LoginWindow(QMainWindow):
     def login_list_item_double_clicked(self, item):
         cfg_index = item.data(Qt.ItemDataRole.UserRole)
         self.create_main_window(Config(self.configs[cfg_index]))
-        
+
     def create_main_window(self, cfg: Config):
         thread = GetUsersettings(cfg, root_dir)
         thread.finish_trigger.connect(self.get_usersettings_finished)
         self.main_window_thread.append(thread)
         thread.start()
-        
+
     def get_usersettings_finished(self, args):
         main_window = CustomMainWindow(*args)
         main_window_list.append(main_window)
         main_window.show()
-        
+
     def refresh_login_user_list(self):
         self.login_user_list.clear()
         for i, cfg in enumerate(self.configs):
@@ -855,15 +886,19 @@ class LoginWindow(QMainWindow):
             self.save_config()
             self.refresh_login_user_list()
 
+
 class GetUsersettings(QThread):
     finish_trigger = pyqtSignal(tuple)
+
     def __init__(self, cfg: Config, root_dir):
         super().__init__()
         self.cfg = cfg
         self.root_dir = root_dir
-    
+
     def run(self):
-        data_dir = os.path.join(self.root_dir, f"data/{self.cfg.username}/{self.cfg.region}")
+        data_dir = os.path.join(
+            self.root_dir, f"data/{self.cfg.username}/{self.cfg.region}"
+        )
         os.makedirs(data_dir, exist_ok=True)
         cache_dir = os.path.join(data_dir, "cache")
         os.makedirs(cache_dir, exist_ok=True)
@@ -911,7 +946,7 @@ def get_usersettings(cfg, logger: IOLogger, setting_dir):
         usersettings.save()
     else:
         usersettings.load()
-    
+
     return usersettings
 
 

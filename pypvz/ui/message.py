@@ -1,4 +1,5 @@
 from time import localtime, strftime, sleep
+import logging
 from queue import Queue
 from collections import deque
 import threading
@@ -16,8 +17,10 @@ class Logger:
         result += msg
         return result
 
-    def log(self, msg: str):
+    def log(self, msg: str, log_info=True):
         self._info_channel.put(self._log_str_format(msg))
+        if log_info:
+            logging.info(msg)
 
 
 class _IOLoggerThread(threading.Thread):

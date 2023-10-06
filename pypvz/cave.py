@@ -15,7 +15,15 @@ class Cave:
     cave_id: int  # 服务器中每个人洞口的唯一标识
     '''
 
-    def __init__(self, root: Union[Element, dict], user_id=None, type=None, layer=None, number=None, **kwargs):
+    def __init__(
+        self,
+        root: Union[Element, dict],
+        user_id=None,
+        type=None,
+        layer=None,
+        number=None,
+        **kwargs,
+    ):
         self.type = type
         if type <= 3:
             assert isinstance(root, Element)
@@ -52,7 +60,9 @@ class Cave:
                 type_name_list[self.type - 1],
                 self.layer,
                 self.number,
-                "({})".format(difficulty_name_list[difficulty - 1]) if (difficulty is not None) else "",
+                "({})".format(difficulty_name_list[difficulty - 1])
+                if (difficulty is not None)
+                else "",
                 self.name,
             )
         elif self.type == 4:
@@ -81,7 +91,7 @@ class CaveMan:
         self.lib = lib
         self.wr = WebRequest(cfg)
 
-    def get_caves(self, id, type, layer: int=None):
+    def get_caves(self, id, type, layer: int = None):
         """
         Args:
             id (int): user's id. not platform id
@@ -128,7 +138,10 @@ class CaveMan:
             response = resp_ev["/1"]
             body = response.body
             if response.status == 0:
-                return [Cave(cave, type=4, layer=i+1, chapter_id=id) for i, cave in enumerate(body['caves'])]
+                return [
+                    Cave(cave, type=4, layer=i + 1, chapter_id=id)
+                    for i, cave in enumerate(body['caves'])
+                ]
             elif response.status == 1:
                 raise NotImplementedError
             else:
@@ -156,7 +169,7 @@ class CaveMan:
             target_amf = 'api.stone.challenge'
         else:
             raise NotImplementedError
-            
+
         req = remoting.Request(
             target=target_amf,
             body=[
@@ -181,4 +194,25 @@ class CaveMan:
             return {"success": False, "result": response.body}
         else:
             raise NotImplementedError
-            
+        
+    def get_garden_cave(self, id):
+        url = f"http://s{self.cfg.region}.youkia.pvz.youkia.com/pvz/index.php/garden/index/id/{id}/sig/0"
+        resp = self.wr.get(url, need_region=False)
+        root = fromstring(resp.decode("utf-8"))
+        garden_cave_item = root.find("garden").find("monster").find("mon")
+        if garden_cave_item is None:
+            return None
+        return GardenCave(garden_cave_item, self.lib)
+
+
+class GardenCave:
+    def __init__(self, root, lib: Library):
+        self.id = int(root['id'])
+        self.monster_id = int(root['monid'])
+        self.plant_id = int(root['pid'])
+        self.name = root['name']
+        self.owner_id = int(root['owid'])
+        self.reward = [
+            lib.get_tool_by_id(int(tool_id)) for tool_id in root['reward'].split(",")
+        ]
+        # monster = root.find("read").find("org")

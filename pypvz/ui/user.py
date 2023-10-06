@@ -427,16 +427,18 @@ class UserSettings:
         self.shop_enabled = False
 
         self.shop = Shop(cfg)
+        self.shop_auto_buy_list = set()
         self.plant_evolution = PlantEvolution(cfg, repo, lib)
         self.task = Task(cfg)
         self.daily_task_enabled = False
         self.auto_use_item_enabled = False
         self.auto_use_item_list = []
+        self.garden_cave_list = []
 
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
         logger = self.io_logger.new_logger()
         if self.shop_enabled:
-            shop_info = self.shop.buy_default()
+            shop_info = self.shop.buy_list(list(self.shop_auto_buy_list), 1)
             for good_p_id, amount in shop_info:
                 logger.log(f"购买了{amount}个{self.lib.get_tool_by_id(good_p_id).name}")
             logger.log("购买完成")
@@ -509,6 +511,9 @@ class UserSettings:
                     "challenge4Level_enabled": self.challenge4Level_enabled,
                     "shop_enabled": self.shop_enabled,
                     "daily_task_enabled": self.daily_task_enabled,
+                    "shop_auto_buy_list": self.shop_auto_buy_list,
+                    "auto_use_item_list": self.auto_use_item_list,
+                    "garden_cave_list": self.garden_cave_list,
                 },
                 f,
             )

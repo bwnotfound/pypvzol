@@ -1,4 +1,5 @@
 from xml.etree.ElementTree import Element, fromstring
+import logging
 
 
 from .web import WebRequest
@@ -64,6 +65,15 @@ class User:
             "http://s{}.youkia.pvz.youkia.com/pvz/index.php/default/user/sig/0"
         )
         root = fromstring(resp.decode("utf-8"))
+        # try:
+        #     root = fromstring(resp.decode("utf-8"))
+        # except Exception as e:
+        #     logging.error(
+        #         "-----Refresh user failed: \n{}. \n-----Exception Stack: \n{}".format(
+        #             resp.decode("utf-8"), str(e)
+        #         )
+        #     )
+        #     raise e
         self.friendMan.refresh(root)
 
         user = root.find("user")

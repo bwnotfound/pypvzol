@@ -32,23 +32,19 @@ class Library:
         plants = fromstring(resp.decode("utf-8")).find("organisms")
         self.plants = [Plant(item) for item in plants]
 
-        self.tools.sort(key=lambda x: x.id)
-        self.plants.sort(key=lambda x: x.id)
+        self.tools = {tool.id: tool for tool in self.tools}
+        self.plants = {plant.id: plant for plant in self.plants}
 
     def get_plant_by_id(self, pid):
         if isinstance(pid, str):
             pid = int(pid)
-        index = bisect.bisect_left(self.plants, pid, key=lambda x: x.id)
-        result = self.plants[index]
-        assert result.id == pid
+        result = self.plants.get(pid, None)
         return result
 
     def get_tool_by_id(self, id):
         if isinstance(id, str):
             id = int(id)
-        index = bisect.bisect_left(self.tools, id, key=lambda x: x.id)
-        result = self.tools[index]
-        assert result.id == id
+        result = self.tools.get(id, None)
         return result
 
 
