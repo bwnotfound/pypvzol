@@ -690,11 +690,11 @@ class CustomMainWindow(QMainWindow):
         )
         function_panel_open_layout.addWidget(function_panel_open_button)
         left_layout.addLayout(function_panel_open_layout)
+        
+        refresh_repository_btn = QPushButton("刷新仓库")
+        refresh_repository_btn.clicked.connect(self.refresh_repository_btn)
+        left_layout.addWidget(refresh_repository_btn)
 
-        # # List Widget
-        # list_widget = QListWidget()
-        # list_widget.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
-        # left_layout.addWidget(list_widget)
         left_layout.addStretch(1)
 
         left_layout.setSpacing(10)
@@ -744,6 +744,10 @@ class CustomMainWindow(QMainWindow):
 
     def run_finished(self):
         self.process_button.setText("开始")
+
+    def refresh_repository_btn(self):
+        self.usersettings.repo.refresh_repository()
+        self.usersettings.logger.log("仓库刷新完成")
 
     def process_button_clicked(self):
         if self.process_button.text() == "开始":

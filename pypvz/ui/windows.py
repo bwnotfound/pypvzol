@@ -1,5 +1,5 @@
 import logging
-import typing
+import concurrent.futures
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -14,13 +14,14 @@ from PyQt6.QtWidgets import (
     QCheckBox,
 )
 from PyQt6 import QtGui
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QThread
 
 from ..repository import Repository
 from ..library import Library
 from .wrapped import QLabel
 from .user import UserSettings
 from ..upgrade import UpgradeMan
+from .message import Logger
 
 
 class SetPlantListWindow(QMainWindow):
@@ -696,11 +697,14 @@ class ChallengeGardenCaveSetting(QMainWindow):
 
 
 class UpgradeQualityWindow(QMainWindow):
+    upgrade_finished_signal = pyqtSignal(int)
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
         self.usersettings = usersettings
         self.upgradeMan = UpgradeMan(self.usersettings.cfg)
         self.init_ui()
+        self.upgrade_thread = None
+        self.upgrade_finished_signal.connect(self.upgrade_finished)
 
     def init_ui(self):
         self.setWindowTitle("升级品质")
@@ -718,7 +722,7 @@ class UpgradeQualityWindow(QMainWindow):
         plant_list_layout = QVBoxLayout()
         plant_list_layout.addWidget(QLabel("植物列表"))
         self.plant_list = QListWidget()
-        self.plant_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.plant_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         plant_list_layout.addWidget(self.plant_list)
         plant_list_widget.setLayout(plant_list_layout)
         main_layout.addWidget(plant_list_widget)
@@ -753,30 +757,66 @@ class UpgradeQualityWindow(QMainWindow):
             self.plant_list.addItem(item)
 
     def upgrade_quality_btn_clicked(self):
-        cur_item = self.plant_list.currentItem()
-        if cur_item is None:
+        if self.upgrade_thread is not None:
+            self.usersettings.logger.log("正在升级品质，请稍后再试")
+        selected_items = self.plant_list.selectedItems()
+        if len(selected_items) == 0:
             logging.info("请先选择一个植物")
             self.usersettings.logger.log("请先选择一个植物")
             return
-        plant_id = cur_item.data(Qt.ItemDataRole.UserRole)
-        target_index = self.upgradeMan.quality_name.index(
-            self.upgrade_quality_choice.currentText()
-        )
-        show_all_info = self.show_all_info.isChecked()
-        while True:
-            result = self.upgradeMan.upgrade_quality(plant_id)
-            logging.info(result['result'])
-            if show_all_info:
-                self.usersettings.logger.log(result['result'])
-            if result['success']:
-                cur_quality_index = self.upgradeMan.quality_name.index(
-                    result['quality_name']
+        selected_plant_id = [
+            item.data(Qt.ItemDataRole.UserRole) for item in selected_items
+        ]
+        need_show_all_info = self.show_all_info.isChecked()
+        args = []
+        for plant_id in selected_plant_id:
+            args.append(
+                (
+                    plant_id,
+                    self.upgradeMan.quality_name.index(
+                        self.upgrade_quality_choice.currentText()
+                    ),
+                    need_show_all_info,
+                    self.upgradeMan,
+                    self.usersettings.logger,
                 )
-                if cur_quality_index >= target_index:
-                    self.usersettings.logger.log(result['result'])
-                    break
+            )
+        self.upgrade_thread = UpgradeQualityThread(
+            args, self.upgrade_finished_signal, self
+        )
+        self.upgrade_thread.start()
+        
+    def upgrade_finished(self, length):
+        self.usersettings.logger.log(f"升级品质完成，共升级{length}个植物")
+        self.upgrade_thread = None
+        
+def _upgrade_quality(args):
+    plant_id, target_index, show_all_info, upgradeMan, logger = args
+    while True:
+        result = upgradeMan.upgrade_quality(plant_id)
+        logging.info(result['result'])
+        if show_all_info:
+            logger.log(result['result'], False)
+        if result['success']:
+            cur_quality_index = upgradeMan.quality_name.index(
+                result['quality_name']
+            )
+            if cur_quality_index >= target_index:
+                logger.log(result['result'])
+                break
 
-
+class UpgradeQualityThread(QThread):
+    def __init__(self, arg_list, finish_signal, parent=None):
+        super().__init__(parent=parent)
+        self.arg_list = arg_list
+        self.finish_signal = finish_signal
+        
+    def run(self):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            result = executor.map(_upgrade_quality, self.arg_list)
+        length = len(list(result))
+        self.finish_signal.emit(length)
+        
 class ShopAutoBuySetting(QMainWindow):
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
@@ -818,18 +858,16 @@ class ShopAutoBuySetting(QMainWindow):
         set_auto_buy_btn = QPushButton("设为自动购买")
         set_auto_buy_btn.clicked.connect(self.set_auto_buy_btn_clicked)
         btn_panel_layout.addWidget(set_auto_buy_btn)
-        
+
         btn_panel_widget.setLayout(btn_panel_layout)
         main_layout.addWidget(btn_panel_widget)
-        
+
         auto_buy_list_widget = QWidget()
         auto_buy_list_widget.setFixedWidth(int(self.width() * 0.35))
         auto_buy_list_layout = QVBoxLayout()
         auto_buy_list_layout.addWidget(QLabel("自动购买列表"))
         self.auto_buy_list = QListWidget()
-        self.auto_buy_list.setSelectionMode(
-            QListWidget.SelectionMode.ExtendedSelection
-        )
+        self.auto_buy_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         auto_buy_list_layout.addWidget(self.auto_buy_list)
         auto_buy_list_widget.setLayout(auto_buy_list_layout)
         main_layout.addWidget(auto_buy_list_widget)
@@ -888,7 +926,7 @@ class ShopAutoBuySetting(QMainWindow):
         for good_id in selected_items_id:
             self.usersettings.shop_auto_buy_list.add(good_id)
         self.refresh_auto_buy_list()
-            
+
     def refresh_auto_buy_list(self):
         self.auto_buy_list.clear()
         for good_id in self.usersettings.shop_auto_buy_list:
@@ -909,7 +947,7 @@ class ShopAutoBuySetting(QMainWindow):
                 self.usersettings.logger.log(f"未知的商店商品类型:{good.type}")
                 logging.info(f"未知的商店商品类型:{good.type}")
                 raise NotImplementedError(f"未知的商店商品类型:{good.type}")
-            
+
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
             selected_items = self.auto_buy_list.selectedItems()

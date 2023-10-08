@@ -20,6 +20,8 @@ class UpgradeMan:
             "战神",
             "至尊",
             "魔神",
+            "耀世",
+            "不朽",
         ]
 
     def upgrade_quality(self, plant_id):
@@ -39,7 +41,14 @@ class UpgradeMan:
             resp_ev = remoting.decode(resp)
             response = resp_ev["/1"]
             if response.status != 0:
-                result["result"] = str(response.body)
+                if response.body.description == "Error:t0004":
+                    result["success"] = True
+                    result["result"] = "升品失败，大概率是已经升到魔神了"
+                    result["quality_name"] = "魔神"
+                else:
+                    result["success"] = True
+                    result["result"] = "升品失败，未知错误，当做升级为魔神了。如有需要请重新尝试"
+                    result["quality_name"] = "魔神"
             else:
                 try:
                     result['success'] = True
