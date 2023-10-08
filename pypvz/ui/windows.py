@@ -21,7 +21,6 @@ from ..library import Library
 from .wrapped import QLabel
 from .user import UserSettings
 from ..upgrade import UpgradeMan
-from .message import Logger
 
 
 class SetPlantListWindow(QMainWindow):
@@ -732,7 +731,7 @@ class UpgradeQualityWindow(QMainWindow):
         for quality_name in self.upgradeMan.quality_name:
             self.upgrade_quality_choice.addItem(quality_name)
         self.upgrade_quality_choice.setCurrentIndex(
-            len(self.upgradeMan.quality_name) - 1
+            self.upgradeMan.quality_name.index("魔神")
         )
         main_layout.addWidget(self.upgrade_quality_choice)
 

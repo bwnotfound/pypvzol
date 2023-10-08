@@ -966,7 +966,10 @@ if __name__ == "__main__":
     main_window_list = []
     login_window = LoginWindow()
     login_window.show()
-    app_return = app.exec()
+    try:
+        app_return = app.exec()
+    except Exception as e:
+        print(str(e))
     for log in logger_list:
         log.close()
     os.system("pause")
