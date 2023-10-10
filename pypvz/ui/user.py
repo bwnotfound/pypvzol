@@ -59,6 +59,8 @@ class Challenge4Level:
         self.pop_after_100 = False
         self.pop_grade = 100
         self.auto_use_challenge_book = False
+        self.normal_challenge_book_amount = 1
+        self.advanced_challenge_book_amount = 1
 
     def add_cave(self, cave: Cave, friend_ids=None, difficulty=1, enabled=True):
         # 这里的cave需要的是cave的id属性，不是cave_id
@@ -156,19 +158,20 @@ class Challenge4Level:
             if not success:
                 if "狩猎场挑战次数已达上限" in result and self.auto_use_challenge_book:
                     use_result = self.repo.use_item(
-                        self.lib.name2tool["高级挑战书"].id, 1, self.lib
+                        self.lib.name2tool["高级挑战书"].id, self.advanced_challenge_book_amount, self.lib
                     )
                     if use_result["success"]:
                         logger.log(use_result["result"])
                         continue
                     use_result = self.repo.use_item(
-                        self.lib.name2tool["挑战书"].id, 1, self.lib
+                        self.lib.name2tool["挑战书"].id, self.normal_challenge_book_amount, self.lib
                     )
                     if use_result["success"]:
                         logger.log(use_result["result"])
                         continue
                 if "频繁" in result:
                     time.sleep(1)
+                    logger.log("挑战过于频繁，选择等待1秒后重试")
                     continue
                 message = message + " 失败. 原因: {}.".format(
                     result,
@@ -406,6 +409,8 @@ class Challenge4Level:
                     "hp_choice": self.hp_choice,
                     "pop_after_100": self.pop_after_100,
                     "auto_use_challenge_book": self.auto_use_challenge_book,
+                    "normal_challenge_book_amount": self.normal_challenge_book_amount,
+                    "advanced_challenge_book_amount": self.advanced_challenge_book_amount,
                 },
                 f,
             )

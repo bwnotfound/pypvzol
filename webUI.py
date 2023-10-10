@@ -222,7 +222,7 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         widget2 = QWidget()
         widget2_layout = QHBoxLayout()
-        widget2_layout.addWidget(QLabel("自动使用挑战书(包括高挑):"))
+        widget2_layout.addWidget(QLabel("自动使用挑战书(优先高挑):"))
         self.auto_use_challenge_book_checkbox = QCheckBox()
         self.auto_use_challenge_book_checkbox.setChecked(
             self.usersettings.challenge4Level.auto_use_challenge_book
@@ -233,6 +233,36 @@ class Challenge4levelSettingWindow(QMainWindow):
         widget2_layout.addWidget(self.auto_use_challenge_book_checkbox)
         widget2.setLayout(widget2_layout)
         right_panel_layout.addWidget(widget2)
+        
+        widget3 = QWidget()
+        widget3_layout = QHBoxLayout()
+        widget3_layout.addWidget(QLabel("一次使用多少高挑:"))
+        self.use_advanced_challenge_book_count_box = QComboBox()
+        self.use_advanced_challenge_book_count_box.addItems([str(i) for i in range(1, 25+1)])
+        self.use_advanced_challenge_book_count_box.setCurrentIndex(
+            self.usersettings.challenge4Level.advanced_challenge_book_amount - 1
+        )
+        self.use_advanced_challenge_book_count_box.currentIndexChanged.connect(
+            self.use_advanced_challenge_book_count_box_currentIndexChanged
+        )
+        widget3_layout.addWidget(self.use_advanced_challenge_book_count_box)
+        widget3.setLayout(widget3_layout)
+        right_panel_layout.addWidget(widget3)
+        
+        widget4 = QWidget()
+        widget4_layout = QHBoxLayout()
+        widget4_layout.addWidget(QLabel("一次使用多少挑战书:"))
+        self.use_normal_challenge_book_count_box = QComboBox()
+        self.use_normal_challenge_book_count_box.addItems([str(i) for i in range(1, 25+1)])
+        self.use_normal_challenge_book_count_box.setCurrentIndex(
+            self.usersettings.challenge4Level.normal_challenge_book_amount - 1
+        )
+        self.use_normal_challenge_book_count_box.currentIndexChanged.connect(
+            self.use_normal_challenge_book_count_box_currentIndexChanged
+        )
+        widget4_layout.addWidget(self.use_normal_challenge_book_count_box)
+        widget4.setLayout(widget4_layout)
+        right_panel_layout.addWidget(widget4)
 
         right_panel.setLayout(right_panel_layout)
         main_layout.addWidget(right_panel)
@@ -245,6 +275,16 @@ class Challenge4levelSettingWindow(QMainWindow):
 
     def pop_checkbox_stateChanged(self):
         self.usersettings.challenge4Level.pop_after_100 = self.pop_checkbox.isChecked()
+        
+    def use_normal_challenge_book_count_box_currentIndexChanged(self):
+        self.usersettings.challenge4Level.normal_challenge_book_amount = (
+            self.use_normal_challenge_book_count_box.currentIndex() + 1
+        )
+    
+    def use_advanced_challenge_book_count_box_currentIndexChanged(self):
+        self.usersettings.challenge4Level.advanced_challenge_book_amount = (
+            self.use_advanced_challenge_book_count_box.currentIndex() + 1
+        )
 
     def auto_use_challenge_book_checkbox_stateChanged(self):
         self.usersettings.challenge4Level.auto_use_challenge_book = (
