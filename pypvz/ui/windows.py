@@ -276,7 +276,10 @@ class EvolutionPanelWindow(QMainWindow):
 
     @property
     def current_evolution_path_index(self):
-        selected_data = [item.data(Qt.ItemDataRole.UserRole) for item in self.evolution_path_list.selectedItems()]
+        selected_data = [
+            item.data(Qt.ItemDataRole.UserRole)
+            for item in self.evolution_path_list.selectedItems()
+        ]
         if len(selected_data) == 0:
             return None
         return selected_data[0]
@@ -1241,8 +1244,13 @@ class AutoSynthesisWindow(QMainWindow):
         self.refresh_all()
 
     def auto_synthesis_btn_clicked(self):
-        while len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id) > 0:
+        length = len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id)
+        while (
+            not (len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id) == 0)
+            and length > 0
+        ):
             self.auto_synthesis_single_btn_clicked(need_check=False)
+            length -= 1
         self.usersettings.auto_synthesis_man.check_data()
         self.refresh_all()
         self.usersettings.logger.log("合成完成")
