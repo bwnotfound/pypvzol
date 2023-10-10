@@ -1235,14 +1235,17 @@ class AutoSynthesisWindow(QMainWindow):
         self.usersettings.auto_synthesis_man.main_plant_id = None
         self.refresh_main_plant_text_box()
         self.refresh_plant_list()
-
-    def auto_synthesis_single_btn_clicked(self, need_check=True):
+        
+    def single_synthesis(self, need_check=True):
         result = self.usersettings.auto_synthesis_man.synthesis()
         self.usersettings.logger.log(result['result'])
-        if not result['success'] or need_check:
+        if (not result['success']) or need_check:
             self.usersettings.auto_synthesis_man.check_data()
         self.refresh_all()
         return result
+
+    def auto_synthesis_single_btn_clicked(self):
+        return self.single_synthesis()
 
     def auto_synthesis_btn_clicked(self):
         length = len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id)
@@ -1250,7 +1253,7 @@ class AutoSynthesisWindow(QMainWindow):
             not (len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id) == 0)
             and length > 0
         ):
-            result = self.auto_synthesis_single_btn_clicked(need_check=False)
+            result = self.single_synthesis(need_check=False)
             if "增强卷轴数量不足10个" in result['result']:
                 break
             length -= 1

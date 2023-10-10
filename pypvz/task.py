@@ -1,7 +1,8 @@
 import re
+import logging
 from typing import Literal
 
-from pyamf import remoting, AMF0
+from pyamf import remoting, AMF0, DecodeError
 
 from . import Config, WebRequest
 
@@ -32,16 +33,23 @@ class Task:
         self.cfg = cfg
         self.wr = WebRequest(cfg)
 
-    def refresh_task(self):
+    def refresh_task(self, retry=True):
         body = []
         req = remoting.Request(target='api.duty.getAll', body=body)
         ev = remoting.Envelope(AMF0)
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
-        resp = self.wr.post(
-            "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-        )
-        resp_ev = remoting.decode(resp)
+        while True:
+            resp = self.wr.post(
+                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+            )
+            try:
+                resp_ev = remoting.decode(resp)
+                break
+            except DecodeError:
+                if not retry:
+                    break
+            logging.info("重新尝试请求刷新任务")
         response = resp_ev["/1"]
         if response.status == 0:
             pass
@@ -55,16 +63,23 @@ class Task:
         self.daily_task = [TaskItem(r, 3) for r in body['dailyTask']]
         self.active_task = [TaskItem(r, 4) for r in body['activeTask']]
 
-    def claim_reward(self, task_item: TaskItem):
+    def claim_reward(self, task_item: TaskItem, retry=True):
         body = [float(task_item.id), float(task_item.choice)]
         req = remoting.Request(target='api.duty.reward', body=body)
         ev = remoting.Envelope(AMF0)
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
-        resp = self.wr.post(
-            "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-        )
-        resp_ev = remoting.decode(resp)
+        while True:
+            resp = self.wr.post(
+                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+            )
+            try:
+                resp_ev = remoting.decode(resp)
+                break
+            except DecodeError:
+                if not retry:
+                    break
+            logging.info("重新尝试请求领取任务奖励")
         response = resp_ev["/1"]
         if response.status == 0:
             pass

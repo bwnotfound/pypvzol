@@ -1,8 +1,8 @@
 import time
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import pyamf
-from pyamf import remoting
+from pyamf import remoting, AMF0, DecodeError
 
 from .. import Config, WebRequest, Repository
 # from ..config import Config
@@ -23,16 +23,23 @@ class RecoverMan:
             "高级血瓶": 15,
         }
 
-    def recover(self, target_id, choice='中级血瓶'):
+    def recover(self, target_id, choice='中级血瓶', retry=True):
         body = [float(target_id), float(self.heal_dict[choice])]
         req = remoting.Request(target='api.apiorganism.refreshHp', body=body)
-        ev = remoting.Envelope(pyamf.AMF0)
+        ev = remoting.Envelope(AMF0)
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
-        resp = self.wr.post(
-            "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-        )
-        resp_ev = remoting.decode(resp)
+        while True:
+            resp = self.wr.post(
+                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+            )
+            try:
+                resp_ev = remoting.decode(resp)
+                break
+            except DecodeError:
+                if not retry:
+                    break
+            logging.info("重新尝试请求回复植物血量")
         response = resp_ev["/1"]
         if response.status == 0:
             return {"success": True, "result": int(response.body)} 

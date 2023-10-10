@@ -1,8 +1,8 @@
 from xml.etree.ElementTree import Element, fromstring
 from typing import Union
+import logging
 
-import pyamf
-from pyamf import remoting
+from pyamf import remoting, AMF0, DecodeError
 
 from .web import WebRequest
 from .library import Library
@@ -91,7 +91,7 @@ class CaveMan:
         self.lib = lib
         self.wr = WebRequest(cfg)
 
-    def get_caves(self, id, type, layer: int = None):
+    def get_caves(self, id, type, layer: int = None, retry=True):
         """
         Args:
             id (int): user's id. not platform id
@@ -128,13 +128,20 @@ class CaveMan:
             assert layer is None
             body = [float(id)]
             req = remoting.Request(target='api.stone.getCaveInfo', body=body)
-            ev = remoting.Envelope(pyamf.AMF0)
+            ev = remoting.Envelope(AMF0)
             ev['/1'] = req
             bin_msg = remoting.encode(ev, strict=True)
-            resp = self.wr.post(
-                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-            )
-            resp_ev = remoting.decode(resp)
+            while True:
+                resp = self.wr.post(
+                    "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+                )
+                try:
+                    resp_ev = remoting.decode(resp)
+                    break
+                except DecodeError:
+                    if not retry:
+                        break
+                logging.info("重新尝试获取矿洞信息")
             response = resp_ev["/1"]
             body = response.body
             if response.status == 0:
@@ -147,7 +154,7 @@ class CaveMan:
             else:
                 raise NotImplementedError
 
-    def challenge(self, cave_id, plant_list: list[int], difficulty, type):
+    def challenge(self, cave_id, plant_list: list[int], difficulty, type, retry=True):
         """
         Challenge a cave.
 
@@ -178,20 +185,27 @@ class CaveMan:
                 float(difficulty),
             ],
         )
-        ev = remoting.Envelope(pyamf.AMF0)
+        ev = remoting.Envelope(AMF0)
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
-        resp = self.wr.post(
-            "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-        )
-        resp_ev = remoting.decode(resp)
+        while True:
+            resp = self.wr.post(
+                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+            )
+            try:
+                resp_ev = remoting.decode(resp)
+                break
+            except DecodeError:
+                if not retry:
+                    break
+            logging.info("重新尝试请求洞口挑战")
         response = resp_ev["/1"]
         if response.status == 0:
             # onResult
             return {"success": True, "result": response.body}
         elif response.status == 1:
             # onStatus
-            return {"success": False, "result": response.body}
+            return {"success": False, "result": response.body.description}
         else:
             raise NotImplementedError
         

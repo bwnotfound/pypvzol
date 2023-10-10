@@ -1,6 +1,7 @@
 from xml.etree.ElementTree import Element, fromstring
+import logging
 
-from pyamf import remoting, AMF0
+from pyamf import remoting, AMF0, DecodeError
 
 from .config import Config
 from .web import WebRequest
@@ -96,16 +97,43 @@ class Repository:
         tool = self.id2tool.get(id, None)
         return tool
 
-    def _use_tool(self, tool_id, amount):
+    def _open_box(self, tool_id, amount, retry=True):
         body = [float(tool_id), float(amount)]
         req = remoting.Request(target='api.reward.openbox', body=body)
         ev = remoting.Envelope(AMF0)
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
-        resp = self.wr.post(
-            "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-        )
-        resp_ev = remoting.decode(resp)
+        while True:
+            resp = self.wr.post(
+                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+            )
+            try:
+                resp_ev = remoting.decode(resp)
+                break
+            except DecodeError:
+                if not retry:
+                    break
+            logging.info("重新尝试请求打开宝箱")
+        response = resp_ev["/1"]
+        return response
+    
+    def _use_item(self, tool_id, amount, retry=True):
+        body = [float(tool_id), float(amount)]
+        req = remoting.Request(target='api.tool.useOf', body=body)
+        ev = remoting.Envelope(AMF0)
+        ev['/1'] = req
+        bin_msg = remoting.encode(ev, strict=True)
+        while True:
+            resp = self.wr.post(
+                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+            )
+            try:
+                resp_ev = remoting.decode(resp)
+                break
+            except DecodeError:
+                if not retry:
+                    break
+            logging.info("重新尝试请求使用物品")
         response = resp_ev["/1"]
         return response
 
@@ -114,17 +142,20 @@ class Repository:
             tool_id = int(tool_id)
         if isinstance(amount, str):
             amount = int(amount)
-        response = self._use_tool(tool_id, amount)
+        response = self._use_item(tool_id, amount)
         if response.status == 0:
-            pass
+            return {
+                "success": True,
+                "result": "使用了{}个{}".format(amount, lib.get_tool_by_id(tool_id).name),
+            }
         elif response.status == 1:
-            raise NotImplementedError
+            return {
+                "success": False,
+                "result": response.body.description,
+            }
         else:
             raise NotImplementedError
-        return {
-            "success": True,
-            "result": "使用了{}个{}".format(amount, lib.get_tool_by_id(tool_id).name),
-        }
+        
 
     def open_box(self, tool_id, amount, lib: Library):
         if isinstance(tool_id, str):
@@ -132,7 +163,7 @@ class Repository:
         if isinstance(amount, str):
             amount = int(amount)
         amount = max(amount, 10)
-        response = self._use_tool(tool_id, amount)
+        response = self._open_box(tool_id, amount)
         if response.status == 0:
             pass
         elif response.status == 1:

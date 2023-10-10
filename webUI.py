@@ -196,7 +196,6 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         hp_choice_widget = QWidget()
         hp_choice_layout = QHBoxLayout()
-
         hp_choice_layout.addWidget(QLabel("血瓶选择:"))
         hp_choice_box = QComboBox()
         self.hp_choice_list = ["低级血瓶", "中级血瓶", "高级血瓶"]
@@ -209,8 +208,28 @@ class Challenge4levelSettingWindow(QMainWindow):
         )
         hp_choice_layout.addWidget(hp_choice_box)
         hp_choice_widget.setLayout(hp_choice_layout)
-
         right_panel_layout.addWidget(hp_choice_widget)
+
+        widget1 = QWidget()
+        widget1_layout = QHBoxLayout()
+        widget1_layout.addWidget(QLabel("100级后弹出:"))
+        self.pop_checkbox = QCheckBox()
+        self.pop_checkbox.setChecked(self.usersettings.challenge4Level.pop_after_100)
+        self.pop_checkbox.stateChanged.connect(self.pop_checkbox_stateChanged)
+        widget1_layout.addWidget(self.pop_checkbox)
+        widget1.setLayout(widget1_layout)
+        right_panel_layout.addWidget(widget1)
+        
+        widget2 = QWidget()
+        widget2_layout = QHBoxLayout()
+        widget2_layout.addWidget(QLabel("自动使用挑战书(包括高挑):"))
+        self.auto_use_challenge_book_checkbox = QCheckBox()
+        self.auto_use_challenge_book_checkbox.setChecked(self.usersettings.challenge4Level.auto_use_challenge_book)
+        self.auto_use_challenge_book_checkbox.stateChanged.connect(self.auto_use_challenge_book_checkbox_stateChanged)
+        widget2_layout.addWidget(self.auto_use_challenge_book_checkbox)
+        widget2.setLayout(widget2_layout)
+        right_panel_layout.addWidget(widget2)
+
         right_panel.setLayout(right_panel_layout)
         main_layout.addWidget(right_panel)
 
@@ -219,6 +238,12 @@ class Challenge4levelSettingWindow(QMainWindow):
 
     def hp_choice_box_currentIndexChanged(self, index):
         self.usersettings.challenge4Level.hp_choice = self.hp_choice_list[index]
+
+    def pop_checkbox_stateChanged(self):
+        self.usersettings.challenge4Level.pop_after_100 = self.pop_checkbox.isChecked()
+        
+    def auto_use_challenge_book_checkbox_stateChanged(self):
+        self.usersettings.challenge4Level.auto_use_challenge_book = self.auto_use_challenge_book_checkbox.isChecked()
 
     def update_selectd_cave(self):
         self.update_friend_list()
@@ -428,7 +453,9 @@ class SettingWindow(QMainWindow):
         )
         shop_enable_layout.addWidget(shop_enable_checkbox)
         shop_auto_buy_setting_btn = QPushButton("设置")
-        shop_auto_buy_setting_btn.clicked.connect(self.shop_auto_buy_setting_btn_clicked)
+        shop_auto_buy_setting_btn.clicked.connect(
+            self.shop_auto_buy_setting_btn_clicked
+        )
         shop_enable_layout.addWidget(shop_auto_buy_setting_btn)
         shop_enable_layout.addStretch(1)
         shop_enable_widget.setLayout(shop_enable_layout)
@@ -469,9 +496,11 @@ class SettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
     def shop_auto_buy_setting_btn_clicked(self):
-        self.shop_auto_buy_setting_window = ShopAutoBuySetting(self.usersettings, parent=self)
+        self.shop_auto_buy_setting_window = ShopAutoBuySetting(
+            self.usersettings, parent=self
+        )
         self.shop_auto_buy_setting_window.show()
 
     def shop_enable_checkbox_stateChanged(self):
@@ -548,7 +577,7 @@ class FunctionPanelWindow(QMainWindow):
         upgrade_quality_btn = QPushButton("升品面板")
         upgrade_quality_btn.clicked.connect(self.upgrade_quality_btn_clicked)
         menu_layout.addWidget(upgrade_quality_btn, 1, 0)
-        
+
         auto_synthesis_btn = QPushButton("自动合成面板")
         auto_synthesis_btn.clicked.connect(self.auto_synthesis_btn_clicked)
         menu_layout.addWidget(auto_synthesis_btn, 2, 0)
@@ -570,11 +599,9 @@ class FunctionPanelWindow(QMainWindow):
             self.usersettings, parent=self
         )
         self.evolution_panel_window.show()
-        
+
     def auto_synthesis_btn_clicked(self):
-        self.auto_synthesis_window = AutoSynthesisWindow(
-            self.usersettings, parent=self
-        )
+        self.auto_synthesis_window = AutoSynthesisWindow(self.usersettings, parent=self)
         self.auto_synthesis_window.show()
 
     def closeEvent(self, event):
@@ -701,7 +728,7 @@ class CustomMainWindow(QMainWindow):
         )
         function_panel_open_layout.addWidget(function_panel_open_button)
         left_layout.addLayout(function_panel_open_layout)
-        
+
         refresh_repository_btn = QPushButton("刷新仓库")
         refresh_repository_btn.clicked.connect(self.refresh_repository_btn)
         left_layout.addWidget(refresh_repository_btn)

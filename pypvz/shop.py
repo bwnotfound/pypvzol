@@ -1,4 +1,6 @@
-from pyamf import remoting, AMF0
+import logging
+
+from pyamf import remoting, AMF0, DecodeError
 
 from . import Config, WebRequest
 
@@ -24,15 +26,23 @@ class Shop:
         self.gift_shop_goods = {}
         self.normal_shop_goods = {}
 
-    def _refresh_shop(self, shop_type: int):
+    def _refresh_shop(self, shop_type: int, retry=True):
         body = [float(shop_type)]
         req = remoting.Request(target='api.shop.getMerchandises', body=body)
         ev = remoting.Envelope(AMF0)
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
-        resp = self.wr.post(
-            "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-        )
+        while True:
+            resp = self.wr.post(
+                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+            )
+            try:
+                resp_ev = remoting.decode(resp)
+                break
+            except DecodeError:
+                if not retry:
+                    break
+            logging.info(f"重新尝试请求刷新商店{shop_type}")
         return resp
 
     def refresh_shop(self):
@@ -71,16 +81,23 @@ class Shop:
             result_info.append((good.p_id, good.num))
         return result_info
 
-    def buy(self, item_id: int, amount: int):
+    def buy(self, item_id: int, amount: int, retry=True):
         body = [float(item_id), float(amount)]
         req = remoting.Request(target='api.shop.buy', body=body)
         ev = remoting.Envelope(AMF0)
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
-        resp = self.wr.post(
-            "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-        )
-        resp_ev = remoting.decode(resp)
+        while True:
+            resp = self.wr.post(
+                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+            )
+            try:
+                resp_ev = remoting.decode(resp)
+                break
+            except DecodeError:
+                if not retry:
+                    break
+            logging.info("重新尝试请求购买物品")
         response = resp_ev["/1"]
         if response.status == 0:
             return {"success": True, "result": response.body.status}

@@ -1,4 +1,5 @@
-from pyamf import AMF0, remoting
+import logging
+from pyamf import AMF0, remoting, DecodeError
 
 from . import Config, WebRequest, Library
 
@@ -24,21 +25,29 @@ class UpgradeMan:
             "不朽",
         ]
 
-    def upgrade_quality(self, plant_id):
+    def upgrade_quality(self, plant_id, retry=True):
         body = [float(plant_id)]
         req = remoting.Request(target='api.apiorganism.qualityUp', body=body)
         ev = remoting.Envelope(AMF0)
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
-        resp = self.wr.post(
-            "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-        )
+        
         result = {
             "success": False,
             "result": "解析升品结果失败，不过一般是成功的",
         }
         try:
-            resp_ev = remoting.decode(resp)
+            while True:
+                resp = self.wr.post(
+                    "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+                )
+                try:
+                    resp_ev = remoting.decode(resp)
+                    break
+                except DecodeError:
+                    if not retry:
+                        break
+                logging.info("重新尝试请求升级品质")
             response = resp_ev["/1"]
             if response.status != 0:
                 if response.body.description == "Error:t0004":

@@ -1,11 +1,10 @@
 import pickle
 import os
+import time
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 import concurrent.futures
 import threading
-
-from pyamf import DecodeError
 
 from ..shop import Shop
 
@@ -57,6 +56,9 @@ class Challenge4Level:
         self.friend_id2cave_id = {}
         self.stone_cave_challenge_max_attempts = stone_cave_challenge_max_attempts
         self.hp_choice = "中级血瓶"
+        self.pop_after_100 = False
+        self.pop_grade = 100
+        self.auto_use_challenge_book = False
 
     def add_cave(self, cave: Cave, friend_ids=None, difficulty=1, enabled=True):
         # 这里的cave需要的是cave的id属性，不是cave_id
@@ -134,16 +136,7 @@ class Challenge4Level:
             cave_id = cave.id
         else:
             raise NotImplementedError
-
-        try:
-            result = self.caveMan.challenge(cave_id, team, difficulty, cave.type)
-        except DecodeError:
-            logger.log(
-                "Amf DecodeError。 重定向的解析问题，暂时没有去解决，退出程序。不过可以继续重新运行，该bug发生频率约为每次挑战的1/10。"
-            )
-            return False
-        success, result = result["success"], result["result"]
-
+        
         if cave.type <= 3:
             message = "挑战{}({}) {}".format(
                 friend.name,
@@ -154,14 +147,31 @@ class Challenge4Level:
             message = "挑战{}".format(
                 cave.format_name(difficulty),
             )
-        if not success:
-            message = message + " 失败. 原因: {}".format(
-                result.description,
-            )
-            logger.log(message)
-            return False
+        else:
+            raise NotImplementedError("cave type error: {}".format(cave.type))
 
-        message += "."
+        while True:
+            result = self.caveMan.challenge(cave_id, team, difficulty, cave.type)
+            success, result = result["success"], result["result"]
+            if not success:
+                if "狩猎场挑战次数已达上限" in result and self.auto_use_challenge_book:
+                    use_result = self.repo.use_item(self.lib.name2tool["高级挑战书"].id, 1, self.lib)
+                    if use_result["success"]:
+                        logger.log(use_result["result"])
+                        time.sleep(15)
+                        continue
+                    use_result = self.repo.use_item(self.lib.name2tool["挑战书"].id, 1, self.lib)
+                    if use_result["success"]:
+                        logger.log(use_result["result"])
+                        time.sleep(15)
+                        continue
+                message = message + " 失败. 原因: {}.".format(
+                    result,
+                )
+                logger.log(message)
+                return False
+            break
+
         plant_list = [
             self.repo.get_plant(int(plant_id['id']))
             for plant_id in result['assailants']
@@ -197,6 +207,12 @@ class Challenge4Level:
 
         # )
         logger.log(message)
+        if self.pop_after_100:
+            trash_plant_list = [
+                self.repo.get_plant(plant_id) for plant_id in self.trash_plant_list
+            ]
+            trash_plant_list = list(filter(lambda x: (x is not None) and x.grade < self.pop_grade, trash_plant_list))
+            self.trash_plant_list = [x.id for x in trash_plant_list]
         return True
 
     def _assemble_team(self, cave: Cave):
@@ -378,6 +394,8 @@ class Challenge4Level:
                     "friend_id2cave_id": self.friend_id2cave_id,
                     "stone_cave_challenge_max_attempts": self.stone_cave_challenge_max_attempts,
                     "hp_choice": self.hp_choice,
+                    "pop_after_100": self.pop_after_100,
+                    "auto_use_challenge_book": self.auto_use_challenge_book,
                 },
                 f,
             )
