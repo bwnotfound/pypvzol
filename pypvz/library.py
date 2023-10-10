@@ -12,18 +12,10 @@ class Library:
         self.refresh_library()
 
     def refresh_library(self):
-        results, exceptions = self.wr.get_async_gather(
-            [
-                ["http://s{}.youkia.pvz.youkia.com/pvz/php_xml/tool.xml"],
-                ["http://s{}.youkia.pvz.youkia.com/pvz/php_xml/organism.xml"],
-            ]
+        results = self.wr.get_async_gather(
+            self.wr.get_async("/pvz/php_xml/tool.xml"),
+            self.wr.get_async("/pvz/php_xml/organism.xml"),
         )
-        tem_list = []
-        for e in exceptions:
-            if isinstance(e, Exception):
-                tem_list.append(e)
-        if len(tem_list) > 0:
-            raise Exception(tem_list)
         resp = results[0]
         tools = fromstring(resp.decode("utf-8")).find("tools")
         self.tools = [Tool(item) for item in tools]
@@ -34,7 +26,7 @@ class Library:
 
         self.tools = {tool.id: tool for tool in self.tools}
         self.plants = {plant.id: plant for plant in self.plants}
-        
+
         self.name2tool = {tool.name: tool for tool in self.tools.values()}
 
     def get_plant_by_id(self, pid):
@@ -61,8 +53,8 @@ class Tool:
         self.describe = root.get("describe")
         self.rare = root.get("rare")
 
+
 class EvolutionLibPath:
-    # "http://s{region}.youkia.pvz.youkia.com/pvz/index.php/organism/evolution/id/{plant_id}/route/{evolution_path uid}/shortcut/2/sig/0"
     def __init__(self, root: Element):
         self.src_pid = int(root.get("id"))
         self.evolutions = []
@@ -71,14 +63,13 @@ class EvolutionLibPath:
                 {
                     "id": int(item.get("id")),  # evolution_path uid
                     "grade": int(item.get("grade")),
-                    "target_id": int(item.get("target")),   # target_plant_pid
+                    "target_id": int(item.get("target")),  # target_plant_pid
                     "tool_id": int(item.get("tool_id")),
                     "money": item.get("money"),
                 }
             )
 
 
-     
 class Plant:
     def __init__(self, root: Element):
         self.id = int(root.get("id"))
@@ -90,6 +81,3 @@ class Plant:
         self.width = int(root.get("width"))
         self.use_condition = root.get("use_condition")
         self.evolution_path = EvolutionLibPath(root)
-        
-    
-        

@@ -219,13 +219,17 @@ class Challenge4levelSettingWindow(QMainWindow):
         widget1_layout.addWidget(self.pop_checkbox)
         widget1.setLayout(widget1_layout)
         right_panel_layout.addWidget(widget1)
-        
+
         widget2 = QWidget()
         widget2_layout = QHBoxLayout()
         widget2_layout.addWidget(QLabel("自动使用挑战书(包括高挑):"))
         self.auto_use_challenge_book_checkbox = QCheckBox()
-        self.auto_use_challenge_book_checkbox.setChecked(self.usersettings.challenge4Level.auto_use_challenge_book)
-        self.auto_use_challenge_book_checkbox.stateChanged.connect(self.auto_use_challenge_book_checkbox_stateChanged)
+        self.auto_use_challenge_book_checkbox.setChecked(
+            self.usersettings.challenge4Level.auto_use_challenge_book
+        )
+        self.auto_use_challenge_book_checkbox.stateChanged.connect(
+            self.auto_use_challenge_book_checkbox_stateChanged
+        )
         widget2_layout.addWidget(self.auto_use_challenge_book_checkbox)
         widget2.setLayout(widget2_layout)
         right_panel_layout.addWidget(widget2)
@@ -241,9 +245,11 @@ class Challenge4levelSettingWindow(QMainWindow):
 
     def pop_checkbox_stateChanged(self):
         self.usersettings.challenge4Level.pop_after_100 = self.pop_checkbox.isChecked()
-        
+
     def auto_use_challenge_book_checkbox_stateChanged(self):
-        self.usersettings.challenge4Level.auto_use_challenge_book = self.auto_use_challenge_book_checkbox.isChecked()
+        self.usersettings.challenge4Level.auto_use_challenge_book = (
+            self.auto_use_challenge_book_checkbox.isChecked()
+        )
 
     def update_selectd_cave(self):
         self.update_friend_list()
@@ -645,12 +651,12 @@ class CustomMainWindow(QMainWindow):
             BytesIO(
                 self.wr_cache.get(
                     self.usersettings.user.face_url,
-                    need_region=False,
-                    use_cache=True,
-                    init_header=False,
+                    init_header="pvzol" in self.usersettings.cfg.host,
+                    url_format=False,
                 )
             )
         )
+        img = img.resize((64, 64))
         user_face_img = QImage(
             img.tobytes(), img.width, img.height, QImage.Format.Format_RGB888
         )
@@ -837,7 +843,7 @@ class LoginWindow(QMainWindow):
 
         username_widget = QWidget()
         username_layout = QHBoxLayout()
-        username_layout.addWidget(QLabel("用户名:"))
+        username_layout.addWidget(QLabel("用户名(这个随便填):"))
         self.username_input = username_input = QLineEdit()
         username_layout.addWidget(username_input)
         username_widget.setLayout(username_layout)
@@ -847,7 +853,8 @@ class LoginWindow(QMainWindow):
         region_layout = QHBoxLayout()
         region_layout.addWidget(QLabel("区服:"))
         self.region_input = region_input = QComboBox()
-        region_input.addItems([str(i) for i in range(12, 46 + 1)])
+        region_input.addItems([f"官服{i}区" for i in range(12, 46 + 1)])
+        region_input.addItems([f"私服{i}区" for i in range(1, 10)])
         region_layout.addWidget(region_input)
         region_widget.setLayout(region_layout)
         main_layout.addWidget(region_widget)
@@ -872,7 +879,14 @@ class LoginWindow(QMainWindow):
     def login_btn_clicked(self):
         # 取出当前选中的用户
         username = self.username_input.text()
-        region = int(self.region_input.currentText())
+        region_text = self.region_input.currentText()
+        region = int(region_text[2:-1])
+        if region_text.startswith("官服"):
+            host = f"s{region}.youkia.pvz.youkia.com"
+        elif region_text.startswith("私服"):
+            host = "pvzol.org"
+        else:
+            raise ValueError(f"Unknown region text: {region_text}")
         cookie = self.cookie_input.text()
         if (cookie[0] == '"' and cookie[-1] == '"') or (
             cookie[0] == "'" and cookie[-1] == "'"
@@ -880,6 +894,7 @@ class LoginWindow(QMainWindow):
             cookie = cookie[1:-1]
         cfg = {
             "username": username,
+            "host": host,
             "region": region,
             "cookie": cookie,
         }
@@ -908,7 +923,9 @@ class LoginWindow(QMainWindow):
     def refresh_login_user_list(self):
         self.login_user_list.clear()
         for i, cfg in enumerate(self.configs):
-            item = QListWidgetItem("{}_{}".format(cfg["username"], cfg["region"]))
+            item = QListWidgetItem(
+                "{}_{}_{}".format(cfg["username"], cfg["region"], cfg["host"])
+            )
             item.setData(Qt.ItemDataRole.UserRole, i)
             self.login_user_list.addItem(item)
 
@@ -939,7 +956,7 @@ class GetUsersettings(QThread):
 
     def run(self):
         data_dir = os.path.join(
-            self.root_dir, f"data/{self.cfg.username}/{self.cfg.region}"
+            self.root_dir, f"data/{self.cfg.username}/{self.cfg.region}/{self.cfg.host}"
         )
         os.makedirs(data_dir, exist_ok=True)
         cache_dir = os.path.join(data_dir, "cache")

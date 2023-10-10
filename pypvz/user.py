@@ -61,9 +61,7 @@ class User:
         self.refresh()
 
     def refresh(self):
-        resp = self.wr.get(
-            "http://s{}.youkia.pvz.youkia.com/pvz/index.php/default/user/sig/0"
-        )
+        resp = self.wr.get("/pvz/index.php/default/user/sig/0")
         root = fromstring(resp.decode("utf-8"))
         # try:
         #     root = fromstring(resp.decode("utf-8"))
@@ -77,12 +75,13 @@ class User:
         self.friendMan.refresh(root)
 
         user = root.find("user")
-        self.user_id = int(user.get("user_id"))
         self.id = int(user.get("id"))
         self.name = user.get("name")
         self.money = int(user.get("money"))
         self.rmb_coupon = int(user.get("rmb_money"))
         self.face_url = user.get("face")
+        if not self.face_url.startswith("http://"):
+            self.face_url = f"http://{self.cfg.host}" + self.face_url
         self.cave_amount = int(user.find("cave").get("amount"))
         self.cave_amount_max = int(user.find("cave").get("max_amount"))
         self.territory_amount = int(user.find("territory").get("amount"))
@@ -97,8 +96,7 @@ class User:
 
     # def refresh_garden(self):
     #     resp = self.wr.get(
-    #         f"http://s{self.cfg.region}.youkia.pvz.youkia.com/pvz/index.php/garden/index/id/{self.id}/sig/0",
-    #         need_region=False,
+    #         f"/pvz/index.php/garden/index/id/{self.id}/sig/0",
     #     )
     #     root = fromstring(resp.content.decode("utf-8"))
 

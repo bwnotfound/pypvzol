@@ -78,7 +78,7 @@ class Cave:
     def is_ready(self):
         # rest_time包括了保护时间，所以rest_time小于0时，表示已经可以挑战
         if self.type <= 3:
-            return self.grade is not None and self.rest_time < 0
+            return self.grade is not None and self.rest_time <= 0
         elif self.type == 4:
             return True
         else:
@@ -106,7 +106,6 @@ class CaveMan:
             RuntimeError: web request failed.
         """
         if type <= 3:
-            assert type in (1, 2, 3) and layer in (1, 2, 3)
             type_name = "public" if type == 2 else "private"
             if type == 1:
                 type_name = type_name + "_" + str(layer * 2)
@@ -116,9 +115,18 @@ class CaveMan:
                 type_name = type_name + (f"_{layer * 2 - 1}" if layer > 1 else "")
             else:
                 raise ValueError("type must be 1, 2 or 3")
-            url = f"http://s{self.cfg.region}.youkia.pvz.youkia.com/pvz/index.php/cave/index/id/{id}/type/{type_name}/sig/0"
-            resp = self.wr.get(url, need_region=False)
-            root = fromstring(resp.decode("utf-8"))
+            url = f"/pvz/index.php/cave/index/id/{id}/type/{type_name}/sig/0"
+            while True:
+                resp = self.wr.get(url)
+                resp_text = resp.decode("utf-8")
+                try:
+                    root = fromstring(resp_text)
+                    break
+                except:
+                    if not retry or (retry and "频繁" not in resp_text):
+                        break
+                    logging.info("重新尝试获取矿洞信息")
+
             caves = [
                 Cave(cave, id, type, layer, i + 1)
                 for i, cave in enumerate(root.find("hunting").findall("h"))
@@ -132,9 +140,7 @@ class CaveMan:
             ev['/1'] = req
             bin_msg = remoting.encode(ev, strict=True)
             while True:
-                resp = self.wr.post(
-                    "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-                )
+                resp = self.wr.post("/pvz/amf/", data=bin_msg.getvalue())
                 try:
                     resp_ev = remoting.decode(resp)
                     break
@@ -189,9 +195,7 @@ class CaveMan:
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
         while True:
-            resp = self.wr.post(
-                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-            )
+            resp = self.wr.post("/pvz/amf/", data=bin_msg.getvalue())
             try:
                 resp_ev = remoting.decode(resp)
                 break
@@ -208,10 +212,10 @@ class CaveMan:
             return {"success": False, "result": response.body.description}
         else:
             raise NotImplementedError
-        
+
     def get_garden_cave(self, id):
-        url = f"http://s{self.cfg.region}.youkia.pvz.youkia.com/pvz/index.php/garden/index/id/{id}/sig/0"
-        resp = self.wr.get(url, need_region=False)
+        url = f"/pvz/index.php/garden/index/id/{id}/sig/0"
+        resp = self.wr.get(url)
         root = fromstring(resp.decode("utf-8"))
         garden_cave_item = root.find("garden").find("monster").find("mon")
         if garden_cave_item is None:

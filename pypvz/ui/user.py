@@ -79,7 +79,7 @@ class Challenge4Level:
             else:
                 raise TypeError("friend_ids must be int or list[int]")
             if len(friend_ids) == 0:
-                raise ValueError("no friend can challenge this cave")
+                raise RuntimeError("你的等级不够，不能挑战")
             sc = SingleCave(cave)
             sc.difficulty = difficulty
             sc.enabled = enabled
@@ -160,15 +160,16 @@ class Challenge4Level:
                     )
                     if use_result["success"]:
                         logger.log(use_result["result"])
-                        time.sleep(15)
                         continue
                     use_result = self.repo.use_item(
                         self.lib.name2tool["挑战书"].id, 1, self.lib
                     )
                     if use_result["success"]:
                         logger.log(use_result["result"])
-                        time.sleep(15)
                         continue
+                if "频繁" in result:
+                    time.sleep(1)
+                    continue
                 message = message + " 失败. 原因: {}.".format(
                     result,
                 )
@@ -326,22 +327,21 @@ class Challenge4Level:
             if caves is None:
                 caves = self.caveMan.get_caves(friend_id, type, layer)
                 _cave_map[uid] = caves
-            find_flag = False
             for cave in caves:
                 if cave.id == id:
-                    find_flag = True
-                    break
-            if not find_flag:
+                    return cave
+            else:
                 raise ValueError(f"can't find cave {id}")
-            return cave
 
         tasks = []
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             for friend_id, cave_ids in self.friend_id2cave_id.items():
                 for id in cave_ids:
                     for sc in self.caves:
                         if sc.cave.id == id:
                             break
+                    else:
+                        continue
                     if not sc.enabled:
                         continue
                     tasks.append(
@@ -352,12 +352,13 @@ class Challenge4Level:
         _, _ = concurrent.futures.wait(
             tasks, return_when=concurrent.futures.ALL_COMPLETED
         )
-        # TODO: 这里的全部加载可能有点问题，等待进一步排查
         for friend_id, cave_ids in self.friend_id2cave_id.items():
             for id in cave_ids:
                 for sc in self.caves:
                     if sc.cave.id == id:
                         break
+                else:
+                    continue
                 if not sc.enabled:
                     continue
                 cave = get_cave(

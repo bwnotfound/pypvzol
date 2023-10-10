@@ -1,5 +1,6 @@
 from xml.etree.ElementTree import Element, fromstring
 import logging
+import time
 
 from pyamf import remoting, AMF0, DecodeError
 
@@ -48,10 +49,19 @@ class Repository:
         self.wr = WebRequest(cfg)
         self.refresh_repository()
 
-    def refresh_repository(self):
-        url = "http://s{}.youkia.pvz.youkia.com/pvz/index.php/Warehouse/index/sig/0"
-        resp = self.wr.get(url)
-        root = fromstring(resp.decode("utf-8"))
+    def refresh_repository(self, retry=True):
+        url = "/pvz/index.php/Warehouse/index/sig/0"
+        while True:
+            resp = self.wr.get(url)
+            resp_text = resp.decode("utf-8")
+            try:
+                root = fromstring(resp_text)
+                break
+            except:
+                if not retry:
+                    break
+                logging.info("重新尝试请求刷新仓库")
+                time.sleep(0.5)
         warehouse = root.find("warehouse")
         tools = warehouse.find("tools")
         organisms = warehouse.find("organisms")
@@ -104,9 +114,7 @@ class Repository:
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
         while True:
-            resp = self.wr.post(
-                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-            )
+            resp = self.wr.post("/pvz/amf/", data=bin_msg.getvalue())
             try:
                 resp_ev = remoting.decode(resp)
                 break
@@ -116,7 +124,7 @@ class Repository:
             logging.info("重新尝试请求打开宝箱")
         response = resp_ev["/1"]
         return response
-    
+
     def _use_item(self, tool_id, amount, retry=True):
         body = [float(tool_id), float(amount)]
         req = remoting.Request(target='api.tool.useOf', body=body)
@@ -124,9 +132,7 @@ class Repository:
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
         while True:
-            resp = self.wr.post(
-                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
-            )
+            resp = self.wr.post("/pvz/amf/", data=bin_msg.getvalue())
             try:
                 resp_ev = remoting.decode(resp)
                 break
@@ -155,7 +161,6 @@ class Repository:
             }
         else:
             raise NotImplementedError
-        
 
     def open_box(self, tool_id, amount, lib: Library):
         if isinstance(tool_id, str):
@@ -175,7 +180,7 @@ class Repository:
         result = "打开了{}个{}，获得了:".format(open_amount, lib.get_tool_by_id(tool_id).name)
         result = result + ",".join(
             [
-                "{}({})".format(reward['amount'], lib.get_tool_by_id(reward['id']).name)
+                "{}({})".format(lib.get_tool_by_id(reward['id']).name, reward['amount'])
                 for reward in body['tools']
             ]
         )

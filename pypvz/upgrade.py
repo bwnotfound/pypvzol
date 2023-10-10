@@ -39,7 +39,7 @@ class UpgradeMan:
         try:
             while True:
                 resp = self.wr.post(
-                    "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+                    "/pvz/amf/", data=bin_msg.getvalue()
                 )
                 try:
                     resp_ev = remoting.decode(resp)
@@ -56,7 +56,7 @@ class UpgradeMan:
                     result["quality_name"] = "魔神"
                 else:
                     result["success"] = True
-                    result["result"] = "升品失败，未知错误，当做升级为魔神了。如有需要请重新尝试"
+                    result["result"] = f"升品失败，错误原因{response.body.description}，当做升级为魔神了。如有需要请重新尝试"
                     result["quality_name"] = "魔神"
             else:
                 try:
@@ -98,7 +98,7 @@ class SynthesisMan:
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
         resp = self.wr.post(
-            "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+            "/pvz/amf/", data=bin_msg.getvalue()
         )
         try:
             resp_ev = remoting.decode(resp)

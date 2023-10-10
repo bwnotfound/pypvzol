@@ -22,3 +22,7 @@ class Config:
     @property
     def region(self):
         return self.config['region']
+    
+    @property
+    def host(self):
+        return self.config['host']

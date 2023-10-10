@@ -12,10 +12,6 @@ class Good:
         self.type = root['type']
         self.num = int(root['num'])
         self.price = int(root['price'])
-        self.buy_type = int(root['buy_type'])
-        self.exchange_tool_id = root['exchange_tool_id']
-        self.discount = int(root['discount'])
-        self.seq = int(root['seq'])
 
 
 class Shop:
@@ -34,7 +30,7 @@ class Shop:
         bin_msg = remoting.encode(ev, strict=True)
         while True:
             resp = self.wr.post(
-                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+                "/pvz/amf/", data=bin_msg.getvalue()
             )
             try:
                 resp_ev = remoting.decode(resp)
@@ -89,7 +85,7 @@ class Shop:
         bin_msg = remoting.encode(ev, strict=True)
         while True:
             resp = self.wr.post(
-                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+                "/pvz/amf/", data=bin_msg.getvalue()
             )
             try:
                 resp_ev = remoting.decode(resp)

@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QComboBox,
     QCheckBox,
+    QApplication,
 )
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
@@ -132,11 +133,11 @@ class AddCaveWindow(QMainWindow):
             item = QListWidgetItem("暗夜狩猎场-{}层".format(i + 1))
             item.setData(Qt.ItemDataRole.UserRole, {"type": 1, "layer": i + 1})
             cave_type_list_widget.addItem(item)
-        for i in range(3):
+        for i in range(4):
             item = QListWidgetItem("僵尸狩猎场-{}层".format(i + 1))
             item.setData(Qt.ItemDataRole.UserRole, {"type": 2, "layer": i + 1})
             cave_type_list_widget.addItem(item)
-        for i in range(3):
+        for i in range(4):
             item = QListWidgetItem("个人狩猎场-{}层".format(i + 1))
             item.setData(Qt.ItemDataRole.UserRole, {"type": 3, "layer": i + 1})
             cave_type_list_widget.addItem(item)
@@ -197,7 +198,10 @@ class AddCaveWindow(QMainWindow):
 
     def cave_list_widget_clicked(self, item: QListWidgetItem):
         cave = item.data(Qt.ItemDataRole.UserRole)
-        self.usersettings.add_cave_challenge4Level(cave)
+        try:
+            self.usersettings.add_cave_challenge4Level(cave)
+        except RuntimeError as e:
+            self.usersettings.logger.log(str(e))
         self.cave_add_update.emit()
 
 
@@ -1242,6 +1246,7 @@ class AutoSynthesisWindow(QMainWindow):
         if (not result['success']) or need_check:
             self.usersettings.auto_synthesis_man.check_data()
         self.refresh_all()
+        QApplication.processEvents()
         return result
 
     def auto_synthesis_single_btn_clicked(self):

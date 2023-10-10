@@ -4,8 +4,7 @@ from hashlib import sha256
 import shutil
 from time import perf_counter
 import logging
-import asyncio
-import aiohttp
+from time import sleep
 import threading
 from queue import Queue
 
@@ -64,6 +63,10 @@ def logTimeDecorator(log_level=logging.INFO, is_async=False):
     return decorator
 
 
+def async_gather(future_list):
+    pass
+
+
 class WebRequest:
     def __init__(self, cfg: Config, cache_dir=None):
         self.cfg = cfg
@@ -73,20 +76,33 @@ class WebRequest:
     def init_header(self, header):
         header["user-agent"] = self.user_agent
         header["cookie"] = self.cfg.cookie
-        header["host"] = f"s{self.cfg.region}.youkia.pvz.youkia.com"
+        header["host"] = self.cfg.host
 
     def hash(self, s):
         assert isinstance(s, str)
         return sha256(s.encode("utf-8")).hexdigest()
+    
+    def get_private_cache(self, url):
+        if "pvzol" not in url:
+            return None
+        url = url.replace("http://pvzol.org/", "")
+        src_path = os.path.join("./data/cache", url)
+        if os.path.exists(src_path) and not os.path.isdir(src_path):
+            with open(src_path, "rb") as f:
+                return f.read()
 
     @logTimeDecorator()
-    def get(self, url, need_region=True, use_cache=False, init_header=True, **kwargs):
+    def get(self, url, use_cache=False, init_header=True, url_format=True, **kwargs):
+        if url_format:
+            url = "http://" + self.cfg.host + url
+        private_cached = self.get_private_cache(url)
+        if private_cached is not None:
+            return private_cached
+
         def check_status(status_code):
             if status_code != 200:
                 raise RuntimeError(f"Request Get Error: {status_code} Url: {url}")
 
-        if need_region:
-            url = url.format(self.cfg.region)
         if init_header:
             if kwargs.get("headers") is None:
                 kwargs["headers"] = {}
@@ -110,84 +126,50 @@ class WebRequest:
                 f.write(content)
         return content
 
-    @logTimeDecorator(is_async=True)
-    async def get_async(
-        self, url, need_region=True, use_cache=False, init_header=True, **kwargs
-    ):
-        def check_status(status_code):
-            if status_code != 200:
-                raise RuntimeError(f"Async Request Get Error: {status_code} Url: {url}")
+    def get_async(self, *args, **kwargs):
+        def run():
+            return self.get(*args, **kwargs)
 
-        if need_region:
-            url = url.format(self.cfg.region)
-        if init_header:
-            if kwargs.get("headers") is None:
-                kwargs["headers"] = {}
-            self.init_header(kwargs["headers"])
+        return run
 
-        if not use_cache:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, **kwargs) as response:
-                    check_status(response.status)
-                    return await response.read()
-
-        assert self.cache_dir is not None
-        url_hash = self.hash(url)
-        if os.path.exists(os.path.join(self.cache_dir, url_hash)):
-            with open(os.path.join(self.cache_dir, url_hash), "rb") as f:
-                content = f.read()
+    def get_async_gather(self, *args):
+        if len(args) == 0:
+            raise ValueError("args must not be empty")
+        elif len(args) == 1 and isinstance(args[0], tuple) or isinstance(args[0], list):
+            func_list = args[0]
         else:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, **kwargs) as response:
-                    check_status(response.status)
-                    content = await response.read()
-                    with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
-                        f.write(content)
-        return content
-
-    def get_async_gather(self, arg_list):
-        single_flag = False
-        if not isinstance(arg_list[0], list):
-            single_flag = True
-            arg_list = [arg_list]
-
-        async def run():
-            task_list = [asyncio.create_task(self.get_async(*arg)) for arg in arg_list]
-            done, _ = await asyncio.wait(task_list, return_when=asyncio.ALL_COMPLETED)
-            results, exceptions = [None] * len(task_list), [None] * len(task_list)
-            for task in done:
-                index = task_list.index(task)
-                try:
-                    result = task.result()
-                    results[index] = result
-                except Exception as e:
-                    exceptions[index] = e
-            return results, exceptions
-
+            func_list = args
         class RunThread(threading.Thread):
-            def __init__(self, channel: Queue):
+            def __init__(self, func, q, result):
                 super().__init__()
-                self.channel = channel
+                self.func = func
+                self.q = q
+                self.result = result
 
             def run(self):
-                self.channel.put(asyncio.run(run()))
+                self.result.append(self.func())
+                self.q.put(1)
 
-        channel = Queue()
-        RunThread(channel).start()
-        item = channel.get()
-        results, exceptions = item
-        if single_flag:
-            results, exceptions = results[0], exceptions[0]
-        return results, exceptions
+        result_list = [[] for _ in range(len(func_list))]
+        q = Queue()
+        for i, func in enumerate(func_list):
+            RunThread(func, q, result_list[i]).start()
+        while q.qsize() < len(func_list):
+            sleep(0.1)
+        return [x[0] for x in result_list]
 
     @logTimeDecorator()
-    def post(self, url, need_region=True, use_cache=False, init_header=True, **kwargs):
+    def post(self, url, use_cache=False, init_header=True, url_format=True, **kwargs):
+        if url_format:
+            url = "http://" + self.cfg.host + url
+        private_cached = self.get_private_cache(url)
+        if private_cached is not None:
+            return private_cached
+
         def check_status(status_code):
             if status_code != 200:
                 raise RuntimeError(f"Request Post Error: {status_code} Url: {url}")
 
-        if need_region:
-            url = url.format(self.cfg.region)
         if init_header:
             if kwargs.get("headers") is None:
                 kwargs["headers"] = {}

@@ -31,7 +31,7 @@ class RecoverMan:
         bin_msg = remoting.encode(ev, strict=True)
         while True:
             resp = self.wr.post(
-                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+                "/pvz/amf/", data=bin_msg.getvalue()
             )
             try:
                 resp_ev = remoting.decode(resp)

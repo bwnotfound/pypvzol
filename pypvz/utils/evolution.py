@@ -49,7 +49,7 @@ class PlantEvolution:
 
     def evolution(self, id, pathItem: EvolutionPathItem):
         url = (
-            "http://s{}.youkia.pvz.youkia.com/pvz/index.php/organism/evolution/id/"
+            "/pvz/index.php/organism/evolution/id/"
             + f"{id}/route/{pathItem.evolution_path['id']}/shortcut/2/sig/0"
         )  # TODO: 这里的2不知道是什么意思
         xml_text = self.wr.get(url).decode("utf-8")

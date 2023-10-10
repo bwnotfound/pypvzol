@@ -33,8 +33,7 @@ class GardenMan:
         if not isinstance(plant_list, (list, tuple)):
             plant_list = [plant_list]
         resp = self.wr.get(
-            f"http://s{self.cfg.region}.youkia.pvz.youkia.com/pvz/index.php/garden/index/id/{id}/sig/0",
-            need_region=False,
+            f"/pvz/index.php/garden/index/id/{id}/sig/0",
         )
         root = fromstring(resp.decode("utf-8"))
         garden = root.find("garden")
@@ -50,7 +49,7 @@ class GardenMan:
             ev['/1'] = req
             bin_msg = remoting.encode(ev, strict=True)
             resp = self.wr.post(
-                "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+                "/pvz/amf/", data=bin_msg.getvalue()
             )
             # TODO: check result
 
