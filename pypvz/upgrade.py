@@ -1,6 +1,6 @@
 from pyamf import AMF0, remoting
 
-from . import Config, WebRequest
+from . import Config, WebRequest, Library
 
 
 class UpgradeMan:
@@ -60,3 +60,39 @@ class UpgradeMan:
         except:
             pass
         return result
+    
+class SynthesisMan:
+    
+    def __init__(self, cfg: Config, lib: Library):
+        self.lib = lib
+        self.cfg = cfg
+        self.wr = WebRequest(cfg)
+        
+    def synthesis(self, id1, id2, attribute_book_id, reinforce_number):
+        '''
+        api.tool.synthesis
+            request:
+                主id,副id,item_id,卷轴数
+            response:
+            (以下都是增加的值)
+                speed:
+                hp:
+                attack:
+                precision:
+                miss:
+            (fight是合成后的值)
+                fight:
+        '''
+        body = [float(id1), float(id2), float(attribute_book_id), float(reinforce_number)]
+        req = remoting.Request(target='api.tool.synthesis', body=body)
+        ev = remoting.Envelope(AMF0)
+        ev['/1'] = req
+        bin_msg = remoting.encode(ev, strict=True)
+        resp = self.wr.post(
+            "http://s{}.youkia.pvz.youkia.com/pvz/amf/", data=bin_msg.getvalue()
+        )
+        try:
+            resp_ev = remoting.decode(resp)
+        except Exception as e:
+            raise RuntimeError(str(e))
+        return resp_ev["/1"]

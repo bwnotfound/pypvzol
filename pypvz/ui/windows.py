@@ -1,5 +1,6 @@
 import logging
 import concurrent.futures
+import typing
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -21,6 +22,8 @@ from ..library import Library
 from .wrapped import QLabel
 from .user import UserSettings
 from ..upgrade import UpgradeMan
+from ..utils.common import format_number
+from ..repository import Plant
 
 
 class SetPlantListWindow(QMainWindow):
@@ -223,6 +226,7 @@ class EvolutionPanelWindow(QMainWindow):
         plant_list_layout = QVBoxLayout()
         plant_list_layout.addWidget(QLabel("植物列表"))
         self.plant_list = QListWidget()
+        self.plant_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         for plant in self.usersettings.repo.plants:
             item = QListWidgetItem(
                 f"{plant.name(self.usersettings.lib)}({plant.grade})"
@@ -241,6 +245,9 @@ class EvolutionPanelWindow(QMainWindow):
         evolution_path_layout = QVBoxLayout()
         evolution_path_layout.addWidget(QLabel("进化路径"))
         self.evolution_path_list = QListWidget()
+        self.evolution_path_list.setSelectionMode(
+            QListWidget.SelectionMode.SingleSelection
+        )
         self.refresh_evolution_path_list()
         evolution_path_layout.addWidget(self.evolution_path_list)
         evolution_path_setting_btn = QPushButton("修改进化路径")
@@ -269,21 +276,26 @@ class EvolutionPanelWindow(QMainWindow):
 
     @property
     def current_evolution_path_index(self):
-        item = self.evolution_path_list.currentItem()
-        return item.data(Qt.ItemDataRole.UserRole) if item is not None else None
-
-    @property
-    def current_plant_id(self):
-        item = self.plant_list.currentItem()
-        return item.data(Qt.ItemDataRole.UserRole) if item is not None else None
-
-    @property
-    def current_plant_pid(self):
-        item = self.plant_list.currentItem()
-        if item is None:
+        selected_data = [item.data(Qt.ItemDataRole.UserRole) for item in self.evolution_path_list.selectedItems()]
+        if len(selected_data) == 0:
             return None
-        id = item.data(Qt.ItemDataRole.UserRole)
-        return self.usersettings.repo.get_plant(id).pid
+        return selected_data[0]
+
+    @property
+    def selected_plant_id(self):
+        selected_data = [
+            item.data(Qt.ItemDataRole.UserRole)
+            for item in self.plant_list.selectedItems()
+        ]
+        return selected_data
+
+    @property
+    def selected_plant_pid(self):
+        selected_data = [
+            self.usersettings.repo.get_plant(item.data(Qt.ItemDataRole.UserRole)).pid
+            for item in self.plant_list.selectedItems()
+        ]
+        return selected_data
 
     def refresh_evolution_path_list(self):
         self.evolution_path_list.clear()
@@ -298,13 +310,17 @@ class EvolutionPanelWindow(QMainWindow):
             self.evolution_path_list.addItem(item)
 
     def evolution_start_btn_clicked(self):
-        if self.current_evolution_path_index is None or self.current_plant_id is None:
+        if self.current_evolution_path_index is None:
+            self.usersettings.logger.log("请先选择一个进化路线")
             return
-        result = self.usersettings.plant_evolution.plant_evolution_all(
-            self.current_evolution_path_index, self.current_plant_id
-        )
-        self.usersettings.logger.log(result["result"])
-        logging.info(result["result"])
+        if len(self.selected_plant_id) == 0:
+            self.usersettings.logger.log("请先选择一个或多个植物")
+            return
+        for plant_id in self.selected_plant_id:
+            result = self.usersettings.plant_evolution.plant_evolution_all(
+                self.current_evolution_path_index, plant_id
+            )
+            self.usersettings.logger.log(result["result"])
 
     def plant_list_refresh_btn_clicked(self):
         self.plant_list.clear()
@@ -318,7 +334,7 @@ class EvolutionPanelWindow(QMainWindow):
 
     def evolution_path_setting_btn_clicked(self):
         if self.current_evolution_path_index is None:
-            logging.info("请先选择一个进化路线")
+            self.usersettings.logger.log("请先选择一个进化路线")
             return
         self.evolution_path_setting = EvolutionPathSetting(
             self.current_evolution_path_index,
@@ -329,9 +345,13 @@ class EvolutionPanelWindow(QMainWindow):
         self.evolution_path_setting.show()
 
     def evolution_path_add_btn_clicked(self):
-        if self.current_plant_pid is None:
+        if len(self.selected_plant_pid) == 0:
+            self.usersettings.logger.log("请先选择一个植物")
             return
-        self.usersettings.plant_evolution.create_new_path(self.current_plant_pid)
+        if len(self.selected_plant_pid) > 1:
+            self.usersettings.logger.log("只能选择一个植物")
+            return
+        self.usersettings.plant_evolution.create_new_path(self.selected_plant_pid[0])
         self.refresh_evolution_path_list()
 
     def evolution_path_remove_btn_clicked(self):
@@ -697,6 +717,7 @@ class ChallengeGardenCaveSetting(QMainWindow):
 
 class UpgradeQualityWindow(QMainWindow):
     upgrade_finished_signal = pyqtSignal(int)
+
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
         self.usersettings = usersettings
@@ -784,11 +805,12 @@ class UpgradeQualityWindow(QMainWindow):
             args, self.upgrade_finished_signal, self
         )
         self.upgrade_thread.start()
-        
+
     def upgrade_finished(self, length):
         self.usersettings.logger.log(f"升级品质完成，共升级{length}个植物")
         self.upgrade_thread = None
-        
+
+
 def _upgrade_quality(args):
     plant_id, target_index, show_all_info, upgradeMan, logger = args
     while True:
@@ -797,25 +819,25 @@ def _upgrade_quality(args):
         if show_all_info:
             logger.log(result['result'], False)
         if result['success']:
-            cur_quality_index = upgradeMan.quality_name.index(
-                result['quality_name']
-            )
+            cur_quality_index = upgradeMan.quality_name.index(result['quality_name'])
             if cur_quality_index >= target_index:
                 logger.log(result['result'])
                 break
+
 
 class UpgradeQualityThread(QThread):
     def __init__(self, arg_list, finish_signal, parent=None):
         super().__init__(parent=parent)
         self.arg_list = arg_list
         self.finish_signal = finish_signal
-        
+
     def run(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             result = executor.map(_upgrade_quality, self.arg_list)
         length = len(list(result))
         self.finish_signal.emit(length)
-        
+
+
 class ShopAutoBuySetting(QMainWindow):
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
@@ -959,3 +981,294 @@ class ShopAutoBuySetting(QMainWindow):
             for good_id in selected_items_id:
                 self.usersettings.shop_auto_buy_list.remove(good_id)
             self.refresh_auto_buy_list()
+
+
+class AutoSynthesisWindow(QMainWindow):
+    def __init__(self, usersettings: UserSettings, parent=None):
+        super().__init__(parent=parent)
+        self.usersettings = usersettings
+        self.init_ui()
+        self.refresh_all()
+
+    def init_ui(self):
+        self.setWindowTitle("自动合成")
+
+        # 将窗口居中显示，宽度为显示器宽度的70%，高度为显示器高度的50%
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.7), int(screen_size.height() * 0.5))
+        self.move(int(screen_size.width() * 0.15), int(screen_size.height() * 0.25))
+
+        main_widget = QWidget()
+        main_layout = QHBoxLayout()
+        main_layout.setSpacing(0)
+
+        widget1 = QWidget()
+        widget1.setFixedWidth(int(self.width() * 0.12))
+        widget1_layout = QVBoxLayout()
+        widget1_layout.addWidget(QLabel("合成书列表"))
+        self.tool_list = QListWidget()
+        self.tool_list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        widget1_layout.addWidget(self.tool_list)
+        widget1.setLayout(widget1_layout)
+        main_layout.addWidget(widget1)
+
+        widget2 = QWidget()
+        widget2.setMinimumWidth(int(self.width() * 0.25))
+        widget2_layout = QVBoxLayout()
+        widget2_layout.addWidget(QLabel("植物列表"))
+        self.plant_list = QListWidget()
+        self.plant_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        widget2_layout.addWidget(self.plant_list)
+        widget2.setLayout(widget2_layout)
+        main_layout.addWidget(widget2)
+
+        widget3 = QWidget()
+        widget3.setFixedWidth(int(self.width() * 0.15))
+        widget3_layout = QVBoxLayout()
+        widget3_layout.addStretch(1)
+        widget3_1 = QWidget()
+        widget3_1_layout = QVBoxLayout()
+        widget3_1_layout.addWidget(QLabel("选择合成属性"))
+        self.auto_synthesis_attribute_choice = QComboBox()
+        for name in self.usersettings.auto_synthesis_man.attribute_list:
+            self.auto_synthesis_attribute_choice.addItem(name)
+        self.auto_synthesis_attribute_choice.setCurrentIndex(
+            self.usersettings.auto_synthesis_man.attribute_list.index(
+                self.usersettings.auto_synthesis_man.chosen_attribute
+            )
+        )
+        self.auto_synthesis_attribute_choice.currentIndexChanged.connect(
+            self.auto_synthesis_attribute_choice_changed
+        )
+        widget3_1_layout.addWidget(self.auto_synthesis_attribute_choice)
+        widget3_1.setLayout(widget3_1_layout)
+        widget3_layout.addWidget(widget3_1)
+        widget3_2 = QWidget()
+        widget3_2_layout = QVBoxLayout()
+        widget3_2_layout.addWidget(QLabel("选择增强卷轴数量"))
+        self.reinforce_number_choice = QComboBox()
+        for i in range(0, 11):
+            self.reinforce_number_choice.addItem(str(i))
+        self.reinforce_number_choice.setCurrentIndex(
+            self.usersettings.auto_synthesis_man.reinforce_number
+        )
+        self.reinforce_number_choice.currentIndexChanged.connect(
+            self.reinforce_number_choice_changed
+        )
+        widget3_2_layout.addWidget(self.reinforce_number_choice)
+        widget3_2.setLayout(widget3_2_layout)
+        widget3_layout.addWidget(widget3_2)
+        plant_import_btn = QPushButton("导入合成池")
+        plant_import_btn.clicked.connect(self.plant_import_btn_clicked)
+        widget3_layout.addWidget(plant_import_btn)
+        main_plant_set_btn = QPushButton("设置主植物(底座)")
+        main_plant_set_btn.clicked.connect(self.main_plant_set_btn_clicked)
+        widget3_layout.addWidget(main_plant_set_btn)
+        main_plant_remove_btn = QPushButton("移除主植物(底座)")
+        main_plant_remove_btn.clicked.connect(self.main_plant_remove_btn_clicked)
+        widget3_layout.addWidget(main_plant_remove_btn)
+        widget3_layout.addStretch(1)
+        widget3.setLayout(widget3_layout)
+        main_layout.addWidget(widget3)
+
+        widget4 = QWidget()
+        widget4.setMinimumWidth(int(self.width() * 0.25))
+        widget4_layout = QVBoxLayout()
+        widget4_layout.addWidget(QLabel("合成池"))
+        self.plant_pool_list = QListWidget()
+        self.plant_pool_list.setSelectionMode(
+            QListWidget.SelectionMode.ExtendedSelection
+        )
+        widget4_layout.addWidget(self.plant_pool_list)
+        widget4.setLayout(widget4_layout)
+        main_layout.addWidget(widget4)
+
+        widget5 = QWidget()
+        widget5.setFixedWidth(int(self.width() * 0.15))
+        widget5_layout = QVBoxLayout()
+        widget5_layout.addWidget(QLabel("当前主植物(底座)"))
+        self.choose_main_plant_text_box = QPlainTextEdit()
+        self.choose_main_plant_text_box.setReadOnly(True)
+        widget5_layout.addWidget(self.choose_main_plant_text_box)
+        widget5.setLayout(widget5_layout)
+        main_layout.addWidget(widget5)
+
+        widget6 = QWidget()
+        widget6.setFixedWidth(int(self.width() * 0.15))
+        widget6_layout = QVBoxLayout()
+        auto_synthesis_btn = QPushButton("全部合成")
+        auto_synthesis_btn.clicked.connect(self.auto_synthesis_btn_clicked)
+        widget6_layout.addWidget(auto_synthesis_btn)
+        auto_synthesis_single_btn = QPushButton("合成一次")
+        auto_synthesis_single_btn.clicked.connect(
+            self.auto_synthesis_single_btn_clicked
+        )
+        widget6_layout.addWidget(auto_synthesis_single_btn)
+        widget6.setLayout(widget6_layout)
+        main_layout.addWidget(widget6)
+
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+    def format_plant_info(self, plant):
+        if isinstance(plant, str):
+            plant = int(plant)
+        if isinstance(plant, int):
+            plant = self.usersettings.repo.get_plant(plant)
+        assert isinstance(plant, Plant), type(plant)
+        attribute2plant_attribute = {
+            "HP": "hp_max",
+            "攻击": "attack",
+            "命中": "precision",
+            "闪避": "miss",
+            "穿透": "piercing",
+            "护甲": "armor",
+        }
+        return "{}({})[{}]-{}:{}".format(
+            plant.name(self.usersettings.lib),
+            plant.grade,
+            plant.quality_str,
+            self.usersettings.auto_synthesis_man.chosen_attribute,
+            format_number(
+                getattr(
+                    plant,
+                    attribute2plant_attribute[
+                        self.usersettings.auto_synthesis_man.chosen_attribute
+                    ],
+                )
+            ),
+        )
+
+    def refresh_tool_list(self):
+        self.tool_list.clear()
+        for (
+            item_id
+        ) in self.usersettings.auto_synthesis_man.attribute_book_dict.values():
+            item = QListWidgetItem(
+                "{}({})".format(
+                    self.usersettings.lib.get_tool_by_id(item_id).name,
+                    self.usersettings.repo.get_tool(item_id)['amount'],
+                )
+            )
+            self.tool_list.addItem(item)
+
+    def refresh_plant_list(self):
+        self.plant_list.clear()
+        for plant in self.usersettings.repo.plants:
+            if (
+                plant.id in self.usersettings.auto_synthesis_man.auto_synthesis_pool_id
+                or plant.id == self.usersettings.auto_synthesis_man.main_plant_id
+            ):
+                continue
+            item = QListWidgetItem(self.format_plant_info(plant))
+            item.setData(Qt.ItemDataRole.UserRole, plant.id)
+            self.plant_list.addItem(item)
+
+    def refresh_plant_pool_list(self):
+        self.plant_pool_list.clear()
+        for plant_id in self.usersettings.auto_synthesis_man.auto_synthesis_pool_id:
+            plant = self.usersettings.repo.get_plant(plant_id)
+            item = QListWidgetItem(self.format_plant_info(plant))
+            item.setData(Qt.ItemDataRole.UserRole, plant_id)
+            self.plant_pool_list.addItem(item)
+
+    def refresh_main_plant_text_box(self):
+        self.choose_main_plant_text_box.setPlainText(
+            self.format_plant_info(self.usersettings.auto_synthesis_man.main_plant_id)
+            if (self.usersettings.auto_synthesis_man.main_plant_id is not None)
+            else ""
+        )
+
+    def auto_synthesis_attribute_choice_changed(self):
+        self.usersettings.auto_synthesis_man.chosen_attribute = (
+            self.auto_synthesis_attribute_choice.currentText()
+        )
+        self.refresh_plant_list()
+        self.refresh_plant_pool_list()
+        self.refresh_main_plant_text_box()
+
+    def reinforce_number_choice_changed(self):
+        self.usersettings.auto_synthesis_man.reinforce_number = int(
+            self.reinforce_number_choice.currentText()
+        )
+
+    def refresh_all(self):
+        self.refresh_tool_list()
+        self.refresh_plant_list()
+        self.refresh_plant_pool_list()
+        self.refresh_main_plant_text_box()
+
+    def plant_import_btn_clicked(self):
+        selected_plant_id = [
+            item.data(Qt.ItemDataRole.UserRole)
+            for item in self.plant_list.selectedItems()
+        ]
+        if len(selected_plant_id) == 0:
+            self.usersettings.logger.log("请先选择一个植物再导入合成池")
+            return
+        for plant_id in selected_plant_id:
+            self.usersettings.auto_synthesis_man.auto_synthesis_pool_id.add(plant_id)
+        self.usersettings.auto_synthesis_man.check_data()
+        self.refresh_plant_list()
+        self.refresh_plant_pool_list()
+
+    def main_plant_set_btn_clicked(self):
+        selected_plant_id = [
+            item.data(Qt.ItemDataRole.UserRole)
+            for item in self.plant_list.selectedItems()
+        ]
+        if len(selected_plant_id) == 0:
+            self.usersettings.logger.log("请先选择一个植物再设置主植物(底座)")
+            return
+        if len(selected_plant_id) > 1:
+            self.usersettings.logger.log("一次只能设置一个主植物(底座)")
+            return
+        plant_id = selected_plant_id[0]
+        self.usersettings.auto_synthesis_man.main_plant_id = plant_id
+        self.refresh_main_plant_text_box()
+        self.refresh_plant_list()
+
+    def main_plant_remove_btn_clicked(self):
+        self.usersettings.auto_synthesis_man.main_plant_id = None
+        self.refresh_main_plant_text_box()
+        self.refresh_plant_list()
+
+    def auto_synthesis_single_btn_clicked(self, need_check=True):
+        result = self.usersettings.auto_synthesis_man.synthesis()
+        self.usersettings.logger.log(result['result'])
+        if not result['success'] or need_check:
+            self.usersettings.auto_synthesis_man.check_data()
+        self.refresh_all()
+
+    def auto_synthesis_btn_clicked(self):
+        while len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id) > 0:
+            self.auto_synthesis_single_btn_clicked(need_check=False)
+        self.usersettings.auto_synthesis_man.check_data()
+        self.refresh_all()
+        self.usersettings.logger.log("合成完成")
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
+            selected_items = self.plant_pool_list.selectedItems()
+            selected_items_id = [
+                item.data(Qt.ItemDataRole.UserRole) for item in selected_items
+            ]
+            if len(selected_items_id) == 0:
+                self.usersettings.logger.log("请先在合成池选择一个植物再删除")
+                return
+            for plant_id in selected_items_id:
+                try:
+                    self.usersettings.auto_synthesis_man.auto_synthesis_pool_id.remove(
+                        plant_id
+                    )
+                except KeyError:
+                    plant = self.usersettings.repo.get_plant(plant_id)
+                    if plant is None:
+                        self.usersettings.logger.log(
+                            "仓库里没有id为{}的植物，可能已被删除".format(plant_id)
+                        )
+                    self.usersettings.logger.log(
+                        "合成池里没有植物{}".format(self.format_plant_info(plant))
+                    )
+            self.refresh_plant_list()
+            self.refresh_plant_pool_list()

@@ -132,3 +132,20 @@ api.apiorganism.exchangeAll
 api.duty.getAll
 api.duty.reward
 api.garden.challenge
+
+
+
+
+
+1. api.tool.synthesis
+    request:
+        主id,副id,item_id,卷轴数
+    response:
+    (以下都是增加的值)
+        speed:
+        hp:
+        attack:
+        precision:
+        miss:
+    (fight是合成后的值)
+        fight:

@@ -41,6 +41,7 @@ from pypvz.ui.windows import (
     AutoUseItemSettingWindow,
     UpgradeQualityWindow,
     ShopAutoBuySetting,
+    AutoSynthesisWindow,
 )
 from pypvz.ui.user import SingleCave, UserSettings
 
@@ -547,6 +548,10 @@ class FunctionPanelWindow(QMainWindow):
         upgrade_quality_btn = QPushButton("升品面板")
         upgrade_quality_btn.clicked.connect(self.upgrade_quality_btn_clicked)
         menu_layout.addWidget(upgrade_quality_btn, 1, 0)
+        
+        auto_synthesis_btn = QPushButton("自动合成面板")
+        auto_synthesis_btn.clicked.connect(self.auto_synthesis_btn_clicked)
+        menu_layout.addWidget(auto_synthesis_btn, 2, 0)
 
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
@@ -565,6 +570,12 @@ class FunctionPanelWindow(QMainWindow):
             self.usersettings, parent=self
         )
         self.evolution_panel_window.show()
+        
+    def auto_synthesis_btn_clicked(self):
+        self.auto_synthesis_window = AutoSynthesisWindow(
+            self.usersettings, parent=self
+        )
+        self.auto_synthesis_window.show()
 
     def closeEvent(self, event):
         self.usersettings.save()

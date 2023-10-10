@@ -10,7 +10,7 @@ from pyamf import DecodeError
 from ..shop import Shop
 
 from ..cave import Cave
-from .. import Config, Repository, Library, User, CaveMan, Task
+from .. import Config, Repository, Library, User, CaveMan, Task, SynthesisMan
 from ..utils.recover import RecoverMan
 from .message import IOLogger, Logger
 from ..utils.evolution import PlantEvolution
@@ -401,6 +401,109 @@ class Challenge4Level:
         self.trash_plant_list = [x.id for x in trash_plant_list]
 
 
+class AutoSynthesisMan:
+    def __init__(self, cfg: Config, lib: Library, repo: Repository):
+        self.lib = lib
+        self.cfg = cfg
+        self.repo = repo
+        self.synthesisMan = SynthesisMan(cfg, lib)
+        self.main_plant_id = None
+        self.chosen_attribute = "HP"
+        self.reinforce_number = 10
+        self.auto_synthesis_pool_id = set()
+        self.attribute_list = ["HP", "攻击", "命中", "闪避", "穿透", "护甲"]
+        self.attribute_book_dict = {
+            "HP": lib.name2tool["HP合成书"].id,
+            "攻击": lib.name2tool["攻击合成书"].id,
+            "命中": lib.name2tool["命中合成书"].id,
+            "闪避": lib.name2tool["闪避合成书"].id,
+            "穿透": lib.name2tool["穿透合成书"].id,
+            "护甲": lib.name2tool["护甲合成书"].id,
+        }
+
+    def check_data(self, refresh_repo=True):
+        if refresh_repo:
+            self.repo.refresh_repository()
+        if isinstance(self.main_plant_id, int):
+            if self.repo.get_plant(self.main_plant_id) is None:
+                self.main_plant_id = None
+        else:
+            self.main_plant_id = None
+        auto_synthesis_pool_id = list(self.auto_synthesis_pool_id)
+        for deputy_plant_id in auto_synthesis_pool_id:
+            if self.repo.get_plant(deputy_plant_id) is None:
+                self.auto_synthesis_pool_id.remove(deputy_plant_id)
+
+    def _synthesis(self, id1, id2, attribute_name):
+        result = {
+            "success": False,
+            "result": "合成出错，请在确定底座无误后重新尝试(注意部分情况下尽管出错但是仍然合成了，请注意)。以下为详细报错原因：",
+        }
+        try:
+            response = self.synthesisMan.synthesis(
+                id1, id2, self.attribute_book_dict[attribute_name], self.reinforce_number
+            )
+        except RuntimeError as e:
+            result['result'] += str(e)
+            return result
+        if response.status != 0:
+            try:
+                result['result'] += response.body.description
+            except:
+                result["result"] += str(response.body)
+            return result
+        result["success"] = True
+        result['result'] = "合成成功"
+        return result
+
+    def synthesis(self):
+        self.check_data()
+        if self.main_plant_id is None:
+            return {"success": False, "result": "未设置底座"}
+        if len(self.auto_synthesis_pool_id) == 0:
+            return {"success": False, "result": "合成池为空"}
+        book_amount = self.repo.get_tool(
+            self.attribute_book_dict[self.chosen_attribute]
+        )['amount']
+        if not book_amount > 0:
+            return {"success": False, "result": f"{self.chosen_attribute}合成书数量不足"}
+        reinforce_amount = self.repo.get_tool(self.lib.name2tool["增强卷轴"].id)['amount']
+        if reinforce_amount < self.reinforce_number:
+            return {"success": False, "result": f"增强卷轴数量不足10个(目前数量：{reinforce_amount})"}
+        deputy_plant_id = list(self.auto_synthesis_pool_id)[0]
+        result = self._synthesis(
+            deputy_plant_id, self.main_plant_id, self.chosen_attribute
+        )
+        if result['success']:
+            self.auto_synthesis_pool_id.remove(deputy_plant_id)
+            self.main_plant_id = deputy_plant_id
+            book = self.repo.get_tool(self.attribute_book_dict[self.chosen_attribute])
+            book['amount'] = max(book['amount'] - 1, 0)
+        return result
+
+    def save(self, save_dir):
+        save_path = os.path.join(save_dir, "user_autosynthesisman")
+        with open(save_path, "wb") as f:
+            pickle.dump(
+                {
+                    "main_plant_id": self.main_plant_id,
+                    "chosen_attribute": self.chosen_attribute,
+                    "auto_synthesis_pool_id": self.auto_synthesis_pool_id,
+                    "reinforce_number": self.reinforce_number,
+                },
+                f,
+            )
+
+    def load(self, load_dir):
+        load_path = os.path.join(load_dir, "user_autosynthesisman")
+        if os.path.exists(load_path):
+            with open(load_path, "rb") as f:
+                d = pickle.load(f)
+            for k, v in d.items():
+                setattr(self, k, v)
+        self.check_data()
+
+
 class UserSettings:
     def __init__(
         self,
@@ -434,6 +537,8 @@ class UserSettings:
         self.auto_use_item_enabled = False
         self.auto_use_item_list = []
         self.garden_cave_list = []
+
+        self.auto_synthesis_man = AutoSynthesisMan(cfg, lib, repo)
 
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
         logger = self.io_logger.new_logger()
@@ -518,6 +623,7 @@ class UserSettings:
                 f,
             )
         self.plant_evolution.save(self.save_dir)
+        self.auto_synthesis_man.save(self.save_dir)
 
     def load(self):
         self.challenge4Level.load(self.save_dir)
@@ -528,3 +634,4 @@ class UserSettings:
             for k, v in d.items():
                 setattr(self, k, v)
         self.plant_evolution.load(self.save_dir)
+        self.auto_synthesis_man.load(self.save_dir)

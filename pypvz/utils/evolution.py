@@ -154,6 +154,9 @@ class PlantEvolution:
             return
         with open(save_path, "rb") as f:
             self.saved_evolution_paths = pickle.load(f)
+        for saved_path in self.saved_evolution_paths:
+            for item in saved_path:
+                item.lib = self.lib
     
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "evolution")

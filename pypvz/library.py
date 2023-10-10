@@ -34,6 +34,8 @@ class Library:
 
         self.tools = {tool.id: tool for tool in self.tools}
         self.plants = {plant.id: plant for plant in self.plants}
+        
+        self.name2tool = {tool.name: tool for tool in self.tools.values()}
 
     def get_plant_by_id(self, pid):
         if isinstance(pid, str):
