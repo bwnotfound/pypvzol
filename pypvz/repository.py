@@ -58,6 +58,10 @@ class Repository:
                 root = fromstring(resp_text)
                 break
             except:
+                if resp_text.startswith("<html"):
+                    logging.info(f"刷新仓库出现问题。大概率是Cookie或者区服选择有误。以下是响应:{resp_text}")
+                    time.sleep(3)
+                    raise RuntimeError("刷新仓库出现问题")
                 if not retry:
                     break
                 logging.info("重新尝试请求刷新仓库")

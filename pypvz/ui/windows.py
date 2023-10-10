@@ -1151,10 +1151,13 @@ class AutoSynthesisWindow(QMainWindow):
         for (
             item_id
         ) in self.usersettings.auto_synthesis_man.attribute_book_dict.values():
+            tool_item = self.usersettings.repo.get_tool(item_id)
+            if tool_item is None:
+                continue
             item = QListWidgetItem(
                 "{}({})".format(
                     self.usersettings.lib.get_tool_by_id(item_id).name,
-                    self.usersettings.repo.get_tool(item_id)['amount'],
+                    tool_item['amount'],
                 )
             )
             self.tool_list.addItem(item)
