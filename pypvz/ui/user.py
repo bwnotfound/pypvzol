@@ -136,7 +136,7 @@ class Challenge4Level:
             cave_id = cave.id
         else:
             raise NotImplementedError
-        
+
         if cave.type <= 3:
             message = "挑战{}({}) {}".format(
                 friend.name,
@@ -155,12 +155,16 @@ class Challenge4Level:
             success, result = result["success"], result["result"]
             if not success:
                 if "狩猎场挑战次数已达上限" in result and self.auto_use_challenge_book:
-                    use_result = self.repo.use_item(self.lib.name2tool["高级挑战书"].id, 1, self.lib)
+                    use_result = self.repo.use_item(
+                        self.lib.name2tool["高级挑战书"].id, 1, self.lib
+                    )
                     if use_result["success"]:
                         logger.log(use_result["result"])
                         time.sleep(15)
                         continue
-                    use_result = self.repo.use_item(self.lib.name2tool["挑战书"].id, 1, self.lib)
+                    use_result = self.repo.use_item(
+                        self.lib.name2tool["挑战书"].id, 1, self.lib
+                    )
                     if use_result["success"]:
                         logger.log(use_result["result"])
                         time.sleep(15)
@@ -211,7 +215,12 @@ class Challenge4Level:
             trash_plant_list = [
                 self.repo.get_plant(plant_id) for plant_id in self.trash_plant_list
             ]
-            trash_plant_list = list(filter(lambda x: (x is not None) and x.grade < self.pop_grade, trash_plant_list))
+            trash_plant_list = list(
+                filter(
+                    lambda x: (x is not None) and x.grade < self.pop_grade,
+                    trash_plant_list,
+                )
+            )
             self.trash_plant_list = [x.id for x in trash_plant_list]
         return True
 
@@ -407,12 +416,22 @@ class Challenge4Level:
                 d = pickle.load(f)
             for k, v in d.items():
                 setattr(self, k, v)
-        main_plant_list = [self.repo.get_plant(x) for x in self.main_plant_list]
+        main_plant_list = list(
+            filter(
+                lambda x: x is not None,
+                [self.repo.get_plant(x) for x in self.main_plant_list],
+            )
+        )
         main_plant_list.sort(
             key=lambda x: (x.grade, x.fight, x.name(self.lib)), reverse=True
         )
         self.main_plant_list = [x.id for x in main_plant_list]
-        trash_plant_list = [self.repo.get_plant(x) for x in self.trash_plant_list]
+        trash_plant_list = list(
+            filter(
+                lambda x: x is not None,
+                [self.repo.get_plant(x) for x in self.trash_plant_list],
+            )
+        )
         trash_plant_list.sort(
             key=lambda x: (x.grade, x.fight, x.name(self.lib)), reverse=True
         )
@@ -459,7 +478,10 @@ class AutoSynthesisMan:
         }
         try:
             response = self.synthesisMan.synthesis(
-                id1, id2, self.attribute_book_dict[attribute_name], self.reinforce_number
+                id1,
+                id2,
+                self.attribute_book_dict[attribute_name],
+                self.reinforce_number,
             )
         except RuntimeError as e:
             result['result'] += str(e)
