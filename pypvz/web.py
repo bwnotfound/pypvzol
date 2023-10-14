@@ -7,9 +7,11 @@ import logging
 from time import sleep
 import threading
 from queue import Queue
-from pyamf import DecodeError, remoting, AMF0
+from pyamf import DecodeError, remoting, AMF0, AMF3
 
 from .config import Config
+
+method_max_retry = 3
 
 
 # last_time = perf_counter()
@@ -78,6 +80,7 @@ class WebRequest:
         header["user-agent"] = self.user_agent
         header["cookie"] = self.cfg.cookie
         header["host"] = self.cfg.host
+        header["Connection"] = "close"
 
     def hash(self, s):
         assert isinstance(s, str)
@@ -108,6 +111,8 @@ class WebRequest:
             if kwargs.get("headers") is None:
                 kwargs["headers"] = {}
             self.init_header(kwargs["headers"])
+        if "timeout" not in kwargs:
+            kwargs["timeout"] = 3
 
         if not use_cache:
             resp = requests.get(url, **kwargs)
@@ -167,6 +172,9 @@ class WebRequest:
         private_cached = self.get_private_cache(url)
         if private_cached is not None:
             return private_cached
+        
+        if "timeout" not in kwargs:
+            kwargs["timeout"] = 3
 
         def check_status(status_code):
             if status_code != 200:
@@ -206,21 +214,35 @@ class WebRequest:
     def _amf_post_decode(self, url, data, msg, max_retry=3):
         cnt = 0
         while cnt < max_retry:
-            resp = self.post(url, data=data)
+            try:
+                resp = self.post(url, data=data)
+            except requests.exceptions.ConnectTimeout:
+                logging.warning("请求{}超时，选择等待0.5秒后重试".format(msg))
+                sleep(0.5)
+                cnt += 1
+                continue
             try:
                 resp_ev = remoting.decode(resp)
                 break
             except DecodeError:
                 cnt += 1
-                logging.info("重新尝试请求{}".format(msg))
-                sleep(0.1)
+                logging.info("重新尝试请求{}，选择等待0.5秒后重试".format(msg))
+                sleep(0.5)
+            except OSError:
+                cnt += 1
+                logging.info("重新尝试请求{}，选择等待0.5秒后重试".format(msg))
+                sleep(0.5)
         else:
             raise RuntimeError("请求{}失败，超过最大尝试次数{}次".format(msg, max_retry))
         return resp_ev["/1"]
 
     def amf_post(self, body, target, url, msg, max_retry=3):
         req = remoting.Request(target=target, body=body)
-        ev = remoting.Envelope(AMF0)
+        ev = remoting.Envelope(AMF3)
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
-        return self._amf_post_decode(url, bin_msg.getvalue(), msg, max_retry)
+        try:
+            result = self._amf_post_decode(url, bin_msg.getvalue(), msg, max_retry)
+        except Exception as e:
+            raise e
+        return result

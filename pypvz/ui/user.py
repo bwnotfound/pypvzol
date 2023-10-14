@@ -48,8 +48,8 @@ class Challenge4Level:
         self.main_plant_list: list[int] = []
         self.trash_plant_list: list[int] = []
         self.free_max = free_max
-        self.friend_id2cave_id = {}
-        self.garden_layer_friend_id2cave_id = {} if cfg.server == "私服" else None
+        self.friend_id2cave = {}
+        self.garden_layer_friend_id2cave = {} if cfg.server == "私服" else None
         self.garden_layer_caves = {} if cfg.server == "私服" else None
         self.hp_choice = "中级血瓶"
         self.pop_after_100 = False
@@ -90,12 +90,12 @@ class Challenge4Level:
             sc = SingleCave(cave, difficulty=difficulty, garden_layer=garden_layer)
             sc.difficulty = difficulty
             if self.cfg.server == "私服":
-                self.friend_id2cave_id = self.garden_layer_friend_id2cave_id.setdefault(
+                self.friend_id2cave = self.garden_layer_friend_id2cave.setdefault(
                     garden_layer, {}
                 )
             for friend_id in friend_ids:
                 sc.friend_id_list.append(friend_id)
-                self.friend_id2cave_id.setdefault(friend_id, set()).add(cave.id)
+                self.friend_id2cave.setdefault(friend_id, set()).add((cave.id, cave.name))
             if self.cfg.server == "私服":
                 self.garden_layer_caves.setdefault(garden_layer, []).append(sc)
             self.caves.append(sc)
@@ -107,33 +107,30 @@ class Challenge4Level:
         else:
             raise NotImplementedError
 
-    def remove_cave(self, cave_id, garden_layer=None):
-        r'''indeed there need id not cave_id'''
-        if isinstance(cave_id, Cave):
-            cave_id = cave_id.id
-        assert isinstance(cave_id, int)
+    def remove_cave(self, cave, garden_layer=None):
+        assert isinstance(cave, Cave)
 
         for sc in self.caves:
-            if sc.cave.id == cave_id:
+            if sc.cave.id == cave.id and sc.cave.name == cave.name:
                 break
         else:
             raise RuntimeError("cave not exists1")
         if self.cfg.server == "私服":
-            self.friend_id2cave_id = self.garden_layer_friend_id2cave_id.get(
+            self.friend_id2cave = self.garden_layer_friend_id2cave.get(
                 garden_layer
             )
 
         if sc.cave.type <= 3:
             pop_list = []
-            for k, v in self.friend_id2cave_id.items():
-                if cave_id in v:
-                    v.remove(cave_id)
+            for k, v in self.friend_id2cave.items():
+                if (cave.id, cave.name) in v:
+                    v.remove((cave.id, cave.name))
                 if len(v) == 0:
                     pop_list.append(k)
             for k in pop_list:
-                self.friend_id2cave_id.pop(k)
+                self.friend_id2cave.pop(k)
             for i, c in enumerate(self.caves):
-                if c.cave.id == cave_id:
+                if c.cave.id == cave.id and c.cave.name == cave.name:
                     break
             else:
                 raise RuntimeError("cave not exists2")
@@ -141,14 +138,14 @@ class Challenge4Level:
             if sc.garden_layer not in self.garden_layer_caves:
                 raise RuntimeError("garden layer not exists")
             for i, c in enumerate(self.garden_layer_caves[sc.garden_layer]):
-                if c.cave.id == cave_id:
+                if c.cave.id == cave.id and c.cave.name == cave.name:
                     break
             else:
                 raise RuntimeError("cave not exists3")
             self.garden_layer_caves[sc.garden_layer].pop(i)
         elif sc.cave.type == 4:
             for i, c in enumerate(self.caves):
-                if c.cave.id == cave_id:
+                if c.cave.id == cave.id and c.cave.name == cave.name:
                     break
             else:
                 raise RuntimeError("cave not exists4")
@@ -285,16 +282,10 @@ class Challenge4Level:
             else:
                 raise ValueError(f"can't find cave {id}")
 
-        if self.cfg.server == "私服":
-            self.friend_id2cave_id = self.garden_layer_friend_id2cave_id.get(
-                garden_layer, None
-            )
-            if self.friend_id2cave_id is None:
-                raise RuntimeError("garden layer is not added1")
-        for friend_id, cave_ids in self.friend_id2cave_id.items():
-            for id in cave_ids:
+        for friend_id, caves in self.friend_id2cave.items():
+            for id, name in caves:
                 for sc in self.caves:
-                    if sc.cave.id == id:
+                    if sc.cave.id == id and sc.cave.name == name:
                         break
                 else:
                     continue
@@ -424,6 +415,7 @@ class Challenge4Level:
 
         self.repo.refresh_repository(logger=self.logger)
         while self.enable_stone:
+            has_challenged = False
             for sc in self.caves:
                 if sc.cave.type != 4 or not sc.enabled:
                     continue
@@ -465,7 +457,7 @@ class Challenge4Level:
                     message = message + "失败. 原因: 挑战过于频繁.".format(result)
                     self.logger.log(message)
                     return
-
+                has_challenged = True
                 message = message + self.format_upgrade_message(result)
                 self.logger.log(message)
                 if self.pop_after_100:
@@ -481,6 +473,9 @@ class Challenge4Level:
                     self.trash_plant_list = [x.id for x in trash_plant_list]
                 if stop_channel.qsize() > 0:
                     return
+            if not has_challenged:
+                self.logger.log("没有可以挑战的宝石副本，跳出挑战宝石副本")
+                break
 
     def auto_challenge(self, stop_channel: Queue):
         # TODO: 显示功能：将process显示，可加速版
@@ -500,10 +495,10 @@ class Challenge4Level:
                 if not result["success"]:
                     return
                 if self.cfg.server == "私服":
-                    self.friend_id2cave_id = self.garden_layer_friend_id2cave_id.get(
+                    self.friend_id2cave = self.garden_layer_friend_id2cave.get(
                         garden_layer, None
                     )
-                    if self.friend_id2cave_id is None:
+                    if self.friend_id2cave is None:
                         raise RuntimeError("garden layer is not added 2")
                 self.challenge_cave(stop_channel, garden_layer=garden_layer)
                 if stop_channel.qsize() > 0:
@@ -519,8 +514,8 @@ class Challenge4Level:
                     "main_plant_list": self.main_plant_list,
                     "trash_plant_list": self.trash_plant_list,
                     "free_max": self.free_max,
-                    "friend_id2cave_id": self.friend_id2cave_id,
-                    "garden_layer_friend_id2cave_id": self.garden_layer_friend_id2cave_id,
+                    "friend_id2cave": self.friend_id2cave,
+                    "garden_layer_friend_id2cave": self.garden_layer_friend_id2cave,
                     "garden_layer_caves": self.garden_layer_caves,
                     "hp_choice": self.hp_choice,
                     "pop_after_100": self.pop_after_100,
