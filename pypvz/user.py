@@ -39,7 +39,15 @@ class FriendMan:
     def refresh(self, root: Element):
         user = root.find("user")
         friends = user.find("friends")
-        self.friends = [Friend(friend) for friend in friends]
+        self.friends: list[Friend] = []
+        for friend in friends:
+            try:
+                self.friends.append(Friend(friend))
+            except:
+                try:
+                    logging.info(f"解析好友{friend.get('name')} 失败，已跳过")
+                except:
+                    logging.info(f"一个好友解析失败，已跳过")
         self.friends.sort(key=lambda x: (x.grade, x.name), reverse=True)
         self.friends = [
             Friend.build(

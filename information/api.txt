@@ -135,7 +135,7 @@ api.garden.challenge
 
 
 
-
+宝箱type=3
 
 1. api.tool.synthesis
     request:
@@ -149,3 +149,7 @@ api.garden.challenge
         miss:
     (fight是合成后的值)
         fight:
+
+2. api.shop.sell
+    request:
+        type_id(1:tool,2:plant),物品/植物id,数量

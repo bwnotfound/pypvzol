@@ -5,45 +5,36 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pyamf import remoting, AMF0, DecodeError
 
 from .. import Config, WebRequest, Repository
+
 # from ..config import Config
 # from ..web import WebRequest
 # from ..repository import Repository
-from ..ui.message import Logger
 
 
 class RecoverMan:
-    def __init__(self, cfg: Config, repo: Repository, logger: Logger = None):
+    def __init__(self, cfg: Config, repo: Repository):
         self.wr = WebRequest(cfg)
         self.cfg = cfg
         self.repo = repo
-        self.logger = logger
         self.heal_dict = {
             "低级血瓶": 13,
             "中级血瓶": 14,
             "高级血瓶": 15,
         }
 
-    def recover(self, target_id, choice='中级血瓶', retry=True):
+    def recover(self, target_id, choice='中级血瓶'):
         body = [float(target_id), float(self.heal_dict[choice])]
-        req = remoting.Request(target='api.apiorganism.refreshHp', body=body)
-        ev = remoting.Envelope(AMF0)
-        ev['/1'] = req
-        bin_msg = remoting.encode(ev, strict=True)
-        while True:
-            resp = self.wr.post(
-                "/pvz/amf/", data=bin_msg.getvalue()
-            )
-            try:
-                resp_ev = remoting.decode(resp)
-                break
-            except DecodeError:
-                if not retry:
-                    break
-            logging.info("重新尝试请求回复植物血量")
-        response = resp_ev["/1"]
+        response = self.wr.amf_post(
+            body, "api.apiorganism.refreshHp", "/pvz/amf/", "回复植物血量"
+        )
         if response.status == 0:
-            return {"success": True, "result": int(response.body)} 
+            return {"success": True, "result": int(response.body)}
         elif response.status == 1:
+            description = response.body.description
+            if "该生物不存在" in description:
+                return {"success": False, "result": "该生物不存在"}
+            if "该植物血量已满" in description:
+                return {"success": False, "result": "该植物血量已满"}
             return {"success": False, "result": response.body.description}
         else:
             raise NotImplementedError
@@ -54,28 +45,17 @@ class RecoverMan:
         hp_zeros = self.repo.hp_below(0, id_only=True)
         success_num = 0
         fail_num = 0
-        success_list = [None] * len(hp_zeros)
-        
-        with ThreadPoolExecutor() as executor:
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [executor.submit(self.recover, id, choice) for id in hp_zeros]
-        
-        for i, future in enumerate(as_completed(futures)):
+
+        for future in as_completed(futures):
             result = future.result()
             if result["success"]:
-                success_list[i] = result['result']
                 success_num += 1
             else:
+                logging.warning("回复植物血量失败: {}".format(result["result"]))
                 fail_num += 1
-        plant_list = [[self.repo.get_plant(id), success_list[i]] for i, id in enumerate(hp_zeros)]
-        plant_list = [item for item in plant_list if item[0] is not None]
-        plant_list.sort(key=lambda x: (x[0].grade, -x[0].id), reverse=True)
-        if self.logger is not None:
-            message = "成功回复了{}个植物: ".format(success_num)
-            for plant, _ in plant_list:
-                message += f"{plant.name}({plant.grade}) "
-            if fail_num > 0:
-                message += f". 其中{fail_num}个失败"
-            self.logger.log(message)
         return success_num, fail_num
 
     def recover_zero_loop(self, time_gap=2, log=False):

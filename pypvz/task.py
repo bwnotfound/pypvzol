@@ -2,9 +2,7 @@ import re
 import logging
 from typing import Literal
 
-from pyamf import remoting, AMF0, DecodeError
-
-from . import Config, WebRequest
+from . import Config, WebRequest, Library
 
 
 class TaskItem:
@@ -16,14 +14,35 @@ class TaskItem:
         # self.max_count = int(root['maxCount'])
         # self.cur_count = int(root['curCount'])
         self.state = int(root['state'])
-        self.reward = {
-            "money": root['reward']['money'],
-            "exp": root['reward']['exp'],
-            "honor": root['reward']['honor'],
-        }
+        rewards = {}
+        for k, v in root['reward'].items():
+            if k == "tools":
+                continue
+            if v == "" or v is None:
+                rewards[k] = None
+            else:
+                rewards[k] = int(v)
+        self.reward_money = rewards['money']
+        self.reward_exp = rewards['exp']
+        self.reward_honor = rewards['honor']
+        self.reward_tools = None
+        if "tools" in root['reward']:
+            self.reward_tools = [
+                {"id": int(tool["id"]), "amount": int(tool["num"])}
+                for tool in root['reward']['tools']
+            ]
 
     def brief_description(self):
         groups = re.findall(r"(.*)<font.*>(.*)</font>(.*)", self.discription)
+        if len(groups) == 0:
+            return self.discription
+        result = "".join(groups[0])
+        return result
+
+    def brief_title(self):
+        groups = re.findall(r"(.*)<font.*>(.*)</font>(.*)", self.title)
+        if len(groups) == 0:
+            return self.title
         result = "".join(groups[0])
         return result
 
@@ -33,24 +52,9 @@ class Task:
         self.cfg = cfg
         self.wr = WebRequest(cfg)
 
-    def refresh_task(self, retry=True):
+    def refresh_task(self):
         body = []
-        req = remoting.Request(target='api.duty.getAll', body=body)
-        ev = remoting.Envelope(AMF0)
-        ev['/1'] = req
-        bin_msg = remoting.encode(ev, strict=True)
-        while True:
-            resp = self.wr.post(
-                "/pvz/amf/", data=bin_msg.getvalue()
-            )
-            try:
-                resp_ev = remoting.decode(resp)
-                break
-            except DecodeError:
-                if not retry:
-                    break
-            logging.info("重新尝试请求刷新任务")
-        response = resp_ev["/1"]
+        response = self.wr.amf_post(body, "api.duty.getAll", "/pvz/amf/", "刷新任务")
         if response.status == 0:
             pass
         elif response.status == 1:
@@ -62,34 +66,39 @@ class Task:
         self.side_task = [TaskItem(r, 2) for r in body['sideTask']]
         self.daily_task = [TaskItem(r, 3) for r in body['dailyTask']]
         self.active_task = [TaskItem(r, 4) for r in body['activeTask']]
+        self.task_list = [
+            self.main_task,
+            self.side_task,
+            self.daily_task,
+            self.active_task,
+        ]
 
-    def claim_reward(self, task_item: TaskItem, retry=True):
+    def claim_reward(self, task_item: TaskItem, lib: Library):
         body = [float(task_item.id), float(task_item.choice)]
-        req = remoting.Request(target='api.duty.reward', body=body)
-        ev = remoting.Envelope(AMF0)
-        ev['/1'] = req
-        bin_msg = remoting.encode(ev, strict=True)
-        while True:
-            resp = self.wr.post(
-                "/pvz/amf/", data=bin_msg.getvalue()
-            )
-            try:
-                resp_ev = remoting.decode(resp)
-                break
-            except DecodeError:
-                if not retry:
-                    break
-            logging.info("重新尝试请求领取任务奖励")
-        response = resp_ev["/1"]
-        if response.status == 0:
-            pass
-        elif response.status == 1:
-            raise NotImplementedError
-        else:
-            raise NotImplementedError
+        response = self.wr.amf_post(body, "api.duty.reward", "/pvz/amf/", "领取任务奖励")
+        if response.status != 0:
+            msg = "领取任务奖励失败。错误原因:{}".format(response.body.description)
+            logging.error(msg)
+            raise NotImplementedError(msg)
+        result = "{}:{}领取成功。获得：".format(
+            task_item.brief_title(), task_item.brief_description()
+        )
+        if task_item.reward_money is not None:
+            result += "金币{},".format(task_item.reward_money)
+        if task_item.reward_exp is not None:
+            result += "经验{},".format(task_item.reward_exp)
+        if task_item.reward_honor is not None:
+            result += "荣誉{},".format(task_item.reward_honor)
+        if task_item.reward_tools is not None:
+            reward_str_list = []
+            for reward in task_item.reward_tools:
+                tool = lib.get_tool_by_id(reward['id'])
+                if tool is None:
+                    logging.warning("未知的奖励物品id:{}".format(reward['id']))
+                    continue
+                reward_str_list.append("{}({})".format(tool.name, reward['amount']))
+            result = result + ",".join(reward_str_list)
         return {
             "success": True,
-            "result": "任务[{}]领取成功，获得{}点荣誉值".format(
-                task_item.brief_description(), task_item.reward['honor']
-            ),
+            "result": result,
         }

@@ -7,3 +7,4 @@ from .user import User, FriendMan
 from .cave import CaveMan
 from .task import Task
 from .upgrade import UpgradeMan, SynthesisMan
+from .arena import ArenaMan

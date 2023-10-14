@@ -1,5 +1,4 @@
 from xml.etree.ElementTree import Element, fromstring
-import bisect
 
 from .web import WebRequest
 from .config import Config

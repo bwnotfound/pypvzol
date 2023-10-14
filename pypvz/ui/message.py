@@ -18,9 +18,10 @@ class Logger:
         return result
 
     def log(self, msg: str, log_info=True):
-        self._info_channel.put(self._log_str_format(msg))
+        message = self._log_str_format(msg)
+        self._info_channel.put(message)
         if log_info:
-            logging.info(msg)
+            logging.info(message)
 
 
 class _IOLoggerThread(threading.Thread):

@@ -5,7 +5,6 @@ import os
 import logging
 import concurrent.futures
 from queue import Queue
-import threading
 
 from PyQt6 import QtGui
 from PyQt6.QtWidgets import (
@@ -85,8 +84,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         top_layout.addWidget(text)
         top_layout.addStretch(1)
         top_layout.addWidget(btn)
-        cave_list = QListWidget()
-        self.cave_list = cave_list
+        self.cave_list = cave_list = QListWidget()
         cave_list.itemClicked.connect(self.cave_list_item_clicked)
         caves_layout.addLayout(top_layout)
         caves_layout.addWidget(cave_list)
@@ -153,6 +151,25 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         right_panel = QWidget()
         right_panel_layout = QVBoxLayout()
+        right_panel_layout.addWidget(QLabel("当前洞口的配置:"))
+        self.current_cave_use_sand = QCheckBox("使用时之沙")
+        self.current_cave_use_sand.setChecked(False)
+        self.current_cave_use_sand.stateChanged.connect(
+            self.current_cave_use_sand_stateChanged
+        )
+        right_panel_layout.addWidget(self.current_cave_use_sand)
+
+        self.current_cave_difficulty = QComboBox()
+        self.current_cave_difficulty.addItems(["简单", "普通", "困难"])
+        self.current_cave_difficulty.setCurrentIndex(3)
+        self.current_cave_difficulty.currentIndexChanged.connect(
+            self.current_cave_difficulty_currentIndexChanged
+        )
+        right_panel_layout.addWidget(self.current_cave_difficulty)
+
+
+        right_panel_layout.addStretch(1)
+        right_panel_layout.addWidget(QLabel("全局挑战设置:"))
 
         free_max_input_widget = QWidget()
         free_max_input_layout = QHBoxLayout()
@@ -169,30 +186,6 @@ class Challenge4levelSettingWindow(QMainWindow):
         free_max_input_layout.addWidget(free_max_input_box)
         free_max_input_widget.setLayout(free_max_input_layout)
         right_panel_layout.addWidget(free_max_input_widget)
-
-        stone_cave_challenge_max_attempts_widget = QWidget()
-        stone_cave_challenge_max_attempts_layout = QHBoxLayout()
-        stone_cave_challenge_max_attempts_box = QSpinBox()
-        stone_cave_challenge_max_attempts_box.setMinimum(0)
-        stone_cave_challenge_max_attempts_box.setMaximum(999)
-        stone_cave_challenge_max_attempts_box.setValue(
-            self.usersettings.challenge4Level.stone_cave_challenge_max_attempts
-        )
-
-        def stone_cave_challenge_max_attempts_box_value_changed(value):
-            self.usersettings.challenge4Level.stone_cave_challenge_max_attempts = value
-
-        stone_cave_challenge_max_attempts_box.valueChanged.connect(
-            stone_cave_challenge_max_attempts_box_value_changed
-        )
-        stone_cave_challenge_max_attempts_layout.addWidget(QLabel("宝石副本最大挑战次数:"))
-        stone_cave_challenge_max_attempts_layout.addWidget(
-            stone_cave_challenge_max_attempts_box
-        )
-        stone_cave_challenge_max_attempts_widget.setLayout(
-            stone_cave_challenge_max_attempts_layout
-        )
-        right_panel_layout.addWidget(stone_cave_challenge_max_attempts_widget)
 
         hp_choice_widget = QWidget()
         hp_choice_layout = QHBoxLayout()
@@ -233,36 +226,52 @@ class Challenge4levelSettingWindow(QMainWindow):
         widget2_layout.addWidget(self.auto_use_challenge_book_checkbox)
         widget2.setLayout(widget2_layout)
         right_panel_layout.addWidget(widget2)
-        
+
         widget3 = QWidget()
         widget3_layout = QHBoxLayout()
         widget3_layout.addWidget(QLabel("一次使用多少高挑:"))
-        self.use_advanced_challenge_book_count_box = QComboBox()
-        self.use_advanced_challenge_book_count_box.addItems([str(i) for i in range(1, 25+1)])
-        self.use_advanced_challenge_book_count_box.setCurrentIndex(
-            self.usersettings.challenge4Level.advanced_challenge_book_amount - 1
+        self.use_advanced_challenge_book_count_box = QSpinBox()
+        self.use_advanced_challenge_book_count_box.setMinimum(1)
+        self.use_advanced_challenge_book_count_box.setMaximum(
+            5 if self.usersettings.cfg.server == "官服" else 2250 // 5
         )
-        self.use_advanced_challenge_book_count_box.currentIndexChanged.connect(
+        self.use_advanced_challenge_book_count_box.setValue(
+            self.usersettings.challenge4Level.advanced_challenge_book_amount
+        )
+        self.use_advanced_challenge_book_count_box.valueChanged.connect(
             self.use_advanced_challenge_book_count_box_currentIndexChanged
         )
         widget3_layout.addWidget(self.use_advanced_challenge_book_count_box)
         widget3.setLayout(widget3_layout)
         right_panel_layout.addWidget(widget3)
-        
+
         widget4 = QWidget()
         widget4_layout = QHBoxLayout()
         widget4_layout.addWidget(QLabel("一次使用多少挑战书:"))
-        self.use_normal_challenge_book_count_box = QComboBox()
-        self.use_normal_challenge_book_count_box.addItems([str(i) for i in range(1, 25+1)])
-        self.use_normal_challenge_book_count_box.setCurrentIndex(
-            self.usersettings.challenge4Level.normal_challenge_book_amount - 1
+        self.use_normal_challenge_book_count_box = QSpinBox()
+        self.use_normal_challenge_book_count_box.setMinimum(1)
+        self.use_normal_challenge_book_count_box.setMaximum(
+            25 if self.usersettings.cfg.server == "官服" else 2250
         )
-        self.use_normal_challenge_book_count_box.currentIndexChanged.connect(
+        self.use_normal_challenge_book_count_box.setValue(
+            self.usersettings.challenge4Level.normal_challenge_book_amount
+        )
+        self.use_normal_challenge_book_count_box.valueChanged.connect(
             self.use_normal_challenge_book_count_box_currentIndexChanged
         )
         widget4_layout.addWidget(self.use_normal_challenge_book_count_box)
         widget4.setLayout(widget4_layout)
         right_panel_layout.addWidget(widget4)
+
+        self.enable_sand = QCheckBox("允许使用时之沙")
+        self.enable_sand.setChecked(self.usersettings.challenge4Level.enable_sand)
+        self.enable_sand.stateChanged.connect(self.enable_sand_stateChanged)
+        right_panel_layout.addWidget(self.enable_sand)
+
+        self.show_lottery = QCheckBox("是否显示获胜战利品(会变慢)")
+        self.show_lottery.setChecked(self.usersettings.challenge4Level.show_lottery)
+        self.show_lottery.stateChanged.connect(self.show_lottery_stateChanged)
+        right_panel_layout.addWidget(self.show_lottery)
 
         right_panel.setLayout(right_panel_layout)
         main_layout.addWidget(right_panel)
@@ -270,20 +279,32 @@ class Challenge4levelSettingWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
+    def current_cave_use_sand_stateChanged(self):
+        self.selectd_cave.use_sand = self.current_cave_use_sand.isChecked()
+
+    def current_cave_difficulty_currentIndexChanged(self, index):
+        self.selectd_cave.difficulty = index + 1
+
+    def show_lottery_stateChanged(self):
+        self.usersettings.challenge4Level.show_lottery = self.show_lottery.isChecked()
+
+    def enable_sand_stateChanged(self):
+        self.usersettings.challenge4Level.enable_sand = self.enable_sand.isChecked()
+
     def hp_choice_box_currentIndexChanged(self, index):
         self.usersettings.challenge4Level.hp_choice = self.hp_choice_list[index]
 
     def pop_checkbox_stateChanged(self):
         self.usersettings.challenge4Level.pop_after_100 = self.pop_checkbox.isChecked()
-        
+
     def use_normal_challenge_book_count_box_currentIndexChanged(self):
         self.usersettings.challenge4Level.normal_challenge_book_amount = (
-            self.use_normal_challenge_book_count_box.currentIndex() + 1
+            self.use_normal_challenge_book_count_box.value()
         )
-    
+
     def use_advanced_challenge_book_count_box_currentIndexChanged(self):
         self.usersettings.challenge4Level.advanced_challenge_book_amount = (
-            self.use_advanced_challenge_book_count_box.currentIndex() + 1
+            self.use_advanced_challenge_book_count_box.value()
         )
 
     def auto_use_challenge_book_checkbox_stateChanged(self):
@@ -293,6 +314,14 @@ class Challenge4levelSettingWindow(QMainWindow):
 
     def update_selectd_cave(self):
         self.update_friend_list()
+        if self.selectd_cave is None:
+            self.current_cave_use_sand.setDisabled(True)
+            self.current_cave_difficulty.setDisabled(True)
+            return
+        self.current_cave_use_sand.setChecked(self.selectd_cave.use_sand)
+        self.current_cave_difficulty.setCurrentIndex(self.selectd_cave.difficulty - 1)
+        self.current_cave_use_sand.setEnabled(True)
+        self.current_cave_difficulty.setEnabled(True)
 
     def cave_list_item_clicked(self, item):
         self.selectd_cave = item.data(Qt.ItemDataRole.UserRole)
@@ -365,7 +394,7 @@ class Challenge4levelSettingWindow(QMainWindow):
                 if self.delete_last_selected_list is self.cave_list:
                     for item in select_items:
                         sc = item.data(Qt.ItemDataRole.UserRole)
-                        self.usersettings.remove_cave_challenge4Level(sc.cave)
+                        self.usersettings.challenge4Level.remove_cave(sc.cave, sc.garden_layer)
                     self.update_cave_list()
                 elif self.delete_last_selected_list is self.main_plant_list:
                     for item in select_items:
@@ -473,7 +502,7 @@ class SettingWindow(QMainWindow):
         menu_layout = QGridLayout()
         challenge4level_widget = QWidget()
         challenge4level_layout = QHBoxLayout()
-        self.challenge4level_checkbox = challenge4level_checkbox = QCheckBox("练级")
+        self.challenge4level_checkbox = challenge4level_checkbox = QCheckBox("刷洞")
         challenge4level_checkbox.setFont(normal_font)
         challenge4level_checkbox.setChecked(self.usersettings.challenge4Level_enabled)
         challenge4level_checkbox.stateChanged.connect(
@@ -507,16 +536,66 @@ class SettingWindow(QMainWindow):
         shop_enable_widget.setLayout(shop_enable_layout)
         menu_layout.addWidget(shop_enable_widget, 1, 0)
 
+        task_panel = QWidget()
+        task_panel_layout = QVBoxLayout()
+        self.task_setting_checkbox = task_setting_checkbox = QCheckBox("自动领取任务")
+        task_setting_checkbox.setFont(normal_font)
+        task_setting_checkbox.setChecked(self.usersettings.task_enabled)
+        task_setting_checkbox.stateChanged.connect(
+            self.task_setting_checkbox_stateChanged
+        )
+        task_panel_layout.addWidget(task_setting_checkbox)
+        task_widget = QWidget()
+        task_layout = QHBoxLayout()
+
+        main_task_widget = QWidget()
+        main_task_layout = QHBoxLayout()
+        self.main_task_checkbox = main_task_checkbox = QCheckBox("主线")
+        main_task_checkbox.setFont(normal_font)
+        main_task_checkbox.setChecked(self.usersettings.enable_list[0])
+        main_task_checkbox.stateChanged.connect(self.main_task_checkbox_stateChanged)
+        main_task_layout.addWidget(main_task_checkbox)
+        main_task_widget.setLayout(main_task_layout)
+        task_layout.addWidget(main_task_widget)
+
+        side_task_widget = QWidget()
+        side_task_layout = QHBoxLayout()
+        self.side_task_checkbox = side_task_checkbox = QCheckBox("支线")
+        side_task_checkbox.setFont(normal_font)
+        side_task_checkbox.setChecked(self.usersettings.enable_list[1])
+        side_task_checkbox.stateChanged.connect(self.side_task_checkbox_stateChanged)
+        side_task_layout.addWidget(side_task_checkbox)
+        side_task_widget.setLayout(side_task_layout)
+        task_layout.addWidget(side_task_widget)
+
         daily_task_widget = QWidget()
         daily_task_layout = QHBoxLayout()
-        self.daily_task_checkbox = daily_task_checkbox = QCheckBox("日常任务领取")
+        self.daily_task_checkbox = daily_task_checkbox = QCheckBox("日常")
         daily_task_checkbox.setFont(normal_font)
-        daily_task_checkbox.setChecked(self.usersettings.daily_task_enabled)
+        daily_task_checkbox.setChecked(self.usersettings.enable_list[2])
         daily_task_checkbox.stateChanged.connect(self.daily_task_checkbox_stateChanged)
         daily_task_layout.addWidget(daily_task_checkbox)
-        daily_task_layout.addStretch(1)
         daily_task_widget.setLayout(daily_task_layout)
-        menu_layout.addWidget(daily_task_widget, 2, 0)
+        task_layout.addWidget(daily_task_widget)
+
+        active_task_widget = QWidget()
+        active_task_layout = QHBoxLayout()
+        self.active_task_checkbox = active_task_checkbox = QCheckBox("活动")
+        active_task_checkbox.setFont(normal_font)
+        active_task_checkbox.setChecked(self.usersettings.enable_list[3])
+        active_task_checkbox.stateChanged.connect(
+            self.active_task_checkbox_stateChanged
+        )
+        active_task_layout.addWidget(active_task_checkbox)
+        active_task_widget.setLayout(active_task_layout)
+        task_layout.addWidget(active_task_widget)
+        task_layout.addStretch(1)
+        task_widget.setLayout(task_layout)
+
+        task_panel_layout.addWidget(task_widget)
+        task_panel.setLayout(task_panel_layout)
+
+        menu_layout.addWidget(task_panel, 2, 0)
 
         auto_use_item_widget = QWidget()
         auto_use_item_layout = QHBoxLayout()
@@ -537,11 +616,42 @@ class SettingWindow(QMainWindow):
         auto_use_item_widget.setLayout(auto_use_item_layout)
         menu_layout.addWidget(auto_use_item_widget, 3, 0)
 
+        rest_time_input_widget = QWidget()
+        rest_time_input_layout = QHBoxLayout()
+        rest_time_input_layout.addWidget(QLabel("休息时间(分钟):"))
+        rest_time_input_box = QSpinBox()
+        rest_time_input_box.setMinimum(0)
+        rest_time_input_box.setMaximum(60 * 24)
+        rest_time_input_box.setValue(self.usersettings.rest_time // 60)
+        rest_time_input_box.valueChanged.connect(self.rest_time_input_box_valueChanged)
+        rest_time_input_layout.addWidget(rest_time_input_box)
+        rest_time_input_widget.setLayout(rest_time_input_layout)
+        menu_layout.addWidget(rest_time_input_widget, 4, 0)
+
+        arena_widget = QWidget()
+        arena_layout = QHBoxLayout()
+        self.arena_checkbox = arena_checkbox = QCheckBox("竞技场")
+        arena_checkbox.setFont(normal_font)
+        arena_checkbox.setChecked(self.usersettings.arena_enabled)
+        arena_checkbox.stateChanged.connect(self.arena_checkbox_stateChanged)
+        arena_layout.addWidget(arena_checkbox)
+        arena_widget.setLayout(arena_layout)
+        menu_layout.addWidget(arena_widget, 5, 0)
+
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def task_setting_checkbox_stateChanged(self):
+        self.usersettings.task_enabled = self.task_setting_checkbox.isChecked()
+
+    def arena_checkbox_stateChanged(self):
+        self.usersettings.arena_enabled = self.arena_checkbox.isChecked()
+
+    def rest_time_input_box_valueChanged(self, value):
+        self.usersettings.rest_time = value
 
     def shop_auto_buy_setting_btn_clicked(self):
         self.shop_auto_buy_setting_window = ShopAutoBuySetting(
@@ -552,8 +662,17 @@ class SettingWindow(QMainWindow):
     def shop_enable_checkbox_stateChanged(self):
         self.usersettings.shop_enabled = self.shop_enable_checkbox.isChecked()
 
+    def main_task_checkbox_stateChanged(self):
+        self.usersettings.enable_list[0] = self.main_task_checkbox.isChecked()
+
+    def side_task_checkbox_stateChanged(self):
+        self.usersettings.enable_list[1] = self.side_task_checkbox.isChecked()
+
     def daily_task_checkbox_stateChanged(self):
-        self.usersettings.daily_task_enabled = self.daily_task_checkbox.isChecked()
+        self.usersettings.enable_list[2] = self.daily_task_checkbox.isChecked()
+
+    def active_task_checkbox_stateChanged(self):
+        self.usersettings.enable_list[3] = self.active_task_checkbox.isChecked()
 
     def auto_use_item_checkbox_stateChanged(self):
         self.usersettings.auto_use_item_enabled = (
@@ -827,6 +946,7 @@ class CustomMainWindow(QMainWindow):
         self.settingWindow.show()
 
     def run_finished(self):
+        self.usersettings.logger.log("暂停运行")
         self.process_button.setText("开始")
 
     def refresh_repository_btn(self):
@@ -840,6 +960,7 @@ class CustomMainWindow(QMainWindow):
             self.process_button.setText("暂停")
             if self.process_stop_channel.qsize() > 0:
                 self.process_stop_channel.get()
+            self.usersettings.logger.log("开始运行")
             self.usersettings.start(self.process_stop_channel, self.finish_trigger)
         elif self.process_button.text() == "暂停":
             self.process_button.setText("开始")
@@ -923,8 +1044,10 @@ class LoginWindow(QMainWindow):
         region = int(region_text[2:-1])
         if region_text.startswith("官服"):
             host = f"s{region}.youkia.pvz.youkia.com"
+            server = "官服"
         elif region_text.startswith("私服"):
             host = "pvzol.org"
+            server = "私服"
         else:
             raise ValueError(f"Unknown region text: {region_text}")
         cookie = self.cookie_input.text()
@@ -937,6 +1060,7 @@ class LoginWindow(QMainWindow):
             "host": host,
             "region": region,
             "cookie": cookie,
+            "server": server,
         }
         self.configs.append(cfg)
         self.save_config()

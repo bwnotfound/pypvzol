@@ -1,12 +1,12 @@
 from xml.etree.ElementTree import Element, fromstring
 from typing import Union
 import logging
-
-from pyamf import remoting, AMF0, DecodeError
+import time
 
 from .web import WebRequest
 from .library import Library
 from .config import Config
+from .ui.message import Logger
 
 
 class Cave:
@@ -18,13 +18,13 @@ class Cave:
     def __init__(
         self,
         root: Union[Element, dict],
-        user_id=None,
-        type=None,
-        layer=None,
-        number=None,
-        **kwargs,
+        type,
+        layer,
+        number,
     ):
         self.type = type
+        self.layer = layer
+        self.number = number
         if type <= 3:
             assert isinstance(root, Element)
             self.id = int(root.get("id"))
@@ -37,17 +37,12 @@ class Cave:
                 self.grade = int(root.find("orgs").find("org").find("gd").text)
             else:
                 self.grade = None
-            self.user_id = user_id
             self.rest_time = int(root.find("lt").text)
-            self.layer = layer
-            self.number = number
             self.open_grade = int(root.find("og").text)
         elif type == 4:
-            assert isinstance(root, dict), layer is not None
+            assert isinstance(root, dict)
             self.id = int(root["id"])
             self.name = root['name']
-            self.layer = layer
-            self.chapter_id = int(kwargs['chapter_id'])
             self.grade = int(root['monsters']['star_1'][0]['gd'])
         else:
             raise NotImplementedError
@@ -76,7 +71,7 @@ class Cave:
 
     @property
     def is_ready(self):
-        # rest_time包括了保护时间，所以rest_time小于0时，表示已经可以挑战
+        # rest_time包括了保护时间，所以rest_time小于等于0时，表示已经可以挑战
         if self.type <= 3:
             return self.grade is not None and self.rest_time <= 0
         elif self.type == 4:
@@ -91,12 +86,12 @@ class CaveMan:
         self.lib = lib
         self.wr = WebRequest(cfg)
 
-    def get_caves(self, id, type, layer: int = None, retry=True):
+    def get_caves(self, user_id, type, layer: int = None, logger: Logger = None):
         """
         Args:
             id (int): user's id. not platform id
-            type (int): 1:暗洞 2:公洞 3:个洞
-            layer (int): 洞口层数: 1~3
+            type (int): 1:暗洞 2:公洞 3:个洞 4:宝石
+            layer (int): 洞口层数: 1~3/4
 
         Returns:
             list[Cave]
@@ -115,52 +110,51 @@ class CaveMan:
                 type_name = type_name + (f"_{layer * 2 - 1}" if layer > 1 else "")
             else:
                 raise ValueError("type must be 1, 2 or 3")
-            url = f"/pvz/index.php/cave/index/id/{id}/type/{type_name}/sig/0"
-            while True:
+            url = f"/pvz/index.php/cave/index/id/{user_id}/type/{type_name}/sig/0"
+            cnt, max_retry = 0, 20
+            while cnt < max_retry:
                 resp = self.wr.get(url)
                 resp_text = resp.decode("utf-8")
                 try:
                     root = fromstring(resp_text)
                     break
                 except:
-                    if not retry or (retry and "频繁" not in resp_text):
-                        break
-                    logging.info("重新尝试获取矿洞信息")
+                    if "频繁" not in resp_text:
+                        if logger is not None:
+                            logger.log("获取矿洞信息失败1")
+                        raise RuntimeError("获取矿洞信息失败1")
+                cnt += 1
+                msg = "获取矿洞信息过于频繁，选择等待1秒后重试。最多再等待{}次".format(max_retry - cnt)
+                if logger is not None:
+                    logger.log(msg)
+                else:
+                    logging.info(msg)
+                time.sleep(1)
+            else:
+                raise RuntimeError("获取矿洞信息失败2")
 
             caves = [
-                Cave(cave, id, type, layer, i + 1)
+                Cave(cave, type, layer, i + 1)
                 for i, cave in enumerate(root.find("hunting").findall("h"))
             ]
-            return caves
         elif type == 4:
-            assert layer is None
-            body = [float(id)]
-            req = remoting.Request(target='api.stone.getCaveInfo', body=body)
-            ev = remoting.Envelope(AMF0)
-            ev['/1'] = req
-            bin_msg = remoting.encode(ev, strict=True)
-            while True:
-                resp = self.wr.post("/pvz/amf/", data=bin_msg.getvalue())
-                try:
-                    resp_ev = remoting.decode(resp)
-                    break
-                except DecodeError:
-                    if not retry:
-                        break
-                logging.info("重新尝试获取矿洞信息")
-            response = resp_ev["/1"]
+            body = [float(user_id)]
+            response = self.wr.amf_post(
+                body, 'api.stone.getCaveInfo', '/pvz/amf/', '获取宝石副本信息'
+            )
             body = response.body
             if response.status == 0:
-                return [
-                    Cave(cave, type=4, layer=i + 1, chapter_id=id)
+                caves = [
+                    Cave(cave, type, user_id, i + 1)
                     for i, cave in enumerate(body['caves'])
                 ]
             elif response.status == 1:
                 raise NotImplementedError
             else:
                 raise NotImplementedError
+        return caves
 
-    def challenge(self, cave_id, plant_list: list[int], difficulty, type, retry=True):
+    def challenge(self, cave_id, plant_list: list[int], difficulty, type):
         """
         Challenge a cave.
 
@@ -182,28 +176,12 @@ class CaveMan:
             target_amf = 'api.stone.challenge'
         else:
             raise NotImplementedError
-
-        req = remoting.Request(
-            target=target_amf,
-            body=[
-                float(cave_id),
-                [int(i) for i in plant_list],
-                float(difficulty),
-            ],
-        )
-        ev = remoting.Envelope(AMF0)
-        ev['/1'] = req
-        bin_msg = remoting.encode(ev, strict=True)
-        while True:
-            resp = self.wr.post("/pvz/amf/", data=bin_msg.getvalue())
-            try:
-                resp_ev = remoting.decode(resp)
-                break
-            except DecodeError:
-                if not retry:
-                    break
-            logging.info("重新尝试请求洞口挑战")
-        response = resp_ev["/1"]
+        body = [
+            float(cave_id),
+            [int(i) for i in plant_list],
+            float(difficulty),
+        ]
+        response = self.wr.amf_post(body, target_amf, '/pvz/amf/', '洞口挑战')
         if response.status == 0:
             # onResult
             return {"success": True, "result": response.body}
@@ -213,6 +191,25 @@ class CaveMan:
         else:
             raise NotImplementedError
 
+    def get_lottery(self, challenge_resp_body):
+        lottery_key = challenge_resp_body['awards_key']
+        body = [lottery_key]
+        response = self.wr.amf_post(
+            body, "api.reward.lottery", '/pvz/amf/', '获取战利品信息', max_retry=2
+        )
+        if response.status == 0:
+            # onResult
+            result = [
+                {"id": int(item["id"]), "amount": int(item["amount"])}
+                for item in response.body['tools']
+            ]
+            return {"success": True, "result": result}
+        else:
+            return {
+                "success": False,
+                "result": "获取战力品信息失败。原因：{}".format(response.body.description),
+            }
+
     def get_garden_cave(self, id):
         url = f"/pvz/index.php/garden/index/id/{id}/sig/0"
         resp = self.wr.get(url)
@@ -221,6 +218,46 @@ class CaveMan:
         if garden_cave_item is None:
             return None
         return GardenCave(garden_cave_item, self.lib)
+
+    def use_sand(self, cave_id):
+        body = [float(cave_id)]
+        response = self.wr.amf_post(body, "api.cave.useTimesands", '/pvz/amf/', '使用时之沙')
+        if response.status == 0:
+            return {
+                "success": True,
+            }
+        elif response.status == 1:
+            return {
+                "success": False,
+                "result": response.body.description,
+            }
+        else:
+            raise NotImplementedError
+
+    def switch_garden_layer(self, target_layer, logger):
+        '''
+        target_layer in [1,2,3,4]
+
+        洞口已切换到第{}层
+        '''
+        target_char = "一二三四"[target_layer - 1]
+        body = [float(1), float(0), float(0), []]
+        while True:
+            response = self.wr.amf_post(
+                body, "api.garden.challenge", '/pvz/amf/', '切换花园层'
+            )
+            resp_text = response.body.description
+            if "洞口已切换" not in resp_text:
+                return {
+                    "success": False,
+                    "result": resp_text,
+                }
+            if target_char in resp_text:
+                return {
+                    "success": True,
+                    "result": resp_text,
+                }
+            logger.log(resp_text)
 
 
 class GardenCave:

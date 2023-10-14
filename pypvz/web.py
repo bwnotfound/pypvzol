@@ -7,6 +7,7 @@ import logging
 from time import sleep
 import threading
 from queue import Queue
+from pyamf import DecodeError, remoting, AMF0
 
 from .config import Config
 
@@ -81,7 +82,7 @@ class WebRequest:
     def hash(self, s):
         assert isinstance(s, str)
         return sha256(s.encode("utf-8")).hexdigest()
-    
+
     def get_private_cache(self, url):
         if "pvzol" not in url:
             return None
@@ -139,6 +140,7 @@ class WebRequest:
             func_list = args[0]
         else:
             func_list = args
+
         class RunThread(threading.Thread):
             def __init__(self, func, q, result):
                 super().__init__()
@@ -199,3 +201,26 @@ class WebRequest:
         if os.path.exists(self.cache_dir):
             shutil.rmtree(self.cache_dir)
             os.mkdir(self.cache_dir)
+            
+
+    def _amf_post_decode(self, url, data, msg, max_retry=3):
+        cnt = 0
+        while cnt < max_retry:
+            resp = self.post(url, data=data)
+            try:
+                resp_ev = remoting.decode(resp)
+                break
+            except DecodeError:
+                cnt += 1
+                logging.info("重新尝试请求{}".format(msg))
+                sleep(0.1)
+        else:
+            raise RuntimeError("请求{}失败，超过最大尝试次数{}次".format(msg, max_retry))
+        return resp_ev["/1"]
+
+    def amf_post(self, body, target, url, msg, max_retry=3):
+        req = remoting.Request(target=target, body=body)
+        ev = remoting.Envelope(AMF0)
+        ev['/1'] = req
+        bin_msg = remoting.encode(ev, strict=True)
+        return self._amf_post_decode(url, bin_msg.getvalue(), msg, max_retry)
