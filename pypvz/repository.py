@@ -77,12 +77,12 @@ class Repository:
                     time.sleep(3)
                     raise RuntimeError("刷新仓库出现问题")
                 cnt += 1
-                msg = "刷新仓库失败，选择等待0.5秒后重试。最多再等待{}次".format(max_retry - cnt)
+                msg = "刷新仓库失败，选择等待1秒后重试。最多再等待{}次".format(max_retry - cnt)
                 if logger is not None:
                     logger.log(msg)
                 else:
                     logging.info(msg)
-                time.sleep(0.5)
+                time.sleep(1)
         warehouse = root.find("warehouse")
         tools = warehouse.find("tools")
         organisms = warehouse.find("organisms")

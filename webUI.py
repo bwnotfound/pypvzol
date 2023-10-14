@@ -175,7 +175,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         free_max_input_layout = QHBoxLayout()
         free_max_input_box = QSpinBox()
         free_max_input_box.setMinimum(0)
-        free_max_input_box.setMaximum(10)
+        free_max_input_box.setMaximum(16)
         free_max_input_box.setValue(self.usersettings.challenge4Level.free_max)
 
         def free_max_input_box_value_changed(value):
@@ -272,12 +272,29 @@ class Challenge4levelSettingWindow(QMainWindow):
         self.show_lottery.setChecked(self.usersettings.challenge4Level.show_lottery)
         self.show_lottery.stateChanged.connect(self.show_lottery_stateChanged)
         right_panel_layout.addWidget(self.show_lottery)
+        
+        self.enable_stone = QCheckBox("允许挑战宝石副本")
+        self.enable_stone.setChecked(self.usersettings.challenge4Level.enable_stone)
+        self.enable_stone.stateChanged.connect(self.enable_stone_stateChanged)
+        right_panel_layout.addWidget(self.enable_stone)
+        
+        if self.usersettings.cfg.server == "私服":
+            self.enable_large_plant_team = QCheckBox("V4使用16格带级")
+            self.enable_large_plant_team.setChecked(self.usersettings.challenge4Level.enable_large_plant_team)
+            self.enable_large_plant_team.stateChanged.connect(self.enable_large_plant_team_stateChanged)
+            right_panel_layout.addWidget(self.enable_large_plant_team)
 
         right_panel.setLayout(right_panel_layout)
         main_layout.addWidget(right_panel)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def enable_large_plant_team_stateChanged(self):
+        self.usersettings.challenge4Level.enable_large_plant_team = self.enable_large_plant_team.isChecked()
+
+    def enable_stone_stateChanged(self):
+        self.usersettings.challenge4Level.enable_stone = self.enable_stone.isChecked()
 
     def current_cave_use_sand_stateChanged(self):
         self.selectd_cave.use_sand = self.current_cave_use_sand.isChecked()
@@ -618,11 +635,11 @@ class SettingWindow(QMainWindow):
 
         rest_time_input_widget = QWidget()
         rest_time_input_layout = QHBoxLayout()
-        rest_time_input_layout.addWidget(QLabel("休息时间(分钟):"))
+        rest_time_input_layout.addWidget(QLabel("休息时间(秒):"))
         rest_time_input_box = QSpinBox()
         rest_time_input_box.setMinimum(0)
-        rest_time_input_box.setMaximum(60 * 24)
-        rest_time_input_box.setValue(self.usersettings.rest_time // 60)
+        rest_time_input_box.setMaximum(60 * 60)
+        rest_time_input_box.setValue(self.usersettings.rest_time)
         rest_time_input_box.valueChanged.connect(self.rest_time_input_box_valueChanged)
         rest_time_input_layout.addWidget(rest_time_input_box)
         rest_time_input_widget.setLayout(rest_time_input_layout)

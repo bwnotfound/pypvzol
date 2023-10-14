@@ -1321,12 +1321,14 @@ class AutoSynthesisWindow(QMainWindow):
             "闪避": "miss",
             "穿透": "piercing",
             "护甲": "armor",
+            "HP特": "hp_max",
+            "攻击特": "attack",
         }
         return "{}({})[{}]-{}:{}".format(
             plant.name(self.usersettings.lib),
             plant.grade,
             plant.quality_str,
-            self.usersettings.auto_synthesis_man.chosen_attribute,
+            self.usersettings.auto_synthesis_man.chosen_attribute.replace("特", ""),
             format_number(
                 getattr(
                     plant,

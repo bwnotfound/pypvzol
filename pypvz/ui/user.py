@@ -32,7 +32,6 @@ class Challenge4Level:
         repo: Repository,
         lib: Library,
         caveMan: CaveMan,
-        grid_amount=10,
         free_max=10,
         logger: Logger = None,
     ):
@@ -43,7 +42,6 @@ class Challenge4Level:
         self.lib = lib
         self.caveMan = caveMan
         self.recoverMan = RecoverMan(cfg, repo)
-        self.grid_amount = grid_amount
         self.logger = logger
 
         self.caves: list[SingleCave] = []
@@ -61,6 +59,8 @@ class Challenge4Level:
         self.advanced_challenge_book_amount = 1
         self.enable_sand = False
         self.show_lottery = False
+        self.enable_stone = True
+        self.enable_large_plant_team = False
 
     def add_cave(
         self, cave: Cave, friend_ids=None, difficulty=3, enabled=True, garden_layer=None
@@ -159,16 +159,17 @@ class Challenge4Level:
     def _assemble_team(self, cave: Cave):
         team = []
         team_grid_amount = 0
+        team_limit = 10 if not self.enable_large_plant_team else 16
         for plant_id in self.main_plant_list:
             plant = self.repo.get_plant(plant_id)
             if plant is None:
                 continue
             width = plant.width(self.lib)
-            if team_grid_amount + width > self.grid_amount:
+            if team_grid_amount + width > team_limit:
                 break
             team.append(plant_id)
             team_grid_amount += width
-        if team_grid_amount == 10:
+        if team_grid_amount == team_limit:
             return team
 
         trash_plant_list = [
@@ -181,13 +182,13 @@ class Challenge4Level:
         )
         for plant in sorted_grade_trash_plant_list:
             width = plant.width(self.lib)
-            if team_grid_amount + width > self.grid_amount:
+            if team_grid_amount + width > team_limit:
                 continue
             if cave.grade - plant.grade < 5:
                 continue
             team.append(plant.id)
             team_grid_amount += width
-        if team_grid_amount < self.grid_amount - self.free_max:
+        if team_grid_amount < team_limit - self.free_max:
             return None
         return team
 
@@ -422,63 +423,64 @@ class Challenge4Level:
             return caves[number - 1]
 
         self.repo.refresh_repository(logger=self.logger)
-        for sc in self.caves:
-            if sc.cave.type != 4 or not sc.enabled:
-                continue
-            cave = get_stone_cave(sc.cave.layer, sc.cave.number)
-            if not cave.is_ready:
-                continue
-            team = self._assemble_team(cave)
-            if team is None:
-                continue
-            success = self._recover()
-            if not success:
-                return
-            difficulty = sc.difficulty
-
-            message = "挑战{}".format(
-                cave.format_name(difficulty),
-            )
-            cnt, max_retry = 0, 20
-            while cnt < max_retry:
-                result = self.caveMan.challenge(cave.id, team, difficulty, 4)
-                success, result = result["success"], result["result"]
+        while self.enable_stone:
+            for sc in self.caves:
+                if sc.cave.type != 4 or not sc.enabled:
+                    continue
+                cave = get_stone_cave(sc.cave.layer, sc.cave.number)
+                if not cave.is_ready:
+                    continue
+                team = self._assemble_team(cave)
+                if team is None:
+                    continue
+                success = self._recover()
                 if not success:
-                    if "频繁" in result:
-                        time.sleep(1)
-                        cnt += 1
-                        self.logger.log(
-                            "挑战过于频繁，选择等待1秒后重试。最多再等待{}次".format(max_retry - cnt)
-                        )
-                        if stop_channel.qsize() > 0:
-                            return
-                        continue
-                    message = message + "失败. 原因: {}.".format(result)
+                    return
+                difficulty = sc.difficulty
+
+                message = "挑战{}".format(
+                    cave.format_name(difficulty),
+                )
+                cnt, max_retry = 0, 20
+                while cnt < max_retry:
+                    result = self.caveMan.challenge(cave.id, team, difficulty, 4)
+                    success, result = result["success"], result["result"]
+                    if not success:
+                        if "频繁" in result:
+                            time.sleep(1)
+                            cnt += 1
+                            self.logger.log(
+                                "挑战过于频繁，选择等待1秒后重试。最多再等待{}次".format(max_retry - cnt)
+                            )
+                            if stop_channel.qsize() > 0:
+                                return
+                            continue
+                        message = message + "失败. 原因: {}.".format(result)
+                        self.logger.log(message)
+                        return
+                    else:
+                        message = message + "成功. "
+                        break
+                else:
+                    message = message + "失败. 原因: 挑战过于频繁.".format(result)
                     self.logger.log(message)
                     return
-                else:
-                    message = message + "成功. "
-                    break
-            else:
-                message = message + "失败. 原因: 挑战过于频繁.".format(result)
-                self.logger.log(message)
-                return
 
-            message = message + self.format_upgrade_message(result)
-            self.logger.log(message)
-            if self.pop_after_100:
-                trash_plant_list = [
-                    self.repo.get_plant(plant_id) for plant_id in self.trash_plant_list
-                ]
-                trash_plant_list = list(
-                    filter(
-                        lambda x: (x is not None) and x.grade < self.pop_grade,
-                        trash_plant_list,
+                message = message + self.format_upgrade_message(result)
+                self.logger.log(message)
+                if self.pop_after_100:
+                    trash_plant_list = [
+                        self.repo.get_plant(plant_id) for plant_id in self.trash_plant_list
+                    ]
+                    trash_plant_list = list(
+                        filter(
+                            lambda x: (x is not None) and x.grade < self.pop_grade,
+                            trash_plant_list,
+                        )
                     )
-                )
-                self.trash_plant_list = [x.id for x in trash_plant_list]
-            if stop_channel.qsize() > 0:
-                return
+                    self.trash_plant_list = [x.id for x in trash_plant_list]
+                if stop_channel.qsize() > 0:
+                    return
 
     def auto_challenge(self, stop_channel: Queue):
         # TODO: 显示功能：将process显示，可加速版
@@ -527,6 +529,8 @@ class Challenge4Level:
                     "advanced_challenge_book_amount": self.advanced_challenge_book_amount,
                     "enable_sand": self.enable_sand,
                     "show_lottery": self.show_lottery,
+                    "enable_stone": self.enable_stone,
+                    "enable_large_plant_team": self.enable_large_plant_team,
                 },
                 f,
             )
@@ -573,7 +577,7 @@ class AutoSynthesisMan:
         self.chosen_attribute = "HP"
         self.reinforce_number = 10
         self.auto_synthesis_pool_id = set()
-        self.attribute_list = ["HP", "攻击", "命中", "闪避", "穿透", "护甲"]
+        self.attribute_list = ["HP", "攻击", "命中", "闪避", "穿透", "护甲", "HP特", "攻击特"]
         self.attribute_book_dict = {
             "HP": lib.name2tool["HP合成书"].id,
             "攻击": lib.name2tool["攻击合成书"].id,
@@ -581,6 +585,8 @@ class AutoSynthesisMan:
             "闪避": lib.name2tool["闪避合成书"].id,
             "穿透": lib.name2tool["穿透合成书"].id,
             "护甲": lib.name2tool["护甲合成书"].id,
+            "HP特": lib.name2tool["特效HP合成书"].id,
+            "攻击特": lib.name2tool["特级攻击合成书"].id,
         }
 
     def check_data(self, refresh_repo=True):
@@ -627,6 +633,12 @@ class AutoSynthesisMan:
             return {"success": False, "result": "未设置底座"}
         if len(self.auto_synthesis_pool_id) == 0:
             return {"success": False, "result": "合成池为空"}
+        book = self.repo.get_tool(self.attribute_book_dict[self.chosen_attribute])
+        if book is None:
+            return {
+                "success": False,
+                "result": "没有{}合成书了".format(self.chosen_attribute),
+            }
         book_amount = self.repo.get_tool(
             self.attribute_book_dict[self.chosen_attribute]
         )['amount']
