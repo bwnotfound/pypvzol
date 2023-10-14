@@ -3,6 +3,7 @@ import os
 import time
 from queue import Queue
 import threading
+import requests
 
 from ..shop import Shop
 
@@ -265,7 +266,7 @@ class Challenge4Level:
                 message = message + "\n\t{}".format(lottery_result["result"])
         return message
 
-    def challenge_cave(self, stop_channel: Queue, garden_layer=None):
+    def challenge_cave(self, stop_channel: Queue):
         _cave_map = {}
 
         def get_cave(friend_id, id, type, layer):
@@ -297,6 +298,8 @@ class Challenge4Level:
                     sc.cave.type,
                     sc.cave.layer,
                 )
+                if cave is None:
+                    return
                 if not cave.is_ready:
                     if self.enable_sand and sc.use_sand:
                         sand_result = self.caveMan.use_sand(cave.cave_id)
@@ -483,14 +486,21 @@ class Challenge4Level:
 
         self.challenge_stone_fuben(stop_channel)
         if self.cfg.server == "官服":
-            self.challenge_cave(stop_channel)
+            try:
+                self.challenge_cave(stop_channel)
+            except Exception as e:
+                self.logger.log("挑战宝石副本异常，异常种类:{}。跳过宝石副本".format(type(e)))
         elif self.cfg.server != "私服":
             raise NotImplementedError
         else:
             if stop_channel.qsize() > 0:
                 return
             for garden_layer in self.garden_layer_caves.keys():
-                result = self.caveMan.switch_garden_layer(garden_layer, self.logger)
+                try:
+                    result = self.caveMan.switch_garden_layer(garden_layer, self.logger)
+                except Exception as e:
+                    self.logger.log("切换到{}层失败，异常种类:{}。跳过自动挑战".format(garden_layer, type(e)))
+                    return
                 self.logger.log(result["result"])
                 if not result["success"]:
                     return
@@ -500,7 +510,10 @@ class Challenge4Level:
                     )
                     if self.friend_id2cave is None:
                         raise RuntimeError("garden layer is not added 2")
-                self.challenge_cave(stop_channel, garden_layer=garden_layer)
+                try:
+                    self.challenge_cave(stop_channel)
+                except Exception as e:
+                    self.logger.log("挑战第{}层洞口异常，异常种类:{}。跳过该层".format(garden_layer, type(e)))
                 if stop_channel.qsize() > 0:
                     break
         self.logger.log("挑战完成")
@@ -725,48 +738,63 @@ class UserSettings:
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
         while stop_channel.qsize() == 0:
             if self.shop_enabled:
-                shop_info = self.shop.buy_list(list(self.shop_auto_buy_list), 1)
-                for good_p_id, amount in shop_info:
-                    self.logger.log(
-                        f"购买了{amount}个{self.lib.get_tool_by_id(good_p_id).name}"
-                    )
-                self.logger.log("购买完成")
+                try:
+                    shop_info = self.shop.buy_list(list(self.shop_auto_buy_list), 1)
+                    for good_p_id, amount in shop_info:
+                        self.logger.log(
+                            f"购买了{amount}个{self.lib.get_tool_by_id(good_p_id).name}"
+                        )
+                    self.logger.log("购买完成")
+                except Exception as e:
+                    self.logger.log(f"购买失败，异常种类:{type(e)}。跳过购买")
                 if stop_channel.qsize() > 0:
                     break
             if self.task_enabled:
-                self.task.refresh_task()
-                for i, enable in enumerate(self.enable_list):
-                    if not enable:
-                        continue
-                    tasks = self.task.task_list[i]
-                    for task in tasks:
-                        if task.state == 1:
-                            result = self.task.claim_reward(task, self.lib)
-                            self.logger.log(result['result'])
+                try:
+                    self.task.refresh_task()
+                    for i, enable in enumerate(self.enable_list):
+                        if not enable:
+                            continue
+                        tasks = self.task.task_list[i]
+                        for task in tasks:
+                            if task.state == 1:
+                                result = self.task.claim_reward(task, self.lib)
+                                self.logger.log(result['result'])
+                except Exception as e:
+                    self.logger.log(f"领取任务奖励失败，异常种类:{type(e)}。跳过领取任务奖励")
                 if stop_channel.qsize() > 0:
                     break
             if self.arena_enabled:
-                self.arena_man.refresh_arena()
-                while self.arena_man.challenge_num > 0:
-                    result = self.arena_man.challenge_first()
-                    if result['success']:
-                        result['result'] += ".还剩{}次挑战机会".format(
-                            self.arena_man.challenge_num - 1
-                        )
-                    self.logger.log(result['result'])
-                    if not result['success']:
-                        break
+                try:
                     self.arena_man.refresh_arena()
-                    if stop_channel.qsize() > 0:
-                        break
-            if stop_channel.qsize() > 0:
-                break
+                    while self.arena_man.challenge_num > 0:
+                        result = self.arena_man.challenge_first()
+                        if result['success']:
+                            result['result'] += ".还剩{}次挑战机会".format(
+                                self.arena_man.challenge_num - 1
+                            )
+                        self.logger.log(result['result'])
+                        if not result['success']:
+                            break
+                        self.arena_man.refresh_arena()
+                        if stop_channel.qsize() > 0:
+                            break
+                except Exception as e:
+                    self.logger.log(f"竞技场挑战失败，异常种类:{type(e)}。跳过竞技场挑战")
+                if stop_channel.qsize() > 0:
+                    break
             if self.auto_use_item_enabled:
-                self.auto_use_item(stop_channel)
-            if stop_channel.qsize() > 0:
-                break
+                try:
+                    self.auto_use_item(stop_channel)
+                except Exception as e:
+                    self.logger.log(f"自动使用道具失败，异常种类:{type(e)}。跳过自动使用道具")
+                if stop_channel.qsize() > 0:
+                    break
             if self.challenge4Level_enabled:
-                self.challenge4Level.auto_challenge(stop_channel)
+                try:
+                    self.challenge4Level.auto_challenge(stop_channel)
+                except Exception as e:
+                    self.logger.log(f"自动挑战失败，异常种类:{type(e)}。跳过自动挑战")
             self.logger.log("工作完成，等待{}".format(second2str(self.rest_time)))
             time.sleep(self.rest_time)
         finished_trigger.emit()
