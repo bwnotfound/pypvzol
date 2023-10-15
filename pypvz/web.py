@@ -1,5 +1,6 @@
 import requests
 import os
+from threading import Lock
 from hashlib import sha256
 import shutil
 from time import perf_counter
@@ -12,7 +13,8 @@ from pyamf import DecodeError, remoting, AMF0, AMF3
 from .config import Config
 
 method_max_retry = 3
-timeout = 7
+timeout = 5
+    
 
 # last_time = perf_counter()
 class LogTimeDecorator(object):

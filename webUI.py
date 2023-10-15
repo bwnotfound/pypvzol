@@ -41,6 +41,7 @@ from pypvz.ui.windows import (
     UpgradeQualityWindow,
     ShopAutoBuySetting,
     AutoSynthesisWindow,
+    HeritageWindow,
 )
 from pypvz.ui.user import SingleCave, UserSettings
 
@@ -763,12 +764,20 @@ class FunctionPanelWindow(QMainWindow):
         auto_synthesis_btn = QPushButton("自动合成面板")
         auto_synthesis_btn.clicked.connect(self.auto_synthesis_btn_clicked)
         menu_layout.addWidget(auto_synthesis_btn, 2, 0)
+        
+        heritage_btn = QPushButton("传承面板")
+        heritage_btn.clicked.connect(self.heritage_btn_clicked)
+        menu_layout.addWidget(heritage_btn, 3, 0)
 
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def heritage_btn_clicked(self):
+        self.heritage_window = HeritageWindow(self.usersettings, parent=self)
+        self.heritage_window.show()
 
     def upgrade_quality_btn_clicked(self):
         self.upgrade_quality_window = UpgradeQualityWindow(

@@ -44,10 +44,10 @@ class UpgradeMan:
             if response.body.description == "Error:t0004":  # 达到(可能是魔神)上限
                 reason = "升品失败。错误原因：植物品质达到上限"
                 result["error_type"] = 1
-            elif response.body.description == "该生物不存在":   
+            elif response.body.description == "该生物不存在":
                 reason = "升品失败。错误原因：该植物不存在"
                 result["error_type"] = 2
-            elif response.body.description == "道具异常":   # 没有刷新书了
+            elif response.body.description == "道具异常":  # 没有刷新书了
                 reason = "升品失败。错误原因：品质刷新书不足"
                 result["error_type"] = 3
             elif "频繁" in response.body.description:
@@ -106,3 +106,93 @@ class SynthesisMan:
         except Exception as e:
             raise RuntimeError(str(e))
         return resp_ev["/1"]
+
+
+class HeritageMan:
+    def __init__(self, cfg: Config, lib: Library):
+        self.lib = lib
+        self.cfg = cfg
+        self.wr = WebRequest(cfg)
+        self.heritage_book_dict = {
+            "HP": lib.name2tool["HP传承书"].id,
+            "攻击": lib.name2tool["攻击传承书"].id,
+            "命中": lib.name2tool["命中传承书"].id,
+            "闪避": lib.name2tool["闪避传承书"].id,
+            "护甲": lib.name2tool["护甲传承书"].id,
+            "穿透": lib.name2tool["穿透传承书"].id,
+            "速度": lib.name2tool["速度传承书"].id,
+        }
+        self.heritage_attribute_dict = {
+            "HP": "hp_max",
+            "攻击": "attack",
+            "命中": "precision",
+            "闪避": "miss",
+            "护甲": "armor",
+            "穿透": "piercing",
+            "速度": "speed",
+        }
+
+    def exchange_one(self, id1, id2, heritage_item_id, heritage_reinforce_number):
+        '''
+        api.tool.synthesis
+            request:
+                主id,副id,item_id,卷轴数
+            response:
+            (以下都是增加的值)
+                speed:
+                hp:
+                attack:
+                precision:
+                miss:
+            (fight是合成后的值)
+                fight:
+        '''
+        body = [
+            float(id2),
+            float(id1),
+            float(heritage_item_id),
+            float(heritage_reinforce_number),
+        ]
+        response = self.wr.amf_post(
+            body, 'api.apiorganism.exchangeOne', "/pvz/amf/", "传承单项属性"
+        )
+        if response.status != 0:
+            return {
+                "success": False,
+                "result": response.body.description,
+            }
+        else:
+            return {
+                "success": True,
+                "result": "单项属性传承成功",
+            }
+
+    def exchange_all(self, id1, id2):
+        '''
+        api.tool.synthesis
+            request:
+                主id,副id,item_id,卷轴数
+            response:
+            (以下都是增加的值)
+                speed:
+                hp:
+                attack:
+                precision:
+                miss:
+            (fight是合成后的值)
+                fight:
+        '''
+        body = [float(id2), float(id1)]
+        response = self.wr.amf_post(
+            body, 'api.apiorganism.exchangeAll', "/pvz/amf/", "传承全属性"
+        )
+        if response.status != 0:
+            return {
+                "success": False,
+                "result": response.body.description,
+            }
+        else:
+            return {
+                "success": True,
+                "result": "全属性传承成功",
+            }

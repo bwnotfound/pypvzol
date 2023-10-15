@@ -24,7 +24,7 @@ from ..repository import Repository
 from ..library import Library
 from .wrapped import QLabel
 from .user import UserSettings
-from ..upgrade import UpgradeMan
+from ..upgrade import UpgradeMan, HeritageMan
 from ..utils.common import format_number
 from ..repository import Plant
 
@@ -692,6 +692,10 @@ class AutoUseItemSettingWindow(QMainWindow):
                     continue
             self.usersettings.repo.refresh_repository()
             self.refresh_item_list()
+        except Exception as e:
+            self.usersettings.logger.log(
+                "部分使用道具出错，已暂停。原因类型：{}".format(type(e).__name__)
+            )
         finally:
             self.part_use_item_btn.setEnabled(True)
 
@@ -733,6 +737,10 @@ class AutoUseItemSettingWindow(QMainWindow):
                     self.usersettings.logger.log(result['result'])
             self.usersettings.repo.refresh_repository()
             self.refresh_item_list()
+        except Exception as e:
+            self.usersettings.logger.log(
+                "全部使用道具出错，已暂停。原因类型：{}".format(type(e).__name__)
+            )
         finally:
             self.use_item_all_btn.setEnabled(True)
 
@@ -990,7 +998,15 @@ class UpgradeQualityWindow(QMainWindow):
                 while True:
                     cnt, max_retry = 0, 15
                     while cnt < max_retry:
-                        result = self.upgradeMan.upgrade_quality(plant_id)
+                        try:
+                            result = self.upgradeMan.upgrade_quality(plant_id)
+                        except Exception as e:
+                            self.usersettings.logger.log(
+                                f"刷品异常，已跳过该植物，同时暂停1秒。原因种类：{type(e).__name__}"
+                            )
+                            error_flag = True
+                            sleep(1)
+                            break
                         cnt += 1
                         if result['success']:
                             break
@@ -1028,15 +1044,16 @@ class UpgradeQualityWindow(QMainWindow):
                     logging.info(msg)
                     if need_show_all_info:
                         self.usersettings.logger.log(msg, False)
-                if error_flag:
-                    break
                 self.refresh_plant_list()
                 QApplication.processEvents()
             self.usersettings.logger.log(f"刷品结束")
             self.usersettings.repo.refresh_repository()
             self.refresh_plant_list()
+        except Exception as e:
+            self.usersettings.logger.log(f"刷品过程中出现异常，已停止。原因种类：{type(e).__name__}")
         finally:
             self.upgrade_quality_btn.setEnabled(True)
+
 
 class ShopAutoBuySetting(QMainWindow):
     def __init__(self, usersettings: UserSettings, parent=None):
@@ -1555,3 +1572,204 @@ class AutoSynthesisWindow(QMainWindow):
                     )
             self.refresh_plant_list()
             self.refresh_plant_pool_list()
+
+
+class HeritageWindow(QMainWindow):
+    def __init__(self, usersettings: UserSettings, parent=None):
+        super().__init__(parent=parent)
+        self.usersettings = usersettings
+        self.heritage_man = HeritageMan(self.usersettings.cfg, self.usersettings.lib)
+        self.id1, self.id2 = None, None
+        self.init_ui()
+        self.refresh_plant_information()
+        self.refresh_plant_list()
+
+    def init_ui(self):
+        self.setWindowTitle("传承面板")
+
+        # 将窗口居中显示，宽度为显示器宽度的60%，高度为显示器高度的50%
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.7), int(screen_size.height() * 0.5))
+        self.move(int(screen_size.width() * 0.15), int(screen_size.height() * 0.25))
+
+        main_widget = QWidget()
+        main_layout = QHBoxLayout()
+
+        widget1 = QWidget()
+        widget1.setMinimumWidth(int(self.width() * 0.25))
+        widget1_layout = QVBoxLayout()
+        widget1_layout.addWidget(QLabel("植物一(传出属性的植物)"))
+        self.heritage_from_plant_list = QListWidget()
+        self.heritage_from_plant_list.setSelectionMode(
+            QListWidget.SelectionMode.SingleSelection
+        )
+        self.heritage_from_plant_list.itemClicked.connect(
+            self.heritage_from_plant_list_item_clicked
+        )
+        widget1_layout.addWidget(self.heritage_from_plant_list)
+        widget1.setLayout(widget1_layout)
+        main_layout.addWidget(widget1)
+
+        widget2 = QWidget()
+        widget2.setMinimumWidth(int(self.width() * 0.25))
+        widget2_layout = QVBoxLayout()
+        widget2_layout.addWidget(QLabel("植物二(接受属性的植物)"))
+        self.heritage_to_plant_list = QListWidget()
+        self.heritage_to_plant_list.setSelectionMode(
+            QListWidget.SelectionMode.SingleSelection
+        )
+        self.heritage_to_plant_list.itemClicked.connect(
+            self.heritage_to_plant_list_item_clicked
+        )
+        widget2_layout.addWidget(self.heritage_to_plant_list)
+        widget2.setLayout(widget2_layout)
+        main_layout.addWidget(widget2)
+
+        widget3 = QWidget()
+        widget3.setMinimumWidth(int(self.width() * 0.15))
+        widget3_layout = QVBoxLayout()
+        widget3_layout.addWidget(QLabel("植物一属性"))
+        self.heritage_from_plant_attribute_list = QPlainTextEdit()
+        self.heritage_from_plant_attribute_list.setReadOnly(True)
+        widget3_layout.addWidget(self.heritage_from_plant_attribute_list)
+        widget3.setLayout(widget3_layout)
+        main_layout.addWidget(widget3)
+
+        widget4 = QWidget()
+        widget4.setMinimumWidth(int(self.width() * 0.15))
+        widget4_layout = QVBoxLayout()
+        widget4_layout.addWidget(QLabel("植物二属性"))
+        self.heritage_to_plant_attribute_list = QPlainTextEdit()
+        self.heritage_to_plant_attribute_list.setReadOnly(True)
+        widget4_layout.addWidget(self.heritage_to_plant_attribute_list)
+        widget4.setLayout(widget4_layout)
+        main_layout.addWidget(widget4)
+
+        widget5 = QWidget()
+        widget5.setMinimumWidth(int(self.width() * 0.2))
+        widget5_layout = QVBoxLayout()
+        widget5_layout.addStretch(1)
+        self.book_choice = QComboBox()
+        self.book_choice.addItems(self.heritage_man.heritage_book_dict.keys())
+        self.book_choice.addItem("全属性")
+        self.book_choice.setCurrentIndex(0)
+        self.book_choice.currentIndexChanged.connect(self.refresh_plant_list)
+        widget5_layout.addWidget(self.book_choice)
+        self.reinforce_number_box = QComboBox()
+        self.reinforce_number_box.addItems([str(i) for i in range(1, 11)])
+        self.reinforce_number_box.setCurrentIndex(0)
+        widget5_layout.addWidget(self.reinforce_number_box)
+        self.heritage_btn = heritage_btn = QPushButton("进行传承")
+        heritage_btn.clicked.connect(self.heritage_btn_clicked)
+        widget5_layout.addWidget(heritage_btn)
+        space_widget = QWidget()
+        space_widget.setFixedHeight(10)
+        widget5_layout.addWidget(space_widget)
+        widget5_layout.addWidget(QLabel("提示，选择全属性\n不用管传承增强的选择"))
+        widget5_layout.addStretch(1)
+        widget5.setLayout(widget5_layout)
+        main_layout.addWidget(widget5)
+
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+    def format_plant_info(self, plant: Plant):
+        return "{}({})[{}]".format(
+            plant.name(self.usersettings.lib),
+            plant.grade,
+            plant.quality_str,
+        )
+
+    def refresh_plant_information(self):
+        if self.id1 is None:
+            self.heritage_from_plant_attribute_list.setPlainText("")
+        else:
+            plant = self.usersettings.repo.get_plant(self.id1)
+            if plant is None:
+                self.heritage_from_plant_attribute_list.setPlainText("")
+                self.id1 = None
+                self.usersettings.logger.log("仓库里没有id为{}的植物，可能已被删除".format(self.id1))
+            else:
+                message = self.format_plant_info(plant) + "\n"
+                for k, v in self.heritage_man.heritage_attribute_dict.items():
+                    message += "{}:{}\n".format(k, format_number(getattr(plant, v)))
+                self.heritage_from_plant_attribute_list.setPlainText(message)
+        if self.id2 is None:
+            self.heritage_to_plant_attribute_list.setPlainText("")
+        else:
+            plant = self.usersettings.repo.get_plant(self.id2)
+            if plant is None:
+                self.heritage_to_plant_attribute_list.setPlainText("")
+                self.id2 = None
+                self.usersettings.logger.log("仓库里没有id为{}的植物，可能已被删除".format(self.id2))
+            else:
+                message = self.format_plant_info(plant) + "\n"
+                for k, v in self.heritage_man.heritage_attribute_dict.items():
+                    message += "{}:{}\n".format(k, format_number(getattr(plant, v)))
+                self.heritage_to_plant_attribute_list.setPlainText(message)
+
+    def heritage_from_plant_list_item_clicked(self, item):
+        plant_id = item.data(Qt.ItemDataRole.UserRole)
+        self.id1 = plant_id
+        self.refresh_plant_information()
+
+    def heritage_to_plant_list_item_clicked(self, item):
+        plant_id = item.data(Qt.ItemDataRole.UserRole)
+        self.id2 = plant_id
+        self.refresh_plant_information()
+
+    def heritage_btn_clicked(self):
+        if self.id1 is None:
+            self.usersettings.logger.log("请先选择植物一")
+            return
+        if self.id2 is None:
+            self.usersettings.logger.log("请先选择植物二")
+            return
+        if self.id1 == self.id2:
+            self.usersettings.logger.log("植物一和植物二不能相同")
+            return
+        self.heritage_btn.setDisabled(True)
+        QApplication.processEvents()
+        try:
+            book_name = self.book_choice.currentText()
+            if book_name == "全属性":
+                result = self.heritage_man.exchange_all(self.id1, self.id2)
+            else:
+                reinforce_number = int(self.reinforce_number_box.currentText())
+                book_id = self.heritage_man.heritage_book_dict[book_name]
+                result = self.heritage_man.exchange_one(
+                    self.id1, self.id2, book_id, reinforce_number
+                )
+            self.usersettings.logger.log(result["result"])
+            self.usersettings.repo.refresh_repository()
+            if result["success"]:
+                self.id1 = None
+            self.refresh_plant_information()
+            self.refresh_plant_list()
+        except Exception as e:
+            self.usersettings.logger.log("传承失败，异常种类：{}".format(type(e).__name__))
+            return
+        finally:
+            self.heritage_btn.setEnabled(True)
+
+    def refresh_plant_list(self):
+        self.heritage_from_plant_list.clear()
+        self.heritage_to_plant_list.clear()
+        current_attribute_name = self.book_choice.currentText()
+        if current_attribute_name == "全属性":
+            current_attribute_name = "HP"
+        current_attribute = self.heritage_man.heritage_attribute_dict[
+            current_attribute_name
+        ]
+        for plant in self.usersettings.repo.plants:
+            if plant is None:
+                continue
+            msg = self.format_plant_info(plant) + "-{}:{}".format(
+                current_attribute_name, format_number(getattr(plant, current_attribute))
+            )
+            item = QListWidgetItem(msg)
+            item.setData(Qt.ItemDataRole.UserRole, plant.id)
+            self.heritage_from_plant_list.addItem(item)
+            item = QListWidgetItem(msg)
+            item.setData(Qt.ItemDataRole.UserRole, plant.id)
+            self.heritage_to_plant_list.addItem(item)
