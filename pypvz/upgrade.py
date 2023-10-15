@@ -50,6 +50,8 @@ class UpgradeMan:
             elif response.body.description == "道具异常":   # 没有刷新书了
                 reason = "升品失败。错误原因：品质刷新书不足"
                 result["error_type"] = 3
+            elif "频繁" in response.body.description:
+                result["error_type"] = 6
             else:
                 reason = f"升品失败。错误原因：{response.body.description}"
                 result["error_type"] = 4

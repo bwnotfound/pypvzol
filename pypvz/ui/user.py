@@ -483,7 +483,7 @@ class Challenge4Level:
             try:
                 self.challenge_cave(stop_channel)
             except Exception as e:
-                self.logger.log("挑战宝石副本异常，异常种类:{}。跳过宝石副本".format(type(e)))
+                self.logger.log("挑战宝石副本异常，异常种类:{}。跳过宝石副本".format(type(e).__name__))
         elif self.cfg.server != "私服":
             raise NotImplementedError
         else:
@@ -494,7 +494,7 @@ class Challenge4Level:
                     result = self.caveMan.switch_garden_layer(garden_layer, self.logger)
                 except Exception as e:
                     self.logger.log(
-                        "切换到{}层失败，异常种类:{}。跳过自动挑战".format(garden_layer, type(e))
+                        "切换到{}层失败，异常种类:{}。跳过自动挑战".format(garden_layer, type(e).__name__)
                     )
                     return
                 self.logger.log(result["result"])
@@ -510,7 +510,7 @@ class Challenge4Level:
                     self.challenge_cave(stop_channel)
                 except Exception as e:
                     self.logger.log(
-                        "挑战第{}层洞口异常，异常种类:{}。跳过该层".format(garden_layer, type(e))
+                        "挑战第{}层洞口异常，异常种类:{}。跳过该层".format(garden_layer, type(e).__name__)
                     )
                 if stop_channel.qsize() > 0:
                     break
@@ -755,7 +755,7 @@ class UserSettings:
                         )
                     self.logger.log("购买完成")
                 except Exception as e:
-                    self.logger.log(f"购买失败，异常种类:{type(e)}。跳过购买")
+                    self.logger.log(f"购买失败，异常种类:{type(e).__name__}。跳过购买")
                 if stop_channel.qsize() > 0:
                     break
             if self.task_enabled:
@@ -770,7 +770,7 @@ class UserSettings:
                                 result = self.task.claim_reward(task, self.lib)
                                 self.logger.log(result['result'])
                 except Exception as e:
-                    self.logger.log(f"领取任务奖励失败，异常种类:{type(e)}。跳过领取任务奖励")
+                    self.logger.log(f"领取任务奖励失败，异常种类:{type(e).__name__}。跳过领取任务奖励")
                 if stop_channel.qsize() > 0:
                     break
             if self.arena_enabled:
@@ -789,21 +789,21 @@ class UserSettings:
                         if stop_channel.qsize() > 0:
                             break
                 except Exception as e:
-                    self.logger.log(f"竞技场挑战失败，异常种类:{type(e)}。跳过竞技场挑战")
+                    self.logger.log(f"竞技场挑战失败，异常种类:{type(e).__name__}。跳过竞技场挑战")
                 if stop_channel.qsize() > 0:
                     break
             if self.auto_use_item_enabled:
                 try:
                     self.auto_use_item(stop_channel)
                 except Exception as e:
-                    self.logger.log(f"自动使用道具失败，异常种类:{type(e)}。跳过自动使用道具")
+                    self.logger.log(f"自动使用道具失败，异常种类:{type(e).__name__}。跳过自动使用道具")
                 if stop_channel.qsize() > 0:
                     break
             if self.challenge4Level_enabled:
                 try:
                     self.challenge4Level.auto_challenge(stop_channel)
                 except Exception as e:
-                    self.logger.log(f"自动挑战失败，异常种类:{type(e)}。跳过自动挑战")
+                    self.logger.log(f"自动挑战失败，异常种类:{type(e).__name__}。跳过自动挑战")
             self.logger.log("工作完成，等待{}".format(second2str(self.rest_time)))
             time.sleep(self.rest_time)
         finished_trigger.emit()

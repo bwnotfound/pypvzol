@@ -12,7 +12,7 @@ from pyamf import DecodeError, remoting, AMF0, AMF3
 from .config import Config
 
 method_max_retry = 3
-
+timeout = 7
 
 # last_time = perf_counter()
 class LogTimeDecorator(object):
@@ -112,7 +112,7 @@ class WebRequest:
                 kwargs["headers"] = {}
             self.init_header(kwargs["headers"])
         if "timeout" not in kwargs:
-            kwargs["timeout"] = 3
+            kwargs["timeout"] = timeout
 
         if not use_cache:
             resp = requests.get(url, **kwargs)
@@ -174,7 +174,7 @@ class WebRequest:
             return private_cached
         
         if "timeout" not in kwargs:
-            kwargs["timeout"] = 3
+            kwargs["timeout"] = timeout
 
         def check_status(status_code):
             if status_code != 200:

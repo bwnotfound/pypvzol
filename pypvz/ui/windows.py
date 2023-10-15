@@ -1,6 +1,6 @@
 import logging
 import concurrent.futures
-import typing
+from time import sleep
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -658,67 +658,83 @@ class AutoUseItemSettingWindow(QMainWindow):
         pass
 
     def part_use_item_btn_clicked(self):
-        cur_index = self.item_list_tab.currentIndex()
-        if cur_index == 0:
-            selected_items = self.item_list.selectedItems()
-        elif cur_index == 1:
-            selected_items = self.box_list.selectedItems()
-        else:
-            self.usersettings.logger.log("请选择道具或宝箱")
-            return
-        amount = self.part_use_amount.value()
-        for item in selected_items:
-            tool_id = item.data(Qt.ItemDataRole.UserRole)
-            repo_tool = self.usersettings.repo.get_tool(tool_id)
-            if repo_tool is None:
-                continue
-            tool_type = self.usersettings.lib.get_tool_by_id(tool_id).type
-            if tool_type == 3:
-                result = self.usersettings.repo.open_box(
-                    tool_id, amount, self.usersettings.lib
-                )
+        self.part_use_item_btn.setDisabled(True)
+        QApplication.processEvents()
+        try:
+            cur_index = self.item_list_tab.currentIndex()
+            if cur_index == 0:
+                selected_items = self.item_list.selectedItems()
+            elif cur_index == 1:
+                selected_items = self.box_list.selectedItems()
             else:
-                result = self.usersettings.repo.use_item(
-                    tool_id, amount, self.usersettings.lib
-                )
-            self.usersettings.logger.log(result['result'])
-            if not result['success']:
-                continue
-        self.usersettings.repo.refresh_repository()
-        self.refresh_item_list()
+                self.usersettings.logger.log("请选择道具或宝箱")
+                return
+            if len(selected_items) == 0:
+                self.usersettings.logger.log("请先选中物品")
+                return
+            amount = self.part_use_amount.value()
+            for item in selected_items:
+                tool_id = item.data(Qt.ItemDataRole.UserRole)
+                repo_tool = self.usersettings.repo.get_tool(tool_id)
+                if repo_tool is None:
+                    continue
+                tool_type = self.usersettings.lib.get_tool_by_id(tool_id).type
+                if tool_type == 3:
+                    result = self.usersettings.repo.open_box(
+                        tool_id, amount, self.usersettings.lib
+                    )
+                else:
+                    result = self.usersettings.repo.use_item(
+                        tool_id, amount, self.usersettings.lib
+                    )
+                self.usersettings.logger.log(result['result'])
+                if not result['success']:
+                    continue
+            self.usersettings.repo.refresh_repository()
+            self.refresh_item_list()
+        finally:
+            self.part_use_item_btn.setEnabled(True)
 
     def use_item_all_btn_clicked(self):
-        cur_index = self.item_list_tab.currentIndex()
-        if cur_index == 0:
-            selected_items = self.item_list.selectedItems()
-        elif cur_index == 1:
-            selected_items = self.box_list.selectedItems()
-        else:
-            self.usersettings.logger.log("请选择道具或宝箱")
-            return
-        for item in selected_items:
-            tool_id = item.data(Qt.ItemDataRole.UserRole)
-            repo_tool = self.usersettings.repo.get_tool(tool_id)
-            if repo_tool is None:
-                continue
-            tool_type = self.usersettings.lib.get_tool_by_id(tool_id).type
-            amount = repo_tool['amount']
-            if tool_type == 3:
-                while amount > 0:
-                    result = self.usersettings.repo.open_box(
-                        tool_id, 99999, self.usersettings.lib
+        self.use_item_all_btn.setDisabled(True)
+        QApplication.processEvents()
+        try:
+            cur_index = self.item_list_tab.currentIndex()
+            if cur_index == 0:
+                selected_items = self.item_list.selectedItems()
+            elif cur_index == 1:
+                selected_items = self.box_list.selectedItems()
+            else:
+                self.usersettings.logger.log("请选择道具或宝箱")
+                return
+            if len(selected_items) == 0:
+                self.usersettings.logger.log("请先选中物品")
+                return
+            for item in selected_items:
+                tool_id = item.data(Qt.ItemDataRole.UserRole)
+                repo_tool = self.usersettings.repo.get_tool(tool_id)
+                if repo_tool is None:
+                    continue
+                tool_type = self.usersettings.lib.get_tool_by_id(tool_id).type
+                amount = repo_tool['amount']
+                if tool_type == 3:
+                    while amount > 0:
+                        result = self.usersettings.repo.open_box(
+                            tool_id, 99999, self.usersettings.lib
+                        )
+                        self.usersettings.logger.log(result['result'])
+                        if not result['success']:
+                            break
+                        amount -= result['open_amount']
+                else:
+                    result = self.usersettings.repo.use_item(
+                        tool_id, amount, self.usersettings.lib
                     )
                     self.usersettings.logger.log(result['result'])
-                    if not result['success']:
-                        break
-                    amount -= result['open_amount']
-            else:
-                result = self.usersettings.repo.use_item(
-                    tool_id, amount, self.usersettings.lib
-                )
-                self.usersettings.logger.log(result['result'])
-        self.usersettings.repo.refresh_repository()
-        self.refresh_item_list()
+            self.usersettings.repo.refresh_repository()
+            self.refresh_item_list()
+        finally:
+            self.use_item_all_btn.setEnabled(True)
 
     def auto_use_item_btn_clicked(self):
         cur_index = self.item_list_tab.currentIndex()
@@ -889,15 +905,11 @@ class ChallengeGardenCaveSetting(QMainWindow):
 
 
 class UpgradeQualityWindow(QMainWindow):
-    upgrade_finished_signal = pyqtSignal(int)
-
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
         self.usersettings = usersettings
         self.upgradeMan = UpgradeMan(self.usersettings.cfg)
         self.init_ui()
-        self.upgrade_thread = None
-        self.upgrade_finished_signal.connect(self.upgrade_finished)
 
     def init_ui(self):
         self.setWindowTitle("升级品质")
@@ -953,19 +965,14 @@ class UpgradeQualityWindow(QMainWindow):
         self.upgrade_quality_btn.setDisabled(True)
         QApplication.processEvents()
         try:
-            if self.upgrade_thread is not None:
-                self.usersettings.logger.log("正在升级品质，请稍后再试")
-                return
             selected_items = self.plant_list.selectedItems()
             if len(selected_items) == 0:
-                logging.info("请先选择一个植物")
                 self.usersettings.logger.log("请先选择一个植物")
                 return
             selected_plant_id = [
                 item.data(Qt.ItemDataRole.UserRole) for item in selected_items
             ]
             need_show_all_info = self.show_all_info.isChecked()
-            args = []
             target_quality_index = self.upgradeMan.quality_name.index(
                 self.upgrade_quality_choice.currentText()
             )
@@ -974,79 +981,62 @@ class UpgradeQualityWindow(QMainWindow):
                 if plant is None:
                     continue
                 if plant.quality_index >= target_quality_index:
-                    continue
-                args.append(
-                    (
-                        plant_id,
-                        "{}({})".format(plant.name(self.usersettings.lib), plant.grade),
-                        target_quality_index,
-                        need_show_all_info,
-                        self.upgradeMan,
-                        self.usersettings.logger,
+                    self.usersettings.logger.log(
+                        f"{plant.name(self.usersettings.lib)}({plant.grade})品质已大于等于目标品质"
                     )
-                )
-            self.upgrade_thread = UpgradeQualityThread(
-                args, self.upgrade_finished_signal, parent=self  # TODO: 这里添加可选work_nums
-            )
-            self.upgrade_thread.start()
+                    continue
+
+                error_flag = False
+                while True:
+                    cnt, max_retry = 0, 15
+                    while cnt < max_retry:
+                        result = self.upgradeMan.upgrade_quality(plant_id)
+                        cnt += 1
+                        if result['success']:
+                            break
+                        else:
+                            if result['error_type'] == 6:
+                                self.usersettings.logger.log(
+                                    "请求升品过于频繁，选择等待1秒后重试，最多再重试{}".format(max_retry - cnt)
+                                )
+                                sleep(1)
+                                continue
+                            else:
+                                self.usersettings.logger.log(result['result'])
+                                error_flag = True
+                                break
+                    else:
+                        self.usersettings.logger.log("重试次数过多，放弃升级品质")
+                        error_flag = True
+                    if error_flag:
+                        break
+                    cur_quality_index = self.upgradeMan.quality_name.index(
+                        result['quality_name']
+                    )
+                    plant.quality_index = cur_quality_index
+                    plant.quality_str = result['quality_name']
+                    if cur_quality_index >= target_quality_index:
+                        self.usersettings.logger.log(
+                            f"{plant.name(self.usersettings.lib)}({plant.grade})升品完成"
+                        )
+                        break
+                    msg = "{}({})升品成功。当前品质：{}".format(
+                        plant.name(self.usersettings.lib),
+                        plant.grade,
+                        result['quality_name'],
+                    )
+                    logging.info(msg)
+                    if need_show_all_info:
+                        self.usersettings.logger.log(msg, False)
+                if error_flag:
+                    break
+                self.refresh_plant_list()
+                QApplication.processEvents()
+            self.usersettings.logger.log(f"刷品结束")
+            self.usersettings.repo.refresh_repository()
+            self.refresh_plant_list()
         finally:
             self.upgrade_quality_btn.setEnabled(True)
-
-    def upgrade_finished(self, length):
-        self.usersettings.logger.log(f"升级品质完成，共升级{length}个植物")
-        self.upgrade_thread = None
-        self.usersettings.repo.refresh_repository()
-        self.refresh_plant_list()
-
-
-def _upgrade_quality(
-    plant_id,
-    plant_info: str,
-    target_index,
-    show_all_info,
-    upgradeMan: UpgradeMan,
-    logger,
-):
-    while True:
-        result = upgradeMan.upgrade_quality(plant_id)
-        result["result"] = plant_info + result["result"]
-        logging.info(result['result'])
-        if show_all_info:
-            logger.log(result['result'], False)
-        if result['success']:
-            cur_quality_index = upgradeMan.quality_name.index(result['quality_name'])
-            if cur_quality_index >= target_index:
-                logger.log(f"{plant_info}升品完成")
-                break
-        else:
-            break
-
-
-class UpgradeQualityThread(QThread):
-    def __init__(self, arg_list, finish_signal, work_nums=2, parent=None):
-        super().__init__(parent=parent)
-        self.arg_list = arg_list
-        self.finish_signal = finish_signal
-        self.work_nums = work_nums
-
-    def run(self):
-        futures = []
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.work_nums
-        ) as executor:
-            futures = [
-                executor.submit(_upgrade_quality, *args) for args in self.arg_list
-            ]
-        success_num = 0
-        for i, future in enumerate(concurrent.futures.as_completed(futures)):
-            try:
-                future.result()
-                logging.info("第{}个植物升品完成".format(i + 1))
-                success_num += 1
-            except Exception as e:
-                logging.warning("第{}个植物升品失败。原因：{}".format(i + 1, str(e)))
-        self.finish_signal.emit(success_num)
-
 
 class ShopAutoBuySetting(QMainWindow):
     def __init__(self, usersettings: UserSettings, parent=None):
@@ -1346,7 +1336,7 @@ class AutoSynthesisWindow(QMainWindow):
             plant = int(plant)
         if isinstance(plant, int):
             plant = self.usersettings.repo.get_plant(plant)
-        assert isinstance(plant, Plant), type(plant)
+        assert isinstance(plant, Plant), type(plant).__name__
         return "{}({})[{}]-{}:{}".format(
             plant.name(self.usersettings.lib),
             plant.grade,
@@ -1478,7 +1468,7 @@ class AutoSynthesisWindow(QMainWindow):
         self.usersettings.auto_synthesis_man.main_plant_id = None
         self.refresh_main_plant_text_box()
         self.refresh_plant_list()
-        
+
     def need_synthesis(self):
         target_value = self.get_end_value()
         current_value = self.get_main_plant_attribute()
@@ -1500,6 +1490,8 @@ class AutoSynthesisWindow(QMainWindow):
             self.usersettings.logger.log(result['result'])
             self.usersettings.auto_synthesis_man.check_data()
             self.refresh_all()
+        except Exception as e:
+            self.usersettings.logger.log("合成异常。异常种类：{}".format(type(e).__name__))
         finally:
             self.auto_synthesis_single_btn.setEnabled(True)
 
@@ -1507,7 +1499,6 @@ class AutoSynthesisWindow(QMainWindow):
         self.auto_synthesis_btn.setDisabled(True)
         QApplication.processEvents()
         try:
-            
             length = len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id)
             if length == 0:
                 self.usersettings.logger.log("合成池为空")
@@ -1534,6 +1525,8 @@ class AutoSynthesisWindow(QMainWindow):
                     return
                 length -= 1
             self.usersettings.logger.log("合成完成")
+        except Exception as e:
+            self.usersettings.logger.log("合成异常。异常种类：{}".format(type(e).__name__))
         finally:
             self.auto_synthesis_btn.setEnabled(True)
 
