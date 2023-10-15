@@ -96,7 +96,9 @@ class Challenge4Level:
                 )
             for friend_id in friend_ids:
                 sc.friend_id_list.append(friend_id)
-                self.friend_id2cave.setdefault(friend_id, set()).add((cave.id, cave.name))
+                self.friend_id2cave.setdefault(friend_id, set()).add(
+                    (cave.id, cave.name)
+                )
             if self.cfg.server == "私服":
                 self.garden_layer_caves.setdefault(garden_layer, []).append(sc)
             self.caves.append(sc)
@@ -117,9 +119,7 @@ class Challenge4Level:
         else:
             raise RuntimeError("cave not exists1")
         if self.cfg.server == "私服":
-            self.friend_id2cave = self.garden_layer_friend_id2cave.get(
-                garden_layer
-            )
+            self.friend_id2cave = self.garden_layer_friend_id2cave.get(garden_layer)
 
         if sc.cave.type <= 3:
             pop_list = []
@@ -210,18 +210,15 @@ class Challenge4Level:
             self.logger.log("成功给{}个植物回复血量".format(success_num_all))
         return True
 
-    def format_upgrade_message(self, response_body):
+    def format_upgrade_message(self, team, response_body):
         message = ""
         plant_list = list(
             filter(
                 lambda x: x is not None,
-                [
-                    self.repo.get_plant(int(plant_id['id']))
-                    for plant_id in response_body['assailants']
-                ],
+                [self.repo.get_plant(plant_id) for plant_id in team],
             )
         )
-        message = message + "\n\t出战植物: {}".format(
+        message = message + "\n\t尝试出战植物: {}".format(
             ' '.join(
                 [
                     "{}({})".format(plant.name(self.lib), plant.grade)
@@ -229,28 +226,24 @@ class Challenge4Level:
                 ]
             )
         )
-        grade_copy_list = [plant.grade for plant in plant_list]
+        plant_grade_list = [(plant.id, plant.grade) for plant in plant_list]
         self.repo.refresh_repository(logger=self.logger)
-        plant_list = list(
-            filter(
-                lambda x: x is not None,
-                [
-                    self.repo.get_plant(int(plant_id['id']))
-                    for plant_id in response_body['assailants']
-                ],
-            )
-        )
-        upgrade_list = [
+        upgrade_data_list = []
+        for plant_id, grade in plant_grade_list:
+            after_plant = self.repo.get_plant(plant_id)
+            if after_plant is None or after_plant.grade == grade:
+                continue
+            upgrade_data_list.append((after_plant, grade, after_plant.grade))
+        upgrade_msg_list = [
             "{}({}->{})".format(
                 plant.name(self.lib),
-                grade_copy_list[i],
-                plant.grade,
+                grade1,
+                grade2,
             )
-            for i, plant in enumerate(plant_list)
-            if plant.grade != grade_copy_list[i]
+            for plant, grade1, grade2 in upgrade_data_list
         ]
-        if len(upgrade_list) > 0:
-            message = message + "\n\t升级植物: {}".format(' '.join(upgrade_list))
+        if len(upgrade_msg_list) > 0:
+            message = message + "\n\t升级植物: {}".format(' '.join(upgrade_msg_list))
         if self.show_lottery:
             lottery_result = self.caveMan.get_lottery(response_body)
             if lottery_result["success"]:
@@ -387,7 +380,7 @@ class Challenge4Level:
                     self.logger.log(message)
                     return
 
-                message = message + self.format_upgrade_message(result)
+                message = message + self.format_upgrade_message(team, result)
                 self.logger.log(message)
                 if self.pop_after_100:
                     trash_plant_list = [
@@ -461,11 +454,12 @@ class Challenge4Level:
                     self.logger.log(message)
                     return
                 has_challenged = True
-                message = message + self.format_upgrade_message(result)
+                message = message + self.format_upgrade_message(team, result)
                 self.logger.log(message)
                 if self.pop_after_100:
                     trash_plant_list = [
-                        self.repo.get_plant(plant_id) for plant_id in self.trash_plant_list
+                        self.repo.get_plant(plant_id)
+                        for plant_id in self.trash_plant_list
                     ]
                     trash_plant_list = list(
                         filter(
@@ -499,7 +493,9 @@ class Challenge4Level:
                 try:
                     result = self.caveMan.switch_garden_layer(garden_layer, self.logger)
                 except Exception as e:
-                    self.logger.log("切换到{}层失败，异常种类:{}。跳过自动挑战".format(garden_layer, type(e)))
+                    self.logger.log(
+                        "切换到{}层失败，异常种类:{}。跳过自动挑战".format(garden_layer, type(e))
+                    )
                     return
                 self.logger.log(result["result"])
                 if not result["success"]:
@@ -513,7 +509,9 @@ class Challenge4Level:
                 try:
                     self.challenge_cave(stop_channel)
                 except Exception as e:
-                    self.logger.log("挑战第{}层洞口异常，异常种类:{}。跳过该层".format(garden_layer, type(e)))
+                    self.logger.log(
+                        "挑战第{}层洞口异常，异常种类:{}。跳过该层".format(garden_layer, type(e))
+                    )
                 if stop_channel.qsize() > 0:
                     break
         self.logger.log("挑战完成")
@@ -596,6 +594,16 @@ class AutoSynthesisMan:
             "HP特": lib.name2tool["特效HP合成书"].id,
             "攻击特": lib.name2tool["特级攻击合成书"].id,
         }
+        self.attribute2plant_attribute = {
+            "HP": "hp_max",
+            "攻击": "attack",
+            "命中": "precision",
+            "闪避": "miss",
+            "穿透": "piercing",
+            "护甲": "armor",
+            "HP特": "hp_max",
+            "攻击特": "attack",
+        }
 
     def check_data(self, refresh_repo=True):
         if refresh_repo:
@@ -635,8 +643,9 @@ class AutoSynthesisMan:
         result['result'] = "合成成功"
         return result
 
-    def synthesis(self):
-        self.check_data()
+    def synthesis(self, need_check=True):
+        if need_check:
+            self.check_data(need_check)
         if self.main_plant_id is None:
             return {"success": False, "result": "未设置底座"}
         if len(self.auto_synthesis_pool_id) == 0:
