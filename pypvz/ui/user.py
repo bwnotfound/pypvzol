@@ -64,6 +64,9 @@ class Challenge4Level:
         self.enable_large_plant_team = False
 
         self.disable_cave_info_fetch = False
+        self.challenge_sand_cave_only_in_disable_mode = True
+        self.need_recover = True
+        
         self.current_garden_layer = None
 
     def add_cave(
@@ -156,7 +159,7 @@ class Challenge4Level:
         else:
             raise NotImplementedError
 
-    def _assemble_team(self, cave: Cave):
+    def _assemble_team(self, grade):
         team = []
         team_grid_amount = 0
         team_limit = 10 if not self.enable_large_plant_team else 16
@@ -184,7 +187,7 @@ class Challenge4Level:
             width = plant.width(self.lib)
             if team_grid_amount + width > team_limit:
                 continue
-            if cave.grade - plant.grade < 5:
+            if grade - plant.grade < 5:
                 continue
             team.append(plant.id)
             team_grid_amount += width
@@ -285,54 +288,68 @@ class Challenge4Level:
                         break
                 else:
                     continue
-                if not sc.enabled:
+                if not sc.enabled or sc.cave.type not in [1, 2, 3]:
                     continue
                 if self.disable_cave_info_fetch:
-                    if not hasattr(sc, "friend_id2cave_id"):
+                    if self.challenge_sand_cave_only_in_disable_mode:
+                        if not sc.use_sand:
+                            continue
+                    if not hasattr(sc, "friend_id2cave_id"):    
                         sc.friend_id2cave_id = {}
                     cave_id = sc.friend_id2cave_id.get(friend_id, None)
                     if cave_id is None:
                         self.switch_garden_layer(sc.garden_layer)
                         cave = get_cave(friend_id, sc)
-                cave = get_cave(
-                    friend_id,
-                    sc,
-                )
-                if cave is None:
-                    return
-                if not cave.is_ready:
+                        cave_id = cave.cave_id
+                        sc.friend_id2cave_id[friend_id] = cave_id
+                        
                     if self.enable_sand and sc.use_sand:
-                        sand_result = self.caveMan.use_sand(cave.cave_id)
+                        sand_result = self.caveMan.use_sand(cave_id)
                         if sand_result["success"]:
                             self.logger.log(
-                                "成功对{}使用时之沙".format(cave.format_name(sc.difficulty))
+                                "成功对{}使用时之沙".format(sc.cave.format_name(sc.difficulty))
                             )
                         else:
+                            self.logger.log(sand_result["result"])
                             continue
-                    else:
-                        continue
+                else:
+                    cave = get_cave(
+                        friend_id,
+                        sc,
+                    )
+                    cave_id = cave.cave_id
+                    if not cave.is_ready:
+                        if self.enable_sand and sc.use_sand:
+                            sand_result = self.caveMan.use_sand(cave_id)
+                            if sand_result["success"]:
+                                self.logger.log(
+                                    "成功对{}使用时之沙".format(sc.cave.format_name(sc.difficulty))
+                                )
+                            else:
+                                self.logger.log(sand_result["result"])
+                                continue
+                        else:
+                            continue
 
-                team = self._assemble_team(cave)
+                team = self._assemble_team(sc.cave.grade)
                 if team is None:
                     continue
-
-                success = self._recover()
-                if not success:
-                    return
-
+                if self.need_recover:
+                    success = self._recover()
+                    if not success:
+                        return
                 difficulty = sc.difficulty
-
                 friend = self.friendman.id2friend[friend_id]
 
                 message = "挑战{}({}) {}".format(
                     friend.name,
                     friend.grade,
-                    cave.format_name(difficulty),
+                    sc.cave.format_name(difficulty),
                 )
                 cnt, max_retry = 0, 20
                 while cnt < max_retry:
                     result = self.caveMan.challenge(
-                        cave.cave_id, team, difficulty, cave.type
+                        cave_id, team, difficulty, sc.cave.type
                     )
                     success, result = result["success"], result["result"]
                     if not success:
@@ -362,20 +379,20 @@ class Challenge4Level:
                             if stop_channel.qsize() > 0:
                                 return
                             continue
-                        if "冷却中" in result and (self.enable_sand and sc.use_sand):
-                            sand_result = self.caveMan.use_sand(cave.cave_id)
-                            if sand_result["success"]:
-                                self.logger.log(
-                                    "成功对{}使用时之沙".format(cave.format_name(difficulty))
-                                )
-                                message = message + "成功. "
-                                break
-                            else:
-                                message = message + "失败. 原因: {}.".format(
-                                    sand_result["result"]
-                                )
-                                self.logger.log(message)
-                                return
+                        # if "冷却中" in result and (self.enable_sand and sc.use_sand):
+                        #     sand_result = self.caveMan.use_sand(cave_id)
+                        #     if sand_result["success"]:
+                        #         self.logger.log(
+                        #             "成功对{}使用时之沙".format(sc.cave.format_name(difficulty))
+                        #         )
+                        #         message = message + "成功. "
+                        #         break
+                        #     else:
+                        #         message = message + "失败. 原因: {}.".format(
+                        #             sand_result["result"]
+                        #         )
+                        #         self.logger.log(message)
+                        #         return
                         message = message + "失败. 原因: {}.".format(result)
                         self.logger.log(message)
                         return
@@ -425,12 +442,13 @@ class Challenge4Level:
                 cave = get_stone_cave(sc.cave.layer, sc.cave.number)
                 if not cave.is_ready:
                     continue
-                team = self._assemble_team(cave)
+                team = self._assemble_team(cave.grade)
                 if team is None:
                     continue
-                success = self._recover()
-                if not success:
-                    return
+                if self.need_recover:
+                    success = self._recover()
+                    if not success:
+                        return
                 difficulty = sc.difficulty
 
                 message = "挑战{}".format(
@@ -517,6 +535,7 @@ class Challenge4Level:
         else:
             self.logger.log("切换到{}层失败，跳过该层".format(target_garden_layer))
             return False
+        self.current_garden_layer = target_garden_layer
         return True
 
     def auto_challenge(self, stop_channel: Queue):
@@ -573,6 +592,9 @@ class Challenge4Level:
                     "show_lottery": self.show_lottery,
                     "enable_stone": self.enable_stone,
                     "enable_large_plant_team": self.enable_large_plant_team,
+                    "disable_cave_info_fetch": self.disable_cave_info_fetch,
+                    "challenge_sand_cave_only_in_disable_mode": self.challenge_sand_cave_only_in_disable_mode,
+                    "need_recover": self.need_recover,
                 },
                 f,
             )

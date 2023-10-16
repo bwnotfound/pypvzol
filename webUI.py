@@ -68,8 +68,8 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         # 将窗口居中显示，宽度为显示器宽度的40%，高度为显示器高度的60%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.4), int(screen_size.height() * 0.6))
-        self.move(int(screen_size.width() * 0.3), int(screen_size.height() * 0.2))
+        self.resize(int(screen_size.width() * 0.4), int(screen_size.height() * 0.8))
+        self.move(int(screen_size.width() * 0.3), int(screen_size.height() * 0.1))
 
         main_widget = QWidget()
         main_layout = QHBoxLayout()
@@ -167,7 +167,6 @@ class Challenge4levelSettingWindow(QMainWindow):
             self.current_cave_difficulty_currentIndexChanged
         )
         right_panel_layout.addWidget(self.current_cave_difficulty)
-
 
         right_panel_layout.addStretch(1)
         right_panel_layout.addWidget(QLabel("全局挑战设置:"))
@@ -273,26 +272,89 @@ class Challenge4levelSettingWindow(QMainWindow):
         self.show_lottery.setChecked(self.usersettings.challenge4Level.show_lottery)
         self.show_lottery.stateChanged.connect(self.show_lottery_stateChanged)
         right_panel_layout.addWidget(self.show_lottery)
-        
+
         self.enable_stone = QCheckBox("允许挑战宝石副本")
         self.enable_stone.setChecked(self.usersettings.challenge4Level.enable_stone)
         self.enable_stone.stateChanged.connect(self.enable_stone_stateChanged)
         right_panel_layout.addWidget(self.enable_stone)
-        
+
         if self.usersettings.cfg.server == "私服":
             self.enable_large_plant_team = QCheckBox("V4使用16格带级")
-            self.enable_large_plant_team.setChecked(self.usersettings.challenge4Level.enable_large_plant_team)
-            self.enable_large_plant_team.stateChanged.connect(self.enable_large_plant_team_stateChanged)
+            self.enable_large_plant_team.setChecked(
+                self.usersettings.challenge4Level.enable_large_plant_team
+            )
+            self.enable_large_plant_team.stateChanged.connect(
+                self.enable_large_plant_team_stateChanged
+            )
             right_panel_layout.addWidget(self.enable_large_plant_team)
+
+        right_panel_layout.addWidget(QLabel("--以下功能需认真选取--\n--(因为不恰当使用会有bug)--"))
+
+        self.need_recover_checkbox = QCheckBox("需要恢复植物血量")
+        self.need_recover_checkbox.setChecked(
+            self.usersettings.challenge4Level.need_recover
+        )
+        self.need_recover_checkbox.stateChanged.connect(
+            self.need_recover_checkbox_stateChanged
+        )
+        right_panel_layout.addWidget(self.need_recover_checkbox)
+
+        self.disable_cave_info_fetch_checkbox = QCheckBox("刷洞加速")
+        self.disable_cave_info_fetch_checkbox.setChecked(
+            self.usersettings.challenge4Level.disable_cave_info_fetch
+        )
+        self.disable_cave_info_fetch_checkbox.stateChanged.connect(
+            self.disable_cave_info_fetch_checkbox_stateChanged
+        )
+        right_panel_layout.addWidget(self.disable_cave_info_fetch_checkbox)
+
+        self.challenge_sand_cave_only_in_disable_mode_checkbox = QCheckBox(
+            "加速时只刷用时之沙的洞"
+        )
+        self.challenge_sand_cave_only_in_disable_mode_checkbox.setChecked(
+            self.usersettings.challenge4Level.challenge_sand_cave_only_in_disable_mode
+        )
+        self.challenge_sand_cave_only_in_disable_mode_checkbox.stateChanged.connect(
+            self.challenge_sand_cave_only_in_disable_mode_checkbox_stateChanged
+        )
+        right_panel_layout.addWidget(
+            self.challenge_sand_cave_only_in_disable_mode_checkbox
+        )
+        warning_textbox = QPlainTextEdit()
+        warning_textbox.setReadOnly(True)
+        warning_textbox.setPlainText(
+            "注意，加速原理是直接挑战对应洞口\n"
+            "因此如果加速不选\"只刷时之沙的洞\"会导致每次循环都会尝试那些没冷却的洞\n"
+            "比如你选了10个洞口，只有一个要用时之沙，那么每次都会尝试挑战那9个不用时之沙的洞口\n"
+            "会造成很大的性能浪费"
+        )
+        right_panel_layout.addWidget(warning_textbox)
 
         right_panel.setLayout(right_panel_layout)
         main_layout.addWidget(right_panel)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
+    def challenge_sand_cave_only_in_disable_mode_checkbox_stateChanged(self):
+        self.usersettings.challenge4Level.challenge_sand_cave_only_in_disable_mode = (
+            self.challenge_sand_cave_only_in_disable_mode_checkbox.isChecked()
+        )
+
+    def need_recover_checkbox_stateChanged(self):
+        self.usersettings.challenge4Level.need_recover = (
+            self.need_recover_checkbox.isChecked()
+        )
+
+    def disable_cave_info_fetch_checkbox_stateChanged(self):
+        self.usersettings.challenge4Level.disable_cave_info_fetch = (
+            self.disable_cave_info_fetch_checkbox.isChecked()
+        )
+
     def enable_large_plant_team_stateChanged(self):
-        self.usersettings.challenge4Level.enable_large_plant_team = self.enable_large_plant_team.isChecked()
+        self.usersettings.challenge4Level.enable_large_plant_team = (
+            self.enable_large_plant_team.isChecked()
+        )
 
     def enable_stone_stateChanged(self):
         self.usersettings.challenge4Level.enable_stone = self.enable_stone.isChecked()
@@ -412,7 +474,9 @@ class Challenge4levelSettingWindow(QMainWindow):
                 if self.delete_last_selected_list is self.cave_list:
                     for item in select_items:
                         sc = item.data(Qt.ItemDataRole.UserRole)
-                        self.usersettings.challenge4Level.remove_cave(sc.cave, sc.garden_layer)
+                        self.usersettings.challenge4Level.remove_cave(
+                            sc.cave, sc.garden_layer
+                        )
                     self.update_cave_list()
                 elif self.delete_last_selected_list is self.main_plant_list:
                     for item in select_items:
@@ -764,7 +828,7 @@ class FunctionPanelWindow(QMainWindow):
         auto_synthesis_btn = QPushButton("自动合成面板")
         auto_synthesis_btn.clicked.connect(self.auto_synthesis_btn_clicked)
         menu_layout.addWidget(auto_synthesis_btn, 2, 0)
-        
+
         heritage_btn = QPushButton("传承面板")
         heritage_btn.clicked.connect(self.heritage_btn_clicked)
         menu_layout.addWidget(heritage_btn, 3, 0)
@@ -774,7 +838,7 @@ class FunctionPanelWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
     def heritage_btn_clicked(self):
         self.heritage_window = HeritageWindow(self.usersettings, parent=self)
         self.heritage_window.show()
