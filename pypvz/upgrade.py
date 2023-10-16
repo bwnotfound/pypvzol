@@ -1,5 +1,6 @@
-import logging
-from pyamf import AMF0, remoting, DecodeError
+from pyamf import AMF0, remoting
+import os
+import pickle
 
 from . import Config, WebRequest, Library
 
@@ -131,6 +132,8 @@ class HeritageMan:
             "穿透": "piercing",
             "速度": "speed",
         }
+        self.id1, self.id2 = None, None
+        self.book_choice, self.reinforce_number = None, None
 
     def exchange_one(self, id1, id2, heritage_item_id, heritage_reinforce_number):
         '''
@@ -196,3 +199,21 @@ class HeritageMan:
                 "success": True,
                 "result": "全属性传承成功",
             }
+            
+    def save(self, save_dir):
+        save_path = os.path.join(save_dir, "user_heritageman")
+        with open(save_path, "wb") as f:
+            pickle.dump(
+                {
+                },
+                f,
+            )
+
+    def load(self, load_dir):
+        load_path = os.path.join(load_dir, "user_heritageman")
+        if os.path.exists(load_path):
+            with open(load_path, "rb") as f:
+                d = pickle.load(f)
+            for k, v in d.items():
+                if hasattr(self, k):
+                    setattr(self, k, v)

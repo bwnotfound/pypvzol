@@ -6,5 +6,5 @@ from .garden import GardenMan
 from .user import User, FriendMan
 from .cave import CaveMan
 from .task import Task
-from .upgrade import UpgradeMan, SynthesisMan
+from .upgrade import UpgradeMan, SynthesisMan, HeritageMan
 from .arena import ArenaMan

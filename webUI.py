@@ -1217,5 +1217,7 @@ if __name__ == "__main__":
         print(str(e))
     for log in logger_list:
         log.close()
+    for main_window in main_window_list:
+        main_window.usersettings.save()
     os.system("pause")
     sys.exit(app_return)

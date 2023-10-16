@@ -3,12 +3,11 @@ import os
 import time
 from queue import Queue
 import threading
-import requests
 
 from ..shop import Shop
 
 from ..cave import Cave
-from .. import Config, Repository, Library, User, CaveMan, Task, SynthesisMan, ArenaMan
+from .. import Config, Repository, Library, User, CaveMan, Task, SynthesisMan, ArenaMan, HeritageMan
 from ..utils.recover import RecoverMan
 from .message import IOLogger, Logger
 from ..utils.evolution import PlantEvolution
@@ -23,6 +22,7 @@ class SingleCave:
         self.enabled = True
         self.friend_id_list: list[int] = []
         self.cave = cave
+        self.friend_id2cave_id = {}
 
 
 class Challenge4Level:
@@ -63,10 +63,12 @@ class Challenge4Level:
         self.enable_stone = True
         self.enable_large_plant_team = False
 
+        self.disable_cave_info_fetch = False
+        self.current_garden_layer = None
+
     def add_cave(
         self, cave: Cave, friend_ids=None, difficulty=3, enabled=True, garden_layer=None
     ):
-        # 这里的cave需要的是cave的id属性，不是cave_id
         for c in self.caves:
             if (
                 cave.id == c.cave.id and cave.name == c.cave.name
@@ -262,12 +264,12 @@ class Challenge4Level:
     def challenge_cave(self, stop_channel: Queue):
         _cave_map = {}
 
-        def get_cave(friend_id, id, type, layer):
-            uid = f"{friend_id}_{type}_{layer}"
+        def get_cave(friend_id, sc: SingleCave):
+            uid = "{}_{}_{}".format(friend_id, sc.cave.type, sc.cave.layer)
             caves = _cave_map.get(uid, None)
             if caves is None:
                 caves = self.caveMan.get_caves(
-                    friend_id, type, layer, logger=self.logger
+                    friend_id, sc.cave.type, sc.cave.layer, logger=self.logger
                 )
                 _cave_map[uid] = caves
             for cave in caves:
@@ -285,11 +287,16 @@ class Challenge4Level:
                     continue
                 if not sc.enabled:
                     continue
+                if self.disable_cave_info_fetch:
+                    if not hasattr(sc, "friend_id2cave_id"):
+                        sc.friend_id2cave_id = {}
+                    cave_id = sc.friend_id2cave_id.get(friend_id, None)
+                    if cave_id is None:
+                        self.switch_garden_layer(sc.garden_layer)
+                        cave = get_cave(friend_id, sc)
                 cave = get_cave(
                     friend_id,
-                    id,
-                    sc.cave.type,
-                    sc.cave.layer,
+                    sc,
                 )
                 if cave is None:
                     return
@@ -474,6 +481,44 @@ class Challenge4Level:
                 self.logger.log("没有可以挑战的宝石副本，跳出挑战宝石副本")
                 break
 
+    def switch_garden_layer(self, target_garden_layer):
+        if (
+            self.current_garden_layer is not None
+            and target_garden_layer == self.current_garden_layer
+        ):
+            return True
+
+        cnt, max_retry = 0, 3
+        while cnt < max_retry:
+            cnt += 1
+            try:
+                result = self.caveMan.switch_garden_layer(
+                    target_garden_layer, self.logger
+                )
+            except Exception as e:
+                self.logger.log(
+                    "切换到{}层失败，暂停1秒，最多再尝试{}次切换。异常种类:{}".format(
+                        target_garden_layer, max_retry - cnt, type(e).__name__
+                    )
+                )
+                time.sleep(1)
+                continue
+            if not result["success"]:
+                msg = "切换到{}层失败，暂停1秒，最多再尝试{}次切换。错误原因:{}".format(
+                    target_garden_layer, max_retry - cnt, result["result"]
+                )
+                time.sleep(1)
+            else:
+                msg = result["result"]
+            self.logger.log(msg)
+            if not result["success"]:
+                continue
+            break
+        else:
+            self.logger.log("切换到{}层失败，跳过该层".format(target_garden_layer))
+            return False
+        return True
+
     def auto_challenge(self, stop_channel: Queue):
         # TODO: 显示功能：将process显示，可加速版
         assert self.main_plant_list is not None and self.trash_plant_list is not None
@@ -487,33 +532,24 @@ class Challenge4Level:
         elif self.cfg.server != "私服":
             raise NotImplementedError
         else:
-            if stop_channel.qsize() > 0:
-                return
             for garden_layer in self.garden_layer_caves.keys():
-                try:
-                    result = self.caveMan.switch_garden_layer(garden_layer, self.logger)
-                except Exception as e:
-                    self.logger.log(
-                        "切换到{}层失败，异常种类:{}。跳过自动挑战".format(garden_layer, type(e).__name__)
-                    )
-                    return
-                self.logger.log(result["result"])
-                if not result["success"]:
-                    return
+                if stop_channel.qsize() > 0:
+                    break
                 if self.cfg.server == "私服":
                     self.friend_id2cave = self.garden_layer_friend_id2cave.get(
                         garden_layer, None
                     )
                     if self.friend_id2cave is None:
                         raise RuntimeError("garden layer is not added 2")
+                    if not self.disable_cave_info_fetch:
+                        if not self.switch_garden_layer(garden_layer):
+                            continue
                 try:
                     self.challenge_cave(stop_channel)
                 except Exception as e:
                     self.logger.log(
                         "挑战第{}层洞口异常，异常种类:{}。跳过该层".format(garden_layer, type(e).__name__)
                     )
-                if stop_channel.qsize() > 0:
-                    break
         self.logger.log("挑战完成")
 
     def save(self, save_dir):
@@ -604,6 +640,8 @@ class AutoSynthesisMan:
             "HP特": "hp_max",
             "攻击特": "attack",
         }
+        self.end_mantissa = 1.0
+        self.end_exponent = 0
 
     def check_data(self, refresh_repo=True):
         if refresh_repo:
@@ -687,6 +725,8 @@ class AutoSynthesisMan:
                     "chosen_attribute": self.chosen_attribute,
                     "auto_synthesis_pool_id": self.auto_synthesis_pool_id,
                     "reinforce_number": self.reinforce_number,
+                    "end_mantissa": self.end_mantissa,
+                    "end_exponent": self.end_exponent,
                 },
                 f,
             )
@@ -743,6 +783,8 @@ class UserSettings:
         self.arena_man = ArenaMan(cfg)
 
         self.auto_synthesis_man = AutoSynthesisMan(cfg, lib, repo)
+        
+        self.heritage_man = HeritageMan(self.cfg, self.lib)
 
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
         while stop_channel.qsize() == 0:
