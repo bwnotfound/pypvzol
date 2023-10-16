@@ -1320,14 +1320,22 @@ class AutoSynthesisWindow(QMainWindow):
         widget6_1_1_layout = QHBoxLayout()
         self.mantissa_line_edit = QLineEdit()
         self.mantissa_line_edit.setValidator(QtGui.QDoubleValidator())
-        self.mantissa_line_edit.setText(str(self.usersettings.auto_synthesis_man.end_mantissa))
-        self.mantissa_line_edit.textChanged.connect(self.mantissa_line_edit_value_changed)
+        self.mantissa_line_edit.setText(
+            str(self.usersettings.auto_synthesis_man.end_mantissa)
+        )
+        self.mantissa_line_edit.textChanged.connect(
+            self.mantissa_line_edit_value_changed
+        )
         widget6_1_1_layout.addWidget(self.mantissa_line_edit)
         widget6_1_1_layout.addWidget(QLabel("x10的"))
         self.exponent_line_edit = QLineEdit()
         self.exponent_line_edit.setValidator(QtGui.QIntValidator())
-        self.exponent_line_edit.setText(str(self.usersettings.auto_synthesis_man.end_exponent))
-        self.exponent_line_edit.textChanged.connect(self.exponent_line_edit_value_changed)
+        self.exponent_line_edit.setText(
+            str(self.usersettings.auto_synthesis_man.end_exponent)
+        )
+        self.exponent_line_edit.textChanged.connect(
+            self.exponent_line_edit_value_changed
+        )
         widget6_1_1_layout.addWidget(self.exponent_line_edit)
         widget6_1_1_layout.addWidget(QLabel("次方亿"))
         widget6_1_layout.addLayout(widget6_1_1_layout)
@@ -1357,7 +1365,7 @@ class AutoSynthesisWindow(QMainWindow):
             self.mantissa_line_edit.setText("1.0")
         mantissa = float(self.mantissa_line_edit.text())
         self.usersettings.auto_synthesis_man.end_mantissa = mantissa
-        
+
     def exponent_line_edit_value_changed(self):
         try:
             int(self.exponent_line_edit.text())
@@ -1677,7 +1685,9 @@ class HeritageWindow(QMainWindow):
         self.reinforce_number_box = QComboBox()
         self.reinforce_number_box.addItems([str(i) for i in range(1, 11)])
         self.reinforce_number_box.setCurrentIndex(0)
-        self.reinforce_number_box.currentIndexChanged.connect(self.reinforce_number_box_changed)
+        self.reinforce_number_box.currentIndexChanged.connect(
+            self.reinforce_number_box_changed
+        )
         widget5_layout.addWidget(self.reinforce_number_box)
         self.heritage_btn = heritage_btn = QPushButton("进行传承")
         heritage_btn.clicked.connect(self.heritage_btn_clicked)
@@ -1739,11 +1749,15 @@ class HeritageWindow(QMainWindow):
         self.id2 = plant_id
         self.heritage_man.id2 = self.id2
         self.refresh_plant_information()
-        
+
     def book_choice_changed(self):
+        self.heritage_man.book_choice_index = self.book_choice.currentIndex()
         self.refresh_plant_list()
-        
+
     def reinforce_number_box_changed(self):
+        self.heritage_man.reinforce_number_index = (
+            self.reinforce_number_box.currentIndex()
+        )
         self.refresh_plant_list()
 
     def heritage_btn_clicked(self):
@@ -1811,6 +1825,16 @@ class HeritageWindow(QMainWindow):
         if self.usersettings.repo.get_plant(self.id2) is None:
             self.id2 = self.heritage_man.id2 = None
         for i in range(self.heritage_from_plant_list.count()):
-            if self.heritage_from_plant_list.item(i).data(Qt.ItemDataRole.UserRole) == self.id1:
+            if (
+                self.heritage_from_plant_list.item(i).data(Qt.ItemDataRole.UserRole)
+                == self.id1
+            ):
                 self.heritage_from_plant_list.setCurrentRow(i)
+                self.heritage_to_plant_list.setCurrentRow(i)
                 break
+        if self.heritage_man.book_choice_index is not None:
+            self.book_choice.setCurrentIndex(self.heritage_man.book_choice_index)
+        if self.heritage_man.reinforce_number_index is not None:
+            self.reinforce_number_box.setCurrentIndex(
+                self.heritage_man.reinforce_number_index
+            )

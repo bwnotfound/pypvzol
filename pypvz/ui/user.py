@@ -899,6 +899,7 @@ class UserSettings:
             )
         self.plant_evolution.save(self.save_dir)
         self.auto_synthesis_man.save(self.save_dir)
+        self.heritage_man.save(self.save_dir)
 
     def load(self):
         self.challenge4Level.load(self.save_dir)
@@ -911,3 +912,4 @@ class UserSettings:
                     setattr(self, k, v)
         self.plant_evolution.load(self.save_dir)
         self.auto_synthesis_man.load(self.save_dir)
+        self.heritage_man.load(self.save_dir)

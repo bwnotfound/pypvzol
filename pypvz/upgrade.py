@@ -133,7 +133,7 @@ class HeritageMan:
             "速度": "speed",
         }
         self.id1, self.id2 = None, None
-        self.book_choice, self.reinforce_number = None, None
+        self.book_choice_index, self.reinforce_number_index = None, None
 
     def exchange_one(self, id1, id2, heritage_item_id, heritage_reinforce_number):
         '''
@@ -205,6 +205,10 @@ class HeritageMan:
         with open(save_path, "wb") as f:
             pickle.dump(
                 {
+                    "id1": self.id1,
+                    "id2": self.id2,
+                    "book_choice_index": self.book_choice_index,
+                    "reinforce_number_index": self.reinforce_number_index,
                 },
                 f,
             )
