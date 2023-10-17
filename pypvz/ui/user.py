@@ -7,7 +7,17 @@ import threading
 from ..shop import Shop
 
 from ..cave import Cave
-from .. import Config, Repository, Library, User, CaveMan, Task, SynthesisMan, ArenaMan, HeritageMan
+from .. import (
+    Config,
+    Repository,
+    Library,
+    User,
+    CaveMan,
+    Task,
+    SynthesisMan,
+    ArenaMan,
+    HeritageMan,
+)
 from ..utils.recover import RecoverMan
 from .message import IOLogger, Logger
 from ..utils.evolution import PlantEvolution
@@ -66,7 +76,8 @@ class Challenge4Level:
         self.disable_cave_info_fetch = False
         self.challenge_sand_cave_only_in_disable_mode = True
         self.need_recover = True
-        
+        self.accelerate_repository_in_challenge_cave = False
+
         self.current_garden_layer = None
 
     def add_cave(
@@ -231,24 +242,46 @@ class Challenge4Level:
                 ]
             )
         )
-        plant_grade_list = [(plant.id, plant.grade) for plant in plant_list]
-        self.repo.refresh_repository(logger=self.logger)
-        upgrade_data_list = []
-        for plant_id, grade in plant_grade_list:
-            after_plant = self.repo.get_plant(plant_id)
-            if after_plant is None or after_plant.grade == grade:
-                continue
-            upgrade_data_list.append((after_plant, grade, after_plant.grade))
-        upgrade_msg_list = [
-            "{}({}->{})".format(
-                plant.name(self.lib),
-                grade1,
-                grade2,
-            )
-            for plant, grade1, grade2 in upgrade_data_list
-        ]
-        if len(upgrade_msg_list) > 0:
-            message = message + "\n\t升级植物: {}".format(' '.join(upgrade_msg_list))
+        
+        if not self.accelerate_repository_in_challenge_cave:
+            plant_grade_list = [(plant.id, plant.grade) for plant in plant_list]
+            self.repo.refresh_repository(logger=self.logger)
+            upgrade_data_list = []
+            for plant_id, grade in plant_grade_list:
+                after_plant = self.repo.get_plant(plant_id)
+                if after_plant is None or after_plant.grade == grade:
+                    continue
+                upgrade_data_list.append((after_plant, grade, after_plant.grade))
+            upgrade_msg_list = [
+                "{}({}->{})".format(
+                    plant.name(self.lib),
+                    grade1,
+                    grade2,
+                )
+                for plant, grade1, grade2 in upgrade_data_list
+            ]
+            if len(upgrade_msg_list) > 0:
+                message = message + "\n\t升级植物: {}".format(' '.join(upgrade_msg_list))
+        else:
+            plant_grade_list = []
+            for plant in plant_list:
+                if not hasattr(plant, "predict_grade"):
+                    setattr(plant, "predict_grade", plant.grade)
+                plant_grade_list.append((plant, plant.predict_grade))
+            upgrade_data_list = []
+            for plant, grade in plant_grade_list:
+                plant.predict_grade = plant.predict_grade + 2.5
+                upgrade_data_list.append((plant, grade, plant.predict_grade))
+            upgrade_msg_list = [
+                "{}({}->{})".format(
+                    plant.name(self.lib),
+                    int(grade1),
+                    int(grade2),
+                )
+                for plant, grade1, grade2 in upgrade_data_list
+            ]
+            if len(upgrade_msg_list) > 0:
+                message = message + "\n\t预测升级植物: {}".format(' '.join(upgrade_msg_list))
         if self.show_lottery:
             lottery_result = self.caveMan.get_lottery(response_body)
             if lottery_result["success"]:
@@ -263,6 +296,44 @@ class Challenge4Level:
             else:
                 message = message + "\n\t{}".format(lottery_result["result"])
         return message
+    
+    def pop_trash_plant(self):
+        if not self.accelerate_repository_in_challenge_cave:
+            trash_plant_list = [
+                self.repo.get_plant(plant_id)
+                for plant_id in self.trash_plant_list
+            ]
+            trash_plant_list = list(
+                filter(
+                    lambda x: (x is not None) and x.grade < self.pop_grade,
+                    trash_plant_list,
+                )
+            )
+            self.trash_plant_list = [x.id for x in trash_plant_list]
+        else:
+            trash_plant_list = [
+                self.repo.get_plant(plant_id)
+                for plant_id in self.trash_plant_list
+            ]
+            for plant in trash_plant_list:
+                if plant is None:
+                    continue
+                if not hasattr(plant, "predict_grade"):
+                    continue
+                if plant.predict_grade > self.pop_grade:
+                    self.repo.refresh_repository()
+                    trash_plant_list = [
+                        self.repo.get_plant(plant_id)
+                        for plant_id in self.trash_plant_list
+                    ]
+                    trash_plant_list = list(
+                        filter(
+                            lambda x: (x is not None) and x.grade < self.pop_grade,
+                            trash_plant_list,
+                        )
+                    )
+                    self.trash_plant_list = [x.id for x in trash_plant_list]
+                    break
 
     def challenge_cave(self, stop_channel: Queue):
         _cave_map = {}
@@ -294,7 +365,7 @@ class Challenge4Level:
                     if self.challenge_sand_cave_only_in_disable_mode:
                         if not sc.use_sand:
                             continue
-                    if not hasattr(sc, "friend_id2cave_id"):    
+                    if not hasattr(sc, "friend_id2cave_id"):
                         sc.friend_id2cave_id = {}
                     cave_id = sc.friend_id2cave_id.get(friend_id, None)
                     if cave_id is None:
@@ -302,7 +373,7 @@ class Challenge4Level:
                         cave = get_cave(friend_id, sc)
                         cave_id = cave.cave_id
                         sc.friend_id2cave_id[friend_id] = cave_id
-                        
+
                     if self.enable_sand and sc.use_sand:
                         sand_result = self.caveMan.use_sand(cave_id)
                         if sand_result["success"]:
@@ -323,7 +394,9 @@ class Challenge4Level:
                             sand_result = self.caveMan.use_sand(cave_id)
                             if sand_result["success"]:
                                 self.logger.log(
-                                    "成功对{}使用时之沙".format(sc.cave.format_name(sc.difficulty))
+                                    "成功对{}使用时之沙".format(
+                                        sc.cave.format_name(sc.difficulty)
+                                    )
                                 )
                             else:
                                 self.logger.log(sand_result["result"])
@@ -334,7 +407,7 @@ class Challenge4Level:
                 team = self._assemble_team(sc.cave.grade)
                 if team is None:
                     continue
-                if self.need_recover:
+                if self.need_recover or self.accelerate_repository_in_challenge_cave:
                     success = self._recover()
                     if not success:
                         return
@@ -347,6 +420,7 @@ class Challenge4Level:
                     sc.cave.format_name(difficulty),
                 )
                 cnt, max_retry = 0, 20
+                need_skip = False
                 while cnt < max_retry:
                     result = self.caveMan.challenge(
                         cave_id, team, difficulty, sc.cave.type
@@ -379,20 +453,11 @@ class Challenge4Level:
                             if stop_channel.qsize() > 0:
                                 return
                             continue
-                        # if "冷却中" in result and (self.enable_sand and sc.use_sand):
-                        #     sand_result = self.caveMan.use_sand(cave_id)
-                        #     if sand_result["success"]:
-                        #         self.logger.log(
-                        #             "成功对{}使用时之沙".format(sc.cave.format_name(difficulty))
-                        #         )
-                        #         message = message + "成功. "
-                        #         break
-                        #     else:
-                        #         message = message + "失败. 原因: {}.".format(
-                        #             sand_result["result"]
-                        #         )
-                        #         self.logger.log(message)
-                        #         return
+                        if "冷却中" in result and (self.enable_sand and sc.use_sand):
+                            message = message + "失败，已跳过该洞口。原因: 洞口冷却中."
+                            self.logger.log(message)
+                            need_skip = True
+                            break
                         message = message + "失败. 原因: {}.".format(result)
                         self.logger.log(message)
                         return
@@ -404,20 +469,15 @@ class Challenge4Level:
                     self.logger.log(message)
                     return
 
+                if need_skip:
+                    if stop_channel.qsize() > 0:
+                        return
+                    continue
+
                 message = message + self.format_upgrade_message(team, result)
                 self.logger.log(message)
                 if self.pop_after_100:
-                    trash_plant_list = [
-                        self.repo.get_plant(plant_id)
-                        for plant_id in self.trash_plant_list
-                    ]
-                    trash_plant_list = list(
-                        filter(
-                            lambda x: (x is not None) and x.grade < self.pop_grade,
-                            trash_plant_list,
-                        )
-                    )
-                    self.trash_plant_list = [x.id for x in trash_plant_list]
+                    self.pop_trash_plant()
                 if stop_channel.qsize() > 0:
                     return
 
@@ -445,7 +505,7 @@ class Challenge4Level:
                 team = self._assemble_team(cave.grade)
                 if team is None:
                     continue
-                if self.need_recover:
+                if self.need_recover or self.accelerate_repository_in_challenge_cave:
                     success = self._recover()
                     if not success:
                         return
@@ -482,17 +542,7 @@ class Challenge4Level:
                 message = message + self.format_upgrade_message(team, result)
                 self.logger.log(message)
                 if self.pop_after_100:
-                    trash_plant_list = [
-                        self.repo.get_plant(plant_id)
-                        for plant_id in self.trash_plant_list
-                    ]
-                    trash_plant_list = list(
-                        filter(
-                            lambda x: (x is not None) and x.grade < self.pop_grade,
-                            trash_plant_list,
-                        )
-                    )
-                    self.trash_plant_list = [x.id for x in trash_plant_list]
+                    self.pop_trash_plant()
                 if stop_channel.qsize() > 0:
                     return
             if not has_challenged:
@@ -595,6 +645,7 @@ class Challenge4Level:
                     "disable_cave_info_fetch": self.disable_cave_info_fetch,
                     "challenge_sand_cave_only_in_disable_mode": self.challenge_sand_cave_only_in_disable_mode,
                     "need_recover": self.need_recover,
+                    "accelerate_repository_in_challenge_cave": self.accelerate_repository_in_challenge_cave,
                 },
                 f,
             )
@@ -716,9 +767,7 @@ class AutoSynthesisMan:
                 "success": False,
                 "result": "没有{}合成书了".format(self.chosen_attribute),
             }
-        book_amount = self.repo.get_tool(
-            self.attribute_book_dict[self.chosen_attribute]
-        )['amount']
+        book_amount = book['amount']
         if not book_amount > 0:
             return {"success": False, "result": f"{self.chosen_attribute}合成书数量不足"}
         reinforce = self.repo.get_tool(self.lib.name2tool["增强卷轴"].id)
@@ -734,8 +783,12 @@ class AutoSynthesisMan:
         if result['success']:
             self.auto_synthesis_pool_id.remove(deputy_plant_id)
             self.main_plant_id = deputy_plant_id
-            book = self.repo.get_tool(self.attribute_book_dict[self.chosen_attribute])
             book['amount'] = max(book['amount'] - 1, 0)
+            if book['amount'] == 0:
+                for i, tool in enumerate(self.repo.tools):
+                    if tool['id'] == book['id']:
+                        self.repo.tools.pop(i)
+                        break
         return result
 
     def save(self, save_dir):
@@ -805,7 +858,7 @@ class UserSettings:
         self.arena_man = ArenaMan(cfg)
 
         self.auto_synthesis_man = AutoSynthesisMan(cfg, lib, repo)
-        
+
         self.heritage_man = HeritageMan(self.cfg, self.lib)
 
     def _start(self, stop_channel: Queue, finished_trigger: Queue):

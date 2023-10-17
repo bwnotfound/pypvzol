@@ -1,5 +1,5 @@
 import logging
-import concurrent.futures
+from copy import deepcopy
 from time import sleep
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -24,7 +24,7 @@ from ..repository import Repository
 from ..library import Library
 from .wrapped import QLabel
 from .user import UserSettings
-from ..upgrade import UpgradeMan, HeritageMan
+from ..upgrade import UpgradeMan, HeritageMan, SkillStoneMan
 from ..utils.common import format_number
 from ..repository import Plant
 
@@ -1838,3 +1838,209 @@ class HeritageWindow(QMainWindow):
             self.reinforce_number_box.setCurrentIndex(
                 self.heritage_man.reinforce_number_index
             )
+
+
+class PlantRelativeWindow(QMainWindow):
+    def __init__(self, usersettings: UserSettings, parent=None):
+        super().__init__(parent=parent)
+        self.usersettings = usersettings
+        self.skill_stone_man = SkillStoneMan(
+            self.usersettings.cfg, self.usersettings.lib
+        )
+        self.init_ui()
+        self.current_plant_id = None
+        self.current_skill_row_index = None
+        self.refresh_plant_list()
+
+    def init_ui(self):
+        self.setWindowTitle("植物相关面板")
+
+        # 将窗口居中显示，宽度为显示器宽度的60%，高度为显示器高度的50%
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.7), int(screen_size.height() * 0.5))
+        self.move(int(screen_size.width() * 0.15), int(screen_size.height() * 0.25))
+
+        main_widget = QWidget()
+        main_layout = QHBoxLayout()
+
+        widget1 = QWidget()
+        widget1.setMinimumWidth(int(self.width() * 0.15))
+        widget1_layout = QVBoxLayout()
+        widget1_layout.addWidget(QLabel("植物列表"))
+        self.plant_list = QListWidget()
+        self.plant_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.plant_list.itemClicked.connect(self.plant_list_item_clicked)
+        widget1_layout.addWidget(self.plant_list)
+        widget1.setLayout(widget1_layout)
+        main_layout.addWidget(widget1)
+
+        widget2 = QWidget()
+        widget2.setMinimumWidth(int(self.width() * 0.15))
+        widget2_layout = QVBoxLayout()
+        widget2_layout.addWidget(QLabel("植物属性"))
+        self.plant_attribute_list = QPlainTextEdit()
+        self.plant_attribute_list.setReadOnly(True)
+        widget2_layout.addWidget(self.plant_attribute_list)
+        widget2.setLayout(widget2_layout)
+        main_layout.addWidget(widget2)
+
+        widget3 = QWidget()
+        widget3.setMinimumWidth(int(self.width() * 0.10))
+        widget3_layout = QVBoxLayout()
+        self.refresh_plant_list_btn = QPushButton("刷新")
+        self.refresh_plant_list_btn.clicked.connect(self.refresh_plant_list_btn_clicked)
+        widget3_layout.addWidget(self.refresh_plant_list_btn)
+        self.function_choice_box = QComboBox()
+        self.function_choice_box.addItems(["技能升级"])
+        self.function_choice_box.setCurrentIndex(0)
+        widget3_layout.addWidget(self.function_choice_box)
+        widget3.setLayout(widget3_layout)
+        main_layout.addWidget(widget3)
+
+        self.function_panel = QWidget()
+        self.function_panel.setMinimumWidth(int(self.width() * 0.4))
+
+        skill_panel_layout = QHBoxLayout()
+        skill_panel_layout1 = QVBoxLayout()
+        skill_panel_layout1.addWidget(QLabel("技能列表"))
+        self.skill_list = QListWidget()
+        self.skill_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.skill_list.itemClicked.connect(self.skill_list_item_clicked)
+        skill_panel_layout1.addWidget(self.skill_list)
+        skill_panel_layout.addLayout(skill_panel_layout1)
+        skill_panel_layout2 = QVBoxLayout()
+        self.skill_upgrade_btn = QPushButton("升级技能")
+        self.skill_upgrade_btn.clicked.connect(self.skill_upgrade_btn_clicked)
+        skill_panel_layout2.addWidget(self.skill_upgrade_btn)
+        skill_panel_layout.addLayout(skill_panel_layout2)
+
+        self.function_panel.setLayout(skill_panel_layout)
+
+        main_layout.addWidget(self.function_panel)
+
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+    def format_plant_info(self, plant: Plant):
+        return "{}({})[{}]".format(
+            plant.name(self.usersettings.lib),
+            plant.grade,
+            plant.quality_str,
+        )
+
+    def refresh_plant_list(self):
+        self.plant_list.clear()
+        for plant in self.usersettings.repo.plants:
+            if plant is None:
+                continue
+            item = QListWidgetItem(self.format_plant_info(plant))
+            item.setData(Qt.ItemDataRole.UserRole, plant.id)
+            self.plant_list.addItem(item)
+
+    def refresh_plant_attribute_textbox(self):
+        if self.current_plant_id is None:
+            self.plant_attribute_list.setPlainText("")
+            return
+        plant = self.usersettings.repo.get_plant(self.current_plant_id)
+        if plant is None:
+            self.plant_attribute_list.setPlainText("")
+            self.current_plant_id = None
+            self.usersettings.logger.log(
+                "仓库里没有id为{}的植物，可能已被删除".format(self.current_plant_id)
+            )
+        else:
+            message = self.format_plant_info(plant) + "\n"
+            for (
+                k,
+                v,
+            ) in self.usersettings.auto_synthesis_man.attribute2plant_attribute.items():
+                message += "{}:{}\n".format(k, format_number(getattr(plant, v)))
+            self.plant_attribute_list.setPlainText(message)
+
+    def plant_list_item_clicked(self, item):
+        plant_id = item.data(Qt.ItemDataRole.UserRole)
+        plant = self.usersettings.repo.get_plant(plant_id)
+        if plant is None:
+            self.usersettings.logger.log("仓库里没有id为{}的植物，可能已被删除".format(plant_id))
+            return
+        self.current_plant_id = plant_id
+        self.refresh_plant_attribute_textbox()
+        if self.function_choice_box.currentIndex() == 0:
+            self.refresh_skill_list()
+            pass
+
+    def refresh_plant_list_btn_clicked(self):
+        self.usersettings.repo.refresh_repository()
+        self.refresh_plant_list()
+        self.refresh_plant_attribute_textbox()
+
+    def refresh_skill_list(self):
+        self.skill_list.clear()
+        if self.current_plant_id is None:
+            return
+        plant = self.usersettings.repo.get_plant(self.current_plant_id)
+        if plant is None:
+            self.usersettings.logger.log(
+                "仓库里没有id为{}的植物，可能已被删除".format(self.current_plant_id)
+            )
+            return
+        for skill in plant.skills:
+            item = QListWidgetItem(skill["name"] + f"(id:{skill['id']})")
+            item.setData(Qt.ItemDataRole.UserRole, skill)
+            self.skill_list.addItem(item)
+        if plant.special_skill is not None:
+            item = QListWidgetItem(plant.special_skill["name"] + f"(id:{skill['id']})")
+            item.setData(Qt.ItemDataRole.UserRole, plant.special_skill)
+            self.skill_list.addItem(item)
+
+    def skill_list_item_clicked(self, item):
+        self.current_skill_row_index = self.skill_list.row(item)
+
+    def skill_upgrade_btn_clicked(self):
+        self.skill_upgrade_btn.setDisabled(True)
+        QApplication.processEvents()
+        try:
+            if self.current_plant_id is None:
+                self.usersettings.logger.log("请先选择一个植物")
+                return
+            plant = self.usersettings.repo.get_plant(self.current_plant_id)
+            if plant is None:
+                self.usersettings.logger.log(
+                    "仓库里没有id为{}的植物，可能已被删除".format(self.current_plant_id)
+                )
+                return
+            skill_item = self.skill_list.currentItem()
+            if skill_item is None:
+                if self.current_skill_row_index is not None:
+                    skill_item = self.skill_list.item(self.current_skill_row_index)
+            if skill_item is None:
+                self.usersettings.logger.log("请先选择一个技能")
+                return
+            skill = skill_item.data(Qt.ItemDataRole.UserRole)
+            pre_skill = deepcopy(skill)
+            result = self.skill_stone_man.upgrade_skill(plant.id, skill)
+            if not result['success']:
+                self.usersettings.logger.log(result['result'])
+            else:
+                if result["upgrade_success"]:
+                    self.usersettings.logger.log("技能升级成功")
+                    for s in plant.skills:
+                        if s["id"] == pre_skill["id"] and s["name"] == pre_skill["name"]:
+                            s["id"] = skill["id"]
+                            break
+                    else:
+                        if plant.special_skill is not None:
+                            if (
+                                plant.special_skill["id"] == pre_skill["id"]
+                                and plant.special_skill["name"] == pre_skill["name"]
+                            ):
+                                plant.special_skill["id"] = skill["id"]
+                    self.skill_list.setCurrentRow(self.current_skill_row_index)
+                    self.refresh_skill_list()
+                else:
+                    self.usersettings.logger.log("技能升级失败")
+        except Exception as e:
+            self.usersettings.logger.log("技能升级异常，异常种类：{}".format(type(e).__name__))
+            return
+        finally:
+            self.skill_upgrade_btn.setEnabled(True)

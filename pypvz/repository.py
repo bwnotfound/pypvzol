@@ -32,6 +32,21 @@ class Plant:
         except:
             self.quality_index = -1
             logging.warning(f"未知的品质{self.quality_str}")
+        self.skills = []
+        for item in root.find("sk").findall("item"):
+            self.skills.append(
+                {
+                    "id": int(item.get("id")),
+                    "name": item.get("na"),
+                }
+            )
+        self.special_skill = None
+        item = root.find("ssk").find("item")
+        if item is not None:
+            self.special_skill = {
+                "id": int(item.get("id")),
+                "name": item.get("name"),
+            }
 
     def width(self, lib: Library):
         assert hasattr(self, "_width") or lib is not None

@@ -42,6 +42,7 @@ from pypvz.ui.windows import (
     ShopAutoBuySetting,
     AutoSynthesisWindow,
     HeritageWindow,
+    PlantRelativeWindow,
 )
 from pypvz.ui.user import SingleCave, UserSettings
 
@@ -320,13 +321,33 @@ class Challenge4levelSettingWindow(QMainWindow):
         right_panel_layout.addWidget(
             self.challenge_sand_cave_only_in_disable_mode_checkbox
         )
+        
+        self.accelerate_repository_in_challenge_cave_checkbox = QCheckBox(
+            "加速时跳过仓库(请看警告说明)"
+        )
+        self.accelerate_repository_in_challenge_cave_checkbox.setChecked(
+            self.usersettings.challenge4Level.accelerate_repository_in_challenge_cave
+        )
+        self.accelerate_repository_in_challenge_cave_checkbox.stateChanged.connect(
+            self.accelerate_repository_in_challenge_cave_checkbox_stateChanged
+        )
+        right_panel_layout.addWidget(
+            self.accelerate_repository_in_challenge_cave_checkbox
+        )
+        
         warning_textbox = QPlainTextEdit()
         warning_textbox.setReadOnly(True)
         warning_textbox.setPlainText(
+            "警告：使用上述功能需详细查看此警告\n"
             "注意，加速原理是直接挑战对应洞口\n"
             "因此如果加速不选\"只刷时之沙的洞\"会导致每次循环都会尝试那些没冷却的洞\n"
             "比如你选了10个洞口，只有一个要用时之沙，那么每次都会尝试挑战那9个不用时之沙的洞口\n"
-            "会造成很大的性能浪费"
+            "会造成很大的性能浪费\n"
+            "对于加速跳过仓库，这个选项开启后，原理是不会去获取仓库信息，会预测你的炮灰等级变化，从而加速\n"
+            "但是因为跳过了仓库信息获取，因此无法保证植物存在和植物血量\n"
+            "选择此选项也会跳过植物回血，请保证以下情况不会发生的时候使用仓库加速:\n"
+            "1. 你的植物不会死亡，包括主力和炮灰\n"
+            "2. 你的植物不会消失，包括主力和炮灰\n"
         )
         right_panel_layout.addWidget(warning_textbox)
 
@@ -335,6 +356,11 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def accelerate_repository_in_challenge_cave_checkbox_stateChanged(self):
+        self.usersettings.challenge4Level.accelerate_repository_in_challenge_cave = (
+            self.accelerate_repository_in_challenge_cave_checkbox.isChecked()
+        )
 
     def challenge_sand_cave_only_in_disable_mode_checkbox_stateChanged(self):
         self.usersettings.challenge4Level.challenge_sand_cave_only_in_disable_mode = (
@@ -832,12 +858,20 @@ class FunctionPanelWindow(QMainWindow):
         heritage_btn = QPushButton("传承面板")
         heritage_btn.clicked.connect(self.heritage_btn_clicked)
         menu_layout.addWidget(heritage_btn, 3, 0)
+        
+        plant_relative_btn = QPushButton("植物相关面板")
+        plant_relative_btn.clicked.connect(self.plant_relative_btn_clicked)
+        menu_layout.addWidget(plant_relative_btn, 4, 0)
 
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def plant_relative_btn_clicked(self):
+        self.plant_relative_window = PlantRelativeWindow(self.usersettings, parent=self)
+        self.plant_relative_window.show()
 
     def heritage_btn_clicked(self):
         self.heritage_window = HeritageWindow(self.usersettings, parent=self)
@@ -1152,7 +1186,17 @@ class LoginWindow(QMainWindow):
             "cookie": cookie,
             "server": server,
         }
-        self.configs.append(cfg)
+        for i, saved_cfg in enumerate(self.configs):
+            if (
+                saved_cfg["username"] == cfg["username"]
+                and saved_cfg["host"] == cfg["host"]
+                and saved_cfg["region"] == cfg["region"]
+                and saved_cfg["server"] == cfg["server"]
+            ):
+                self.configs[i]["cookie"] = cfg["cookie"]
+                break
+        else:
+            self.configs.append(cfg)
         self.save_config()
         self.refresh_login_user_list()
         # 强制重新渲染login窗口元素
@@ -1229,19 +1273,19 @@ class GetUsersettings(QThread):
 
 
 def get_usersettings(cfg, logger: IOLogger, setting_dir):
-    results = []
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = []
-        futures.append(executor.submit(User, cfg))
-        futures.append(executor.submit(Library, cfg))
-        futures.append(executor.submit(Repository, cfg))
+    # results = []
+    # with concurrent.futures.ThreadPoolExecutor() as executor:
+    #     futures = []
+    #     futures.append(executor.submit(User, cfg))
+    #     futures.append(executor.submit(Library, cfg))
+    #     futures.append(executor.submit(Repository, cfg))
 
-        for future in futures:
-            results.append(future.result())
+    #     for future in futures:
+    #         results.append(future.result())
 
-    user: User = results[0]
-    lib: Library = results[1]
-    repo: Repository = results[2]
+    user: User = User(cfg)
+    lib: Library = Library(cfg)
+    repo: Repository = Repository(cfg)
 
     caveMan: CaveMan = CaveMan(cfg, lib)
 

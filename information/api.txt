@@ -133,7 +133,20 @@ api.duty.getAll
 api.duty.reward
 api.garden.challenge
 
+官服获取cookie接口：
+1. http://www.youkia.com/index.php/logins/login?jsoncallback=jsonp123&account=(qq号)%40qq.com&password=(密码)
+    返回形式: jsonp123({
+        "status": 1,
+        "nickname": "...",
+        ...
+    }
+    )
+    同时set-cookies youkia=.....
+2. http://s{region}.youkia.pvz.youkia.com/pvz/index.php?user_id=(nickname)&nickname=(nickname)&sig=0&invite_user_id=0
+    请求需要 youkia=...
+    响应设置 pvz_youkia_new1 = .....
 
+反正最后要s{region}的PHPSESSID和pvz_youkia_new1
 
 宝箱type=3
 
