@@ -87,6 +87,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         top_layout.addStretch(1)
         top_layout.addWidget(btn)
         self.cave_list = cave_list = QListWidget()
+        cave_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         cave_list.itemClicked.connect(self.cave_list_item_clicked)
         caves_layout.addLayout(top_layout)
         caves_layout.addWidget(cave_list)
@@ -99,8 +100,9 @@ class Challenge4levelSettingWindow(QMainWindow):
         text = QLabel("要打的好友列表")
         top_layout.addWidget(text)
         top_layout.addStretch(1)
-        friend_list = QListWidget()
-        self.friend_list = friend_list
+        self.friend_list = friend_list = QListWidget()
+        friend_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        friend_list.itemClicked.connect(self.friend_list_item_clicked)
         friend_list_panel_layout.addLayout(top_layout)
         friend_list_panel_layout.addWidget(friend_list)
         friend_list_panel.setLayout(friend_list_panel_layout)
@@ -154,6 +156,14 @@ class Challenge4levelSettingWindow(QMainWindow):
         right_panel = QWidget()
         right_panel_layout = QVBoxLayout()
         right_panel_layout.addWidget(QLabel("当前洞口的配置:"))
+
+        self.enable_cave_checkbox = QCheckBox("启用当前洞口")
+        self.enable_cave_checkbox.setChecked(False)
+        self.enable_cave_checkbox.stateChanged.connect(
+            self.enable_cave_checkbox_stateChanged
+        )
+        right_panel_layout.addWidget(self.enable_cave_checkbox)
+
         self.current_cave_use_sand = QCheckBox("使用时之沙")
         self.current_cave_use_sand.setChecked(False)
         self.current_cave_use_sand.stateChanged.connect(
@@ -171,6 +181,15 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         right_panel_layout.addStretch(1)
         right_panel_layout.addWidget(QLabel("全局挑战设置:"))
+
+        cave_enabled_switch_layout = QHBoxLayout()
+        enable_all_cave_btn = QPushButton("启用所有洞口")
+        enable_all_cave_btn.clicked.connect(self.enable_all_cave_btn_clicked)
+        cave_enabled_switch_layout.addWidget(enable_all_cave_btn)
+        disable_all_cave_btn = QPushButton("禁用所有洞口")
+        disable_all_cave_btn.clicked.connect(self.disable_all_cave_btn_clicked)
+        cave_enabled_switch_layout.addWidget(disable_all_cave_btn)
+        right_panel_layout.addLayout(cave_enabled_switch_layout)
 
         free_max_input_widget = QWidget()
         free_max_input_layout = QHBoxLayout()
@@ -321,10 +340,8 @@ class Challenge4levelSettingWindow(QMainWindow):
         right_panel_layout.addWidget(
             self.challenge_sand_cave_only_in_disable_mode_checkbox
         )
-        
-        self.accelerate_repository_in_challenge_cave_checkbox = QCheckBox(
-            "加速时跳过仓库(请看警告说明)"
-        )
+
+        self.accelerate_repository_in_challenge_cave_checkbox = QCheckBox("跳过仓库来加速")
         self.accelerate_repository_in_challenge_cave_checkbox.setChecked(
             self.usersettings.challenge4Level.accelerate_repository_in_challenge_cave
         )
@@ -334,7 +351,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         right_panel_layout.addWidget(
             self.accelerate_repository_in_challenge_cave_checkbox
         )
-        
+
         warning_textbox = QPlainTextEdit()
         warning_textbox.setReadOnly(True)
         warning_textbox.setPlainText(
@@ -356,7 +373,20 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
+    def enable_all_cave_btn_clicked(self):
+        for sc in self.usersettings.challenge4Level.caves:
+            sc.enabled = True
+        self.selectd_cave_update.emit()
+
+    def disable_all_cave_btn_clicked(self):
+        for sc in self.usersettings.challenge4Level.caves:
+            sc.enabled = False
+        self.selectd_cave_update.emit()
+
+    def enable_cave_checkbox_stateChanged(self):
+        self.selectd_cave.enabled = self.enable_cave_checkbox.isChecked()
+
     def accelerate_repository_in_challenge_cave_checkbox_stateChanged(self):
         self.usersettings.challenge4Level.accelerate_repository_in_challenge_cave = (
             self.accelerate_repository_in_challenge_cave_checkbox.isChecked()
@@ -421,11 +451,14 @@ class Challenge4levelSettingWindow(QMainWindow):
     def update_selectd_cave(self):
         self.update_friend_list()
         if self.selectd_cave is None:
+            self.enable_cave_checkbox.setDisabled(True)
             self.current_cave_use_sand.setDisabled(True)
             self.current_cave_difficulty.setDisabled(True)
             return
+        self.enable_cave_checkbox.setChecked(self.selectd_cave.enabled)
         self.current_cave_use_sand.setChecked(self.selectd_cave.use_sand)
         self.current_cave_difficulty.setCurrentIndex(self.selectd_cave.difficulty - 1)
+        self.enable_cave_checkbox.setEnabled(True)
         self.current_cave_use_sand.setEnabled(True)
         self.current_cave_difficulty.setEnabled(True)
 
@@ -433,6 +466,9 @@ class Challenge4levelSettingWindow(QMainWindow):
         self.selectd_cave = item.data(Qt.ItemDataRole.UserRole)
         self.selectd_cave_update.emit()
         self.delete_last_selected_list = self.cave_list
+
+    def friend_list_item_clicked(self, item):
+        self.delete_last_selected_list = self.friend_list
 
     def main_plant_list_item_clicked(self, item):
         self.delete_last_selected_list = self.main_plant_list
@@ -518,6 +554,16 @@ class Challenge4levelSettingWindow(QMainWindow):
                             plant.id
                         )
                     self.update_trash_plant_list()
+                elif self.delete_last_selected_list is self.friend_list:
+                    friend_ids = [
+                        item.data(Qt.ItemDataRole.UserRole).id for item in select_items
+                    ]
+                    self.usersettings.challenge4Level.remove_cave_friend(
+                        self.selectd_cave,
+                        friend_ids,
+                        self.selectd_cave.garden_layer,
+                    )
+                    self.update_friend_list()
                 else:
                     raise NotImplementedError
         # elif event.key() == Qt.Key.Key_Up or event.key() == Qt.Key.Key_A:
@@ -724,6 +770,28 @@ class SettingWindow(QMainWindow):
         auto_use_item_widget.setLayout(auto_use_item_layout)
         menu_layout.addWidget(auto_use_item_widget, 3, 0)
 
+        arena_widget = QWidget()
+        arena_layout = QHBoxLayout()
+        self.arena_checkbox = arena_checkbox = QCheckBox("竞技场")
+        arena_checkbox.setFont(normal_font)
+        arena_checkbox.setChecked(self.usersettings.arena_enabled)
+        arena_checkbox.stateChanged.connect(self.arena_checkbox_stateChanged)
+        arena_layout.addWidget(arena_checkbox)
+        arena_widget.setLayout(arena_layout)
+        menu_layout.addWidget(arena_widget, 4, 0)
+
+        serverbattle_widget = QWidget()
+        serverbattle_layout = QHBoxLayout()
+        self.serverbattle_checkbox = serverbattle_checkbox = QCheckBox("跨服战")
+        serverbattle_checkbox.setFont(normal_font)
+        serverbattle_checkbox.setChecked(self.usersettings.serverbattle_enabled)
+        serverbattle_checkbox.stateChanged.connect(
+            self.serverbattle_checkbox_stateChanged
+        )
+        serverbattle_layout.addWidget(serverbattle_checkbox)
+        serverbattle_widget.setLayout(serverbattle_layout)
+        menu_layout.addWidget(serverbattle_widget, 5, 0)
+
         rest_time_input_widget = QWidget()
         rest_time_input_layout = QHBoxLayout()
         rest_time_input_layout.addWidget(QLabel("休息时间(秒):"))
@@ -734,23 +802,50 @@ class SettingWindow(QMainWindow):
         rest_time_input_box.valueChanged.connect(self.rest_time_input_box_valueChanged)
         rest_time_input_layout.addWidget(rest_time_input_box)
         rest_time_input_widget.setLayout(rest_time_input_layout)
-        menu_layout.addWidget(rest_time_input_widget, 4, 0)
+        menu_layout.addWidget(rest_time_input_widget, 6, 0)
 
-        arena_widget = QWidget()
-        arena_layout = QHBoxLayout()
-        self.arena_checkbox = arena_checkbox = QCheckBox("竞技场")
-        arena_checkbox.setFont(normal_font)
-        arena_checkbox.setChecked(self.usersettings.arena_enabled)
-        arena_checkbox.stateChanged.connect(self.arena_checkbox_stateChanged)
-        arena_layout.addWidget(arena_checkbox)
-        arena_widget.setLayout(arena_layout)
-        menu_layout.addWidget(arena_widget, 5, 0)
+        max_timeout_widget = QWidget()
+        max_timeout_layout = QHBoxLayout()
+        max_timeout_layout.addWidget(QLabel("请求最大超时时间(秒):"))
+        self.max_timeout_input_box = max_timeout_input_box = QSpinBox()
+        max_timeout_input_box.setMinimum(1)
+        max_timeout_input_box.setMaximum(60)
+        max_timeout_input_box.setValue(self.usersettings.cfg.timeout)
+        max_timeout_input_box.valueChanged.connect(
+            self.max_timeout_input_box_valueChanged
+        )
+        max_timeout_layout.addWidget(max_timeout_input_box)
+        max_timeout_widget.setLayout(max_timeout_layout)
+        menu_layout.addWidget(max_timeout_widget, 7, 0)
+
+        millsecond_delay_widget = QWidget()
+        millsecond_delay_layout = QHBoxLayout()
+        millsecond_delay_layout.addWidget(QLabel("请求间隔(毫秒):"))
+        self.millsecond_delay_input_box = millsecond_delay_input_box = QSpinBox()
+        millsecond_delay_input_box.setMinimum(0)
+        millsecond_delay_input_box.setMaximum(60 * 1000)
+        millsecond_delay_input_box.setValue(self.usersettings.cfg.millsecond_delay)
+        millsecond_delay_input_box.valueChanged.connect(
+            self.millsecond_delay_input_box_valueChanged
+        )
+        millsecond_delay_layout.addWidget(millsecond_delay_input_box)
+        millsecond_delay_widget.setLayout(millsecond_delay_layout)
+        menu_layout.addWidget(millsecond_delay_widget, 8, 0)
 
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def serverbattle_checkbox_stateChanged(self):
+        self.usersettings.serverbattle_enabled = self.serverbattle_checkbox.isChecked()
+
+    def millsecond_delay_input_box_valueChanged(self):
+        self.usersettings.cfg.millsecond_delay = self.millsecond_delay_input_box.value()
+
+    def max_timeout_input_box_valueChanged(self):
+        self.usersettings.cfg.timeout = self.max_timeout_input_box.value()
 
     def task_setting_checkbox_stateChanged(self):
         self.usersettings.task_enabled = self.task_setting_checkbox.isChecked()
@@ -858,7 +953,7 @@ class FunctionPanelWindow(QMainWindow):
         heritage_btn = QPushButton("传承面板")
         heritage_btn.clicked.connect(self.heritage_btn_clicked)
         menu_layout.addWidget(heritage_btn, 3, 0)
-        
+
         plant_relative_btn = QPushButton("植物相关面板")
         plant_relative_btn.clicked.connect(self.plant_relative_btn_clicked)
         menu_layout.addWidget(plant_relative_btn, 4, 0)
@@ -868,7 +963,7 @@ class FunctionPanelWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
     def plant_relative_btn_clicked(self):
         self.plant_relative_window = PlantRelativeWindow(self.usersettings, parent=self)
         self.plant_relative_window.show()
@@ -1080,7 +1175,6 @@ class CustomMainWindow(QMainWindow):
     def process_button_clicked(self):
         if self.process_button.text() == "开始":
             self.process_stop_channel = Queue(maxsize=1)
-            self.usersettings.repo.refresh_repository()
             self.process_button.setText("暂停")
             if self.process_stop_channel.qsize() > 0:
                 self.process_stop_channel.get()

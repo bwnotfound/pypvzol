@@ -12,58 +12,97 @@ from pyamf import DecodeError, remoting, AMF0, AMF3
 
 from .config import Config
 
-method_max_retry = 3
-timeout = 5
     
+class TimeCounter(object):
+    def __init__(self, *args):
+        self.name = None
+        self.wrapper = None
+        if len(args) == 0:
+            return
+        if len(args) == 1:
+            if callable(args[0]):
+                fn = args[0]
 
-# last_time = perf_counter()
-class LogTimeDecorator(object):
-    def __init__(self, func, log_level=logging.INFO, is_async=False):
-        self.func = func
-        self.log_level = log_level
-        self.is_async = is_async
+                def warpper(instance):
+                    def _wrapper(*args, **kwargs):
+                        start = perf_counter()
+                        result = fn(instance, *args, **kwargs)
+                        end = perf_counter()
+                        self._print(end - start)
+                        return result
+
+                    return _wrapper
+
+                self.wrapper = warpper
+            elif isinstance(args[0], str):
+                self.name = args[0]
+            else:
+                raise NotImplementedError
+
+    def _print(self, interval):
+        if self.name is not None:
+            print(f'{self.name} cost time: {interval:.3f}s')
+        else:
+            print(f'Cost time: {interval:.3f}s')
+
+    def __call__(self, fn):
+        def warpper(instance):
+            def _wrapper(*args, **kwargs):
+                start = perf_counter()
+                result = fn(instance, *args, **kwargs)
+                end = perf_counter()
+                self._print(end - start)
+                return result
+
+            return _wrapper
+
+        self.wrapper = warpper
+        return self
 
     def __get__(self, instance, owner):
-        if self.is_async:
+        return self.wrapper(instance)
 
-            async def wrapper(*args, **kwargs):
-                start_time = perf_counter()
-                result = await self.func(instance, *args, **kwargs)
-                end_time = perf_counter()
-                logging.log(
-                    self.log_level,
-                    f"Url: {args[0]}\n\tTime cost: {end_time - start_time:.3f}s",
-                )
+    def __enter__(self):
+        self.start = perf_counter()
 
-                # global last_time
-                # logging.log(self.log_level, f"Time Gap: {end_time - last_time:.3f}s")
-                # last_time = end_time
+    def __exit__(self, *args):
+        end = perf_counter()
+        self._print(end - self.start)
+        
+class LogTimeDecorator(object):
+    def __init__(self, func, log_level=logging.INFO):
+        self.func = func
+        self.log_level = log_level
+        self.start_time = None
+        self.end_time = None
+        
+    def _log(self, url):
+        logging.log(
+            self.log_level,
+            f"Url: {url}\n\tTime cost: {self.end_time - self.start_time:.3f}s",
+        )
 
-                return result
-
-        else:
-
-            def wrapper(*args, **kwargs):
-                start_time = perf_counter()
-                result = self.func(instance, *args, **kwargs)
-                end_time = perf_counter()
-                logging.log(
-                    self.log_level,
-                    f"Url: {args[0]}\n\tTime cost: {end_time - start_time:.3f}s",
-                )
-
-                # global last_time
-                # logging.log(self.log_level, f"Time Gap: {end_time - last_time:.3f}s")
-                # last_time = end_time
-
-                return result
+    def __get__(self, instance, owner):
+        def wrapper(*args, **kwargs):
+            self.start_time = perf_counter()
+            result = self.func(instance, *args, **kwargs)
+            self.end_time = perf_counter()
+            self._log(args[0])
+            return result
 
         return wrapper
 
+    def __enter__(self):
+        self.start_time = perf_counter()
 
-def logTimeDecorator(log_level=logging.INFO, is_async=False):
+    def __exit__(self, *args):
+        self.end_time = perf_counter()
+        self._log(self.func)
+
+
+def logTimeDecorator(log_level=logging.INFO):
     def decorator(func):
-        return LogTimeDecorator(func, log_level, is_async)
+        return LogTimeDecorator(func, log_level)
 
     return decorator
 
@@ -97,42 +136,47 @@ class WebRequest:
             with open(src_path, "rb") as f:
                 return f.read()
 
-    @logTimeDecorator()
     def get(self, url, use_cache=False, init_header=True, url_format=True, **kwargs):
-        if url_format:
-            url = "http://" + self.cfg.host + url
-        private_cached = self.get_private_cache(url)
-        if private_cached is not None:
-            return private_cached
+        try:
+            self.cfg.acquire()
+            if url_format:
+                url = "http://" + self.cfg.host + url
+            private_cached = self.get_private_cache(url)
+            if private_cached is not None:
+                return private_cached
 
-        def check_status(status_code):
-            if status_code != 200:
-                raise RuntimeError(f"Request Get Error: {status_code} Url: {url}")
+            def check_status(status_code):
+                if status_code != 200:
+                    raise RuntimeError(f"Request Get Error: {status_code} Url: {url}")
 
-        if init_header:
-            if kwargs.get("headers") is None:
-                kwargs["headers"] = {}
-            self.init_header(kwargs["headers"])
-        if "timeout" not in kwargs:
-            kwargs["timeout"] = timeout
+            if init_header:
+                if kwargs.get("headers") is None:
+                    kwargs["headers"] = {}
+                self.init_header(kwargs["headers"])
+            if "timeout" not in kwargs:
+                kwargs["timeout"] = self.cfg.timeout
 
-        if not use_cache:
-            resp = requests.get(url, **kwargs)
-            check_status(resp.status_code)
-            return resp.content
+            if not use_cache:
+                with LogTimeDecorator(url):
+                    resp = requests.get(url, **kwargs)
+                check_status(resp.status_code)
+                return resp.content
 
-        assert self.cache_dir is not None
-        url_hash = self.hash(url)
-        if os.path.exists(os.path.join(self.cache_dir, url_hash)):
-            with open(os.path.join(self.cache_dir, url_hash), "rb") as f:
-                content = f.read()
-        else:
-            resp = requests.get(url, **kwargs)
-            check_status(resp.status_code)
-            content = resp.content
-            with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
-                f.write(content)
-        return content
+            assert self.cache_dir is not None
+            url_hash = self.hash(url)
+            if os.path.exists(os.path.join(self.cache_dir, url_hash)):
+                with open(os.path.join(self.cache_dir, url_hash), "rb") as f:
+                    content = f.read()
+            else:
+                with LogTimeDecorator(url):
+                    resp = requests.get(url, **kwargs)
+                check_status(resp.status_code)
+                content = resp.content
+                with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
+                    f.write(content)
+            return content
+        finally:
+            self.cfg.release()
 
     def get_async(self, *args, **kwargs):
         def run():
@@ -167,44 +211,49 @@ class WebRequest:
             sleep(0.1)
         return [x[0] for x in result_list]
 
-    @logTimeDecorator()
     def post(self, url, use_cache=False, init_header=True, url_format=True, **kwargs):
-        if url_format:
-            url = "http://" + self.cfg.host + url
-        private_cached = self.get_private_cache(url)
-        if private_cached is not None:
-            return private_cached
-        
-        if "timeout" not in kwargs:
-            kwargs["timeout"] = timeout
+        try:
+            self.cfg.acquire()
+            if url_format:
+                url = "http://" + self.cfg.host + url
+            private_cached = self.get_private_cache(url)
+            if private_cached is not None:
+                return private_cached
+            
+            if "timeout" not in kwargs:
+                kwargs["timeout"] = self.cfg.timeout
 
-        def check_status(status_code):
-            if status_code != 200:
-                raise RuntimeError(f"Request Post Error: {status_code} Url: {url}")
+            def check_status(status_code):
+                if status_code != 200:
+                    raise RuntimeError(f"Request Post Error: {status_code} Url: {url}")
 
-        if init_header:
-            if kwargs.get("headers") is None:
-                kwargs["headers"] = {}
-            self.init_header(kwargs["headers"])
+            if init_header:
+                if kwargs.get("headers") is None:
+                    kwargs["headers"] = {}
+                self.init_header(kwargs["headers"])
 
-        if not use_cache:
-            resp = requests.post(url, **kwargs)
-            check_status(resp.status_code)
-            return resp.content
+            if not use_cache:
+                with LogTimeDecorator(url):
+                    resp = requests.post(url, **kwargs)
+                check_status(resp.status_code)
+                return resp.content
 
-        assert self.cache_dir is not None
-        url_hash = self.hash(url)
-        if os.path.exists(os.path.join(self.cache_dir, url_hash)):
-            with open(os.path.join(self.cache_dir, url_hash), "rb") as f:
-                content = f.read()
-        else:
-            resp = requests.post(url, **kwargs)
-            check_status(resp.status_code)
-            content = resp.content
-            with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
-                f.write(content)
+            assert self.cache_dir is not None
+            url_hash = self.hash(url)
+            if os.path.exists(os.path.join(self.cache_dir, url_hash)):
+                with open(os.path.join(self.cache_dir, url_hash), "rb") as f:
+                    content = f.read()
+            else:
+                with LogTimeDecorator(url):
+                    resp = requests.post(url, **kwargs)
+                check_status(resp.status_code)
+                content = resp.content
+                with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
+                    f.write(content)
 
-        return content
+            return content
+        finally:
+            self.cfg.release()
 
     def clear_cache(self):
         assert self.cache_dir is not None

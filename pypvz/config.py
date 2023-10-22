@@ -1,6 +1,7 @@
 import json
 import logging
-
+from threading import Lock
+from time import perf_counter, sleep
 
 class Config:
     def __init__(self, config_path):
@@ -24,6 +25,20 @@ class Config:
             error("host")
         if 'server' not in self.config:
             error("server")
+        self.timeout = 7
+        self.millsecond_delay = 0
+        self._lock = Lock()
+        self.last_time = 0
+    
+    def acquire(self):
+        self._lock.acquire()
+        now = perf_counter()
+        if now - self.last_time < self.millsecond_delay / 1000:
+            sleep((self.millsecond_delay / 1000) - (now - self.last_time))
+        
+    def release(self):
+        self._lock.release()
+        self.last_time = perf_counter()
             
     @property
     def username(self):

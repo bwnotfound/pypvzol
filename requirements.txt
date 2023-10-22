@@ -3,3 +3,4 @@ pyqt6
 py3amf
 pillow
 aiohttp
+cloudscraper

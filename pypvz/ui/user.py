@@ -17,6 +17,7 @@ from .. import (
     SynthesisMan,
     ArenaMan,
     HeritageMan,
+    ServerbattleMan,
 )
 from ..utils.recover import RecoverMan
 from .message import IOLogger, Logger
@@ -169,6 +170,18 @@ class Challenge4Level:
             self.caves.pop(i)
         else:
             raise NotImplementedError
+    
+    def remove_cave_friend(self, sc, friend_ids, garden_layer=None):
+        assert isinstance(sc, SingleCave)
+        if self.cfg.server == "私服":
+            self.friend_id2cave = self.garden_layer_friend_id2cave.get(garden_layer)
+
+        if not sc.cave.type <= 3:
+            return
+        for friend_id in friend_ids:
+            sc.friend_id_list.remove(friend_id)
+            sc.friend_id2cave_id.pop(friend_id, None)
+            self.friend_id2cave[friend_id].remove((sc.cave.id, sc.cave.name))
 
     def _assemble_team(self, grade):
         team = []
@@ -242,7 +255,7 @@ class Challenge4Level:
                 ]
             )
         )
-        
+
         if not self.accelerate_repository_in_challenge_cave:
             plant_grade_list = [(plant.id, plant.grade) for plant in plant_list]
             self.repo.refresh_repository(logger=self.logger)
@@ -296,12 +309,11 @@ class Challenge4Level:
             else:
                 message = message + "\n\t{}".format(lottery_result["result"])
         return message
-    
+
     def pop_trash_plant(self):
         if not self.accelerate_repository_in_challenge_cave:
             trash_plant_list = [
-                self.repo.get_plant(plant_id)
-                for plant_id in self.trash_plant_list
+                self.repo.get_plant(plant_id) for plant_id in self.trash_plant_list
             ]
             trash_plant_list = list(
                 filter(
@@ -312,8 +324,7 @@ class Challenge4Level:
             self.trash_plant_list = [x.id for x in trash_plant_list]
         else:
             trash_plant_list = [
-                self.repo.get_plant(plant_id)
-                for plant_id in self.trash_plant_list
+                self.repo.get_plant(plant_id) for plant_id in self.trash_plant_list
             ]
             for plant in trash_plant_list:
                 if plant is None:
@@ -427,7 +438,9 @@ class Challenge4Level:
                     )
                     success, result = result["success"], result["result"]
                     if not success:
-                        if "狩猎场挑战次数已达上限" in result and self.auto_use_challenge_book:
+                        if (
+                            "狩猎场挑战次数已达上限" in result or "挑战次数不足" in result
+                        ) and self.auto_use_challenge_book:
                             use_result = self.repo.use_item(
                                 self.lib.name2tool["高级挑战书"].id,
                                 self.advanced_challenge_book_amount,
@@ -453,7 +466,7 @@ class Challenge4Level:
                             if stop_channel.qsize() > 0:
                                 return
                             continue
-                        if "冷却中" in result and (self.enable_sand and sc.use_sand):
+                        if "冷却中" in result:
                             message = message + "失败，已跳过该洞口。原因: 洞口冷却中."
                             self.logger.log(message)
                             need_skip = True
@@ -592,7 +605,8 @@ class Challenge4Level:
         # TODO: 显示功能：将process显示，可加速版
         assert self.main_plant_list is not None and self.trash_plant_list is not None
 
-        self.challenge_stone_fuben(stop_channel)
+        if self.enable_stone:
+            self.challenge_stone_fuben(stop_channel)
         if self.cfg.server == "官服":
             try:
                 self.challenge_cave(stop_channel)
@@ -715,6 +729,7 @@ class AutoSynthesisMan:
         }
         self.end_mantissa = 1.0
         self.end_exponent = 0
+        self.force_synthesis = False
 
     def check_data(self, refresh_repo=True):
         if refresh_repo:
@@ -728,6 +743,20 @@ class AutoSynthesisMan:
         for deputy_plant_id in auto_synthesis_pool_id:
             if self.repo.get_plant(deputy_plant_id) is None:
                 self.auto_synthesis_pool_id.remove(deputy_plant_id)
+    
+    def get_max_attribute_plant_id(self):
+        auto_synthesis_pool_id = list(self.auto_synthesis_pool_id)
+        max_attribute_value = 0
+        max_plant_id = None
+        for deputy_plant_id in auto_synthesis_pool_id:
+            plant = self.repo.get_plant(deputy_plant_id)
+            if plant is None:
+                continue
+            attribute_value = getattr(plant, self.attribute2plant_attribute[self.chosen_attribute])
+            if attribute_value > max_attribute_value:
+                max_attribute_value = attribute_value
+                max_plant_id = deputy_plant_id
+        return max_plant_id
 
     def _synthesis(self, id1, id2, attribute_name):
         result = {
@@ -802,6 +831,7 @@ class AutoSynthesisMan:
                     "reinforce_number": self.reinforce_number,
                     "end_mantissa": self.end_mantissa,
                     "end_exponent": self.end_exponent,
+                    "force_synthesis": self.force_synthesis,
                 },
                 f,
             )
@@ -856,10 +886,10 @@ class UserSettings:
         self.rest_time = 0
         self.arena_enabled = False
         self.arena_man = ArenaMan(cfg)
-
         self.auto_synthesis_man = AutoSynthesisMan(cfg, lib, repo)
-
         self.heritage_man = HeritageMan(self.cfg, self.lib)
+        self.serverbattle_man = ServerbattleMan(self.cfg)
+        self.serverbattle_enabled = False
 
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
         while stop_channel.qsize() == 0:
@@ -873,6 +903,20 @@ class UserSettings:
                     self.logger.log("购买完成")
                 except Exception as e:
                     self.logger.log(f"购买失败，异常种类:{type(e).__name__}。跳过购买")
+                if stop_channel.qsize() > 0:
+                    break
+            if self.serverbattle_enabled:
+                try:
+                    while True:
+                        result = self.serverbattle_man.challenge()
+                        self.logger.log(result["result"])
+                        if not result["success"]:
+                            break
+                        if stop_channel.qsize() > 0:
+                            break
+                except Exception as e:
+                    self.logger.log(f"跨服挑战失败，异常种类:{type(e).__name__}。跳过跨服挑战")
+                    break
                 if stop_channel.qsize() > 0:
                     break
             if self.task_enabled:
@@ -922,7 +966,12 @@ class UserSettings:
                 except Exception as e:
                     self.logger.log(f"自动挑战失败，异常种类:{type(e).__name__}。跳过自动挑战")
             self.logger.log("工作完成，等待{}".format(second2str(self.rest_time)))
-            time.sleep(self.rest_time)
+            if self.rest_time == 0:
+                time.sleep(0.1)
+            for _ in range(self.rest_time):
+                if stop_channel.qsize() > 0:
+                    break
+                time.sleep(1)
         finished_trigger.emit()
 
     def start(self, stop_channel: Queue, finished_trigger):
@@ -969,6 +1018,9 @@ class UserSettings:
                     "rest_time": self.rest_time,
                     "arena_enabled": self.arena_enabled,
                     "task_enabled": self.task_enabled,
+                    "timeout": self.cfg.timeout,
+                    "millsecond_delay": self.cfg.millsecond_delay,
+                    "serverbattle_enabled": self.serverbattle_enabled,
                 },
                 f,
             )
@@ -985,6 +1037,10 @@ class UserSettings:
             for k, v in d.items():
                 if hasattr(self, k):
                     setattr(self, k, v)
+            if "timeout" in d:
+                self.cfg.timeout = d["timeout"]
+            if "millsecond_delay" in d:
+                self.cfg.millsecond_delay = d["millsecond_delay"]
         self.plant_evolution.load(self.save_dir)
         self.auto_synthesis_man.load(self.save_dir)
         self.heritage_man.load(self.save_dir)

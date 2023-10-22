@@ -1,6 +1,7 @@
 import logging
 from copy import deepcopy
 from time import sleep
+from threading import Event
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -913,10 +914,18 @@ class ChallengeGardenCaveSetting(QMainWindow):
 
 
 class UpgradeQualityWindow(QMainWindow):
+    upgrade_finish_signal = pyqtSignal()
+    refresh_signal = pyqtSignal()
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
         self.usersettings = usersettings
         self.upgradeMan = UpgradeMan(self.usersettings.cfg)
+        self.interrupt_event = Event()
+        self.rest_event = Event()
+        self.rest_event.set()
+        self.run_thread = None
+        self.refresh_signal.connect(self.refresh_plant_list)
+        self.upgrade_finish_signal.connect(self.upgrade_finish)
         self.init_ui()
 
     def init_ui(self):
@@ -949,7 +958,7 @@ class UpgradeQualityWindow(QMainWindow):
         )
         main_layout.addWidget(self.upgrade_quality_choice)
 
-        self.upgrade_quality_btn = upgrade_quality_btn = QPushButton("升级品质")
+        self.upgrade_quality_btn = upgrade_quality_btn = QPushButton("全部刷品")
         upgrade_quality_btn.clicked.connect(self.upgrade_quality_btn_clicked)
         main_layout.addWidget(upgrade_quality_btn)
 
@@ -970,27 +979,94 @@ class UpgradeQualityWindow(QMainWindow):
             self.plant_list.addItem(item)
 
     def upgrade_quality_btn_clicked(self):
-        self.upgrade_quality_btn.setDisabled(True)
-        QApplication.processEvents()
         try:
-            selected_items = self.plant_list.selectedItems()
-            if len(selected_items) == 0:
-                self.usersettings.logger.log("请先选择一个植物")
-                return
-            selected_plant_id = [
-                item.data(Qt.ItemDataRole.UserRole) for item in selected_items
-            ]
-            need_show_all_info = self.show_all_info.isChecked()
-            target_quality_index = self.upgradeMan.quality_name.index(
-                self.upgrade_quality_choice.currentText()
-            )
-            for plant_id in selected_plant_id:
+            self.upgrade_quality_btn.setDisabled(True)
+            QApplication.processEvents()
+            if self.upgrade_quality_btn.text() == "全部刷品":
+                selected_items = self.plant_list.selectedItems()
+                if len(selected_items) == 0:
+                    self.usersettings.logger.log("请先选择一个植物")
+                    return
+                selected_plant_id = [
+                    item.data(Qt.ItemDataRole.UserRole) for item in selected_items
+                ]
+                need_show_all_info = self.show_all_info.isChecked()
+                target_quality_index = self.upgradeMan.quality_name.index(
+                    self.upgrade_quality_choice.currentText()
+                )
+                self.upgrade_quality_btn.setText("中止刷品")
+                self.run_thread = UpgradeQualityThread(
+                    self.usersettings,
+                    self.upgradeMan,
+                    selected_plant_id,
+                    target_quality_index,
+                    need_show_all_info,
+                    self.upgrade_finish_signal,
+                    self.interrupt_event,
+                    self.refresh_signal,
+                    self.rest_event,
+                    ...
+                )
+                self.rest_event.clear()
+                self.run_thread.start()
+            elif self.upgrade_quality_btn.text() == "中止刷品":
+                self.upgrade_quality_btn.setText("全部刷品")
+                self.interrupt_event.set()
+                self.rest_event.wait()
+            else:
+                raise RuntimeError(f"未知按钮文本：{self.upgrade_quality_btn.text()}")
+        finally:
+            self.upgrade_quality_btn.setEnabled(True)
+
+    def upgrade_finish(self):
+        self.usersettings.repo.refresh_repository()
+        self.refresh_signal.emit()
+        self.upgrade_quality_btn.setText("全部刷品")
+        self.run_thread = None
+        
+    def closeEvent(self, event):
+        if self.run_thread is not None:
+            self.interrupt_event.set()
+            self.rest_event.wait()
+        return super().closeEvent(event)
+
+
+class UpgradeQualityThread(QThread):
+    def __init__(
+        self,
+        usersettings: UserSettings,
+        upgrade_man: UpgradeMan,
+        selected_plant_id,
+        target_quality_index,
+        need_show_all_info,
+        upgrade_finish_signal,
+        interrupt_event: Event,
+        refresh_signal,
+        rest_event: Event,
+        force_upgrade=False,
+    ):
+        super().__init__()
+        self.usersettings = usersettings
+        self.upgrade_man = upgrade_man
+        self.need_show_all_info = need_show_all_info
+        self.selected_plant_id = selected_plant_id
+        self.target_quality_index = target_quality_index
+        self.upgrade_finish_signal = upgrade_finish_signal
+        self.interrupt_event = interrupt_event
+        self.refresh_signal = refresh_signal
+        self.rest_event = rest_event
+        self.force_upgrade = force_upgrade
+        
+    def upgrade_quality(self):
+        has_failure = False
+        try:
+            for plant_id in self.selected_plant_id:
                 plant = self.usersettings.repo.get_plant(plant_id)
                 if plant is None:
                     continue
-                if plant.quality_index >= target_quality_index:
+                if plant.quality_index >= self.target_quality_index:
                     self.usersettings.logger.log(
-                        f"{plant.name(self.usersettings.lib)}({plant.grade})品质已大于等于目标品质"
+                        f"{plant.name(self.usersettings.lib)}({plant.grade})品质已大于等于目标品质", self.need_show_all_info
                     )
                     continue
 
@@ -998,40 +1074,44 @@ class UpgradeQualityWindow(QMainWindow):
                 while True:
                     cnt, max_retry = 0, 15
                     while cnt < max_retry:
+                        if self.interrupt_event.is_set():
+                            self.interrupt_event.clear()
+                            self.usersettings.logger.log("中止刷品")
+                            return
+                        cnt += 1
                         try:
-                            result = self.upgradeMan.upgrade_quality(plant_id)
+                            result = self.upgrade_man.upgrade_quality(plant_id)
                         except Exception as e:
                             self.usersettings.logger.log(
-                                f"刷品异常，已跳过该植物，同时暂停1秒。原因种类：{type(e).__name__}"
+                                f"刷品异常，已跳过该植物，同时暂停1秒。原因种类：{type(e).__name__}", self.need_show_all_info
                             )
                             error_flag = True
                             sleep(1)
                             break
-                        cnt += 1
                         if result['success']:
                             break
+                        if result['error_type'] == 6:
+                            self.usersettings.logger.log(
+                                "请求升品过于频繁，选择等待1秒后重试，最多再重试{}".format(max_retry - cnt), self.need_show_all_info
+                            )
+                            sleep(1)
+                            continue
                         else:
-                            if result['error_type'] == 6:
-                                self.usersettings.logger.log(
-                                    "请求升品过于频繁，选择等待1秒后重试，最多再重试{}".format(max_retry - cnt)
-                                )
-                                sleep(1)
-                                continue
-                            else:
-                                self.usersettings.logger.log(result['result'])
-                                error_flag = True
-                                break
+                            self.usersettings.logger.log(result['result']+"。已跳过该植物", self.need_show_all_info)
+                            error_flag = True
+                            break
                     else:
-                        self.usersettings.logger.log("重试次数过多，放弃升级品质")
+                        self.usersettings.logger.log("重试次数过多，放弃升级品质，跳过该植物", self.need_show_all_info)
                         error_flag = True
                     if error_flag:
+                        has_failure = True
                         break
-                    cur_quality_index = self.upgradeMan.quality_name.index(
+                    cur_quality_index = self.upgrade_man.quality_name.index(
                         result['quality_name']
                     )
                     plant.quality_index = cur_quality_index
                     plant.quality_str = result['quality_name']
-                    if cur_quality_index >= target_quality_index:
+                    if cur_quality_index >= self.target_quality_index:
                         self.usersettings.logger.log(
                             f"{plant.name(self.usersettings.lib)}({plant.grade})升品完成"
                         )
@@ -1041,18 +1121,22 @@ class UpgradeQualityWindow(QMainWindow):
                         plant.grade,
                         result['quality_name'],
                     )
-                    logging.info(msg)
-                    if need_show_all_info:
-                        self.usersettings.logger.log(msg, False)
-                self.refresh_plant_list()
-                QApplication.processEvents()
+                    self.usersettings.logger.log(msg, self.need_show_all_info)
+                self.refresh_signal.emit()
             self.usersettings.logger.log(f"刷品结束")
-            self.usersettings.repo.refresh_repository()
-            self.refresh_plant_list()
         except Exception as e:
-            self.usersettings.logger.log(f"刷品过程中出现异常，已停止。原因种类：{type(e).__name__}")
+            self.usersettings.logger.log(f"刷品过程中出现异常，已停止。原因种类：{type(e).__name__}", self.need_show_all_info)
+            has_failure = True
+        if has_failure and self.force_upgrade:
+            self.usersettings.logger.log("刷品过程中出现异常，重启刷品")
+            self.upgrade_quality()
+
+    def run(self):
+        try:
+            self.upgrade_quality()
         finally:
-            self.upgrade_quality_btn.setEnabled(True)
+            self.upgrade_finish_signal.emit()
+            self.rest_event.set()
 
 
 class ShopAutoBuySetting(QMainWindow):
@@ -1201,9 +1285,18 @@ class ShopAutoBuySetting(QMainWindow):
 
 
 class AutoSynthesisWindow(QMainWindow):
+    synthesis_finish_signal = pyqtSignal()
+    refresh_all_signal = pyqtSignal()
+
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
         self.usersettings = usersettings
+        self.interrupt_event = Event()
+        self.rest_event = Event()
+        self.rest_event.set()
+        self.run_thread = None
+        self.refresh_all_signal.connect(self.refresh_all)
+        self.synthesis_finish_signal.connect(self.synthesis_finish)
         self.init_ui()
         self.refresh_all()
 
@@ -1350,6 +1443,18 @@ class AutoSynthesisWindow(QMainWindow):
         )
         widget6_layout.addWidget(auto_synthesis_single_btn)
 
+        widget6_2_layout = QHBoxLayout()
+        widget6_2_layout.addWidget(QLabel("异常后继续合成："))
+        self.force_synthesisi_checkbox = QCheckBox()
+        self.force_synthesisi_checkbox.setChecked(
+            self.usersettings.auto_synthesis_man.force_synthesis
+        )
+        self.force_synthesisi_checkbox.stateChanged.connect(
+            self.force_synthesisi_checkbox_value_changed
+        )
+        widget6_2_layout.addWidget(self.force_synthesisi_checkbox)
+        widget6_layout.addLayout(widget6_2_layout)
+
         widget6_layout.addStretch(1)
 
         widget6.setLayout(widget6_layout)
@@ -1357,6 +1462,11 @@ class AutoSynthesisWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def force_synthesisi_checkbox_value_changed(self):
+        self.usersettings.auto_synthesis_man.force_synthesis = (
+            self.force_synthesisi_checkbox.isChecked()
+        )
 
     def mantissa_line_edit_value_changed(self):
         try:
@@ -1539,39 +1649,36 @@ class AutoSynthesisWindow(QMainWindow):
             self.auto_synthesis_single_btn.setEnabled(True)
 
     def auto_synthesis_btn_clicked(self):
-        self.auto_synthesis_btn.setDisabled(True)
-        QApplication.processEvents()
         try:
-            length = len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id)
-            if length == 0:
-                self.usersettings.logger.log("合成池为空")
-                return
-            self.usersettings.auto_synthesis_man.check_data()
-            while (
-                not (
-                    len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id)
-                    == 0
+            self.auto_synthesis_btn.setDisabled(True)
+            QApplication.processEvents()
+            if self.auto_synthesis_btn.text() == "全部合成":
+                self.auto_synthesis_btn.setText("停止合成")
+                self.run_thread = SynthesisThread(
+                    self.usersettings,
+                    self.synthesis_finish_signal,
+                    self.interrupt_event,
+                    self.refresh_all_signal,
+                    self.need_synthesis,
+                    self.rest_event,
+                    force_synthesis=self.usersettings.auto_synthesis_man.force_synthesis,
                 )
-                and length > 0
-            ):
-                if not self.need_synthesis():
-                    return
-                result = self.usersettings.auto_synthesis_man.synthesis(
-                    need_check=False
+                self.rest_event.clear()
+                self.run_thread.start()
+            elif self.auto_synthesis_btn.text() == "停止合成":
+                self.interrupt_event.set()
+                self.rest_event.wait()
+                self.auto_synthesis_btn.setText("全部合成")
+            else:
+                raise NotImplementedError(
+                    "全部合成按钮文本：{} 未知".format(self.auto_synthesis_btn.text())
                 )
-                self.usersettings.logger.log(result['result'])
-                self.usersettings.auto_synthesis_man.check_data()
-                self.refresh_all()
-                QApplication.processEvents()
-                if not result["success"]:
-                    self.usersettings.logger.log("合成异常，已跳出合成")
-                    return
-                length -= 1
-            self.usersettings.logger.log("合成完成")
-        except Exception as e:
-            self.usersettings.logger.log("合成异常。异常种类：{}".format(type(e).__name__))
         finally:
             self.auto_synthesis_btn.setEnabled(True)
+
+    def synthesis_finish(self):
+        self.auto_synthesis_btn.setText("全部合成")
+        self.run_thread = None
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
@@ -1598,6 +1705,94 @@ class AutoSynthesisWindow(QMainWindow):
                     )
             self.refresh_plant_list()
             self.refresh_plant_pool_list()
+
+    def closeEvent(self, event):
+        if self.run_thread is not None:
+            self.interrupt_event.set()
+            self.rest_event.wait()
+        super().closeEvent(event)
+
+
+class SynthesisThread(QThread):
+    def __init__(
+        self,
+        usersettings: UserSettings,
+        synthesis_finish_signal,
+        interrupt_event: Event,
+        refresh_all_signal,
+        need_synthesis,
+        rest_event: Event,
+        synthesis_number=None,
+        force_synthesis=False,
+    ):
+        super().__init__()
+        self.usersettings = usersettings
+        self.synthesis_number = synthesis_number
+        self.synthesis_finish_signal = synthesis_finish_signal
+        self.interrupt_event = interrupt_event
+        self.refresh_all_signal = refresh_all_signal
+        self.need_synthesis = need_synthesis
+        self.rest_event = rest_event
+        self.force_synthesis = force_synthesis
+
+    def synthesis(self):
+        try:
+            length = len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id)
+            if self.synthesis_number is not None:
+                length = min(self.synthesis_number, length)
+            if length == 0:
+                self.usersettings.logger.log("合成池为空")
+                return
+            elif length < 0:
+                self.usersettings.logger.log("合成次数不能为负数")
+                return
+            self.usersettings.auto_synthesis_man.check_data()
+            while (
+                not (
+                    len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id)
+                    == 0
+                )
+                and length > 0
+            ):
+                if self.interrupt_event.is_set():
+                    self.interrupt_event.clear()
+                    self.usersettings.logger.log("中止合成")
+                    return
+                if not self.need_synthesis():
+                    return
+                result = self.usersettings.auto_synthesis_man.synthesis(
+                    need_check=False
+                )
+                self.usersettings.logger.log(result['result'])
+                self.usersettings.auto_synthesis_man.check_data()
+                self.refresh_all_signal.emit()
+                if not result["success"]:
+                    self.usersettings.logger.log("合成异常，已跳出合成")
+                    return
+                length -= 1
+            self.usersettings.logger.log("合成完成")
+        except Exception as e:
+            self.usersettings.logger.log("合成异常。异常种类：{}".format(type(e).__name__))
+            if self.force_synthesis:
+                self.usersettings.logger.log("重启合成")
+                self.usersettings.auto_synthesis_man.check_data()
+                if self.usersettings.auto_synthesis_man.main_plant_id is None:
+                    self.usersettings.logger.log("重新设置底座为合成池中最大属性的植物")
+                    plant_id = (
+                        self.usersettings.auto_synthesis_man.get_max_attribute_plant_id()
+                    )
+                    self.usersettings.auto_synthesis_man.main_plant_id = plant_id
+                    self.usersettings.auto_synthesis_man.auto_synthesis_pool_id.remove(
+                        plant_id
+                    )
+                self.synthesis()
+
+    def run(self):
+        try:
+            self.synthesis()
+        finally:
+            self.synthesis_finish_signal.emit()
+            self.rest_event.set()
 
 
 class HeritageWindow(QMainWindow):
@@ -2025,7 +2220,10 @@ class PlantRelativeWindow(QMainWindow):
                 if result["upgrade_success"]:
                     self.usersettings.logger.log("技能升级成功")
                     for s in plant.skills:
-                        if s["id"] == pre_skill["id"] and s["name"] == pre_skill["name"]:
+                        if (
+                            s["id"] == pre_skill["id"]
+                            and s["name"] == pre_skill["name"]
+                        ):
                             s["id"] = skill["id"]
                             break
                     else:

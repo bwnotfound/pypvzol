@@ -1,4 +1,3 @@
-from pyamf import AMF0, remoting
 import os
 import pickle
 

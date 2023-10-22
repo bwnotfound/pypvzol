@@ -166,3 +166,29 @@ api.garden.challenge
 2. api.shop.sell
     request:
         type_id(1:tool,2:plant),物品/植物id,数量
+
+
+3. api.active.sign
+    领取签到奖励，签到直接发这个amf就行
+
+4. api.active.rewardTimes
+    领取累计签到奖励
+    request:
+        id: [1~5]
+
+5. api.serverbattle.challenge
+    跨服挑战，直接发送
+
+6. api.territory.recommen
+    获取推荐列表
+
+7. api.territory.challenge
+    挑战
+    request:
+        id: 推荐列表中的id
+        array:
+        1
+        0
+
+8. api.vip.awards
+    vip奖励领取，直接发送就行
