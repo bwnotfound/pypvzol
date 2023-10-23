@@ -12,6 +12,8 @@ from pyamf import DecodeError, remoting, AMF0, AMF3
 
 from .config import Config
 
+proxies = { "http": None, "https": None}
+
     
 class TimeCounter(object):
     def __init__(self, *args):
@@ -158,7 +160,7 @@ class WebRequest:
 
             if not use_cache:
                 with LogTimeDecorator(url):
-                    resp = requests.get(url, **kwargs)
+                    resp = requests.get(url, **kwargs, proxies={ "http": None, "https": None})
                 check_status(resp.status_code)
                 return resp.content
 
@@ -169,7 +171,7 @@ class WebRequest:
                     content = f.read()
             else:
                 with LogTimeDecorator(url):
-                    resp = requests.get(url, **kwargs)
+                    resp = requests.get(url, **kwargs, proxies={ "http": None, "https": None})
                 check_status(resp.status_code)
                 content = resp.content
                 with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
@@ -234,7 +236,7 @@ class WebRequest:
 
             if not use_cache:
                 with LogTimeDecorator(url):
-                    resp = requests.post(url, **kwargs)
+                    resp = requests.post(url, **kwargs, proxies={ "http": None, "https": None})
                 check_status(resp.status_code)
                 return resp.content
 
@@ -245,7 +247,7 @@ class WebRequest:
                     content = f.read()
             else:
                 with LogTimeDecorator(url):
-                    resp = requests.post(url, **kwargs)
+                    resp = requests.post(url, **kwargs, proxies={ "http": None, "https": None})
                 check_status(resp.status_code)
                 content = resp.content
                 with open(os.path.join(self.cache_dir, url_hash), "wb") as f:

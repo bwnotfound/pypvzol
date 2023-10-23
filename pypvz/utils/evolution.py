@@ -160,5 +160,11 @@ class PlantEvolution:
     
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "evolution")
+        for saved_path in self.saved_evolution_paths:
+            for item in saved_path:
+                item.lib = None
         with open(save_path, "wb") as f:
             f.write(pickle.dumps(self.saved_evolution_paths))
+        for saved_path in self.saved_evolution_paths:
+            for item in saved_path:
+                item.lib = self.lib

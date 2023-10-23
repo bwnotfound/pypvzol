@@ -185,7 +185,7 @@ api.garden.challenge
 7. api.territory.challenge
     挑战
     request:
-        id: 推荐列表中的id
+        id: 推荐列表中的id(2001~2004，难度一~四)
         array:
         1
         0
