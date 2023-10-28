@@ -26,25 +26,27 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QLineEdit,
 )
-from PyQt6.QtGui import QImage, QPixmap, QFont, QTextCursor
+from PyQt6.QtGui import QImage, QPixmap, QTextCursor
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PIL import Image
 
 from pypvz import WebRequest, Config, User, CaveMan, Repository, Library
 from pypvz.ui.message import IOLogger
 from pypvz.ui.wrapped import QLabel, normal_font
-from pypvz.ui.windows import (
-    EvolutionPanelWindow,
-    SetPlantListWindow,
-    AddCaveWindow,
+from pypvz.ui.windows.common import (
     AutoUseItemSettingWindow,
-    UpgradeQualityWindow,
+    AddCaveWindow,
     ShopAutoBuySetting,
-    AutoSynthesisWindow,
     HeritageWindow,
     PlantRelativeWindow,
+    SetPlantListWindow,
 )
 from pypvz.ui.user import SingleCave, UserSettings
+from pypvz.ui.windows import (
+    EvolutionPanelWindow,
+    UpgradeQualityWindow,
+    AutoSynthesisWindow,
+)
 
 
 class Challenge4levelSettingWindow(QMainWindow):
@@ -1408,12 +1410,12 @@ if __name__ == "__main__":
     root_dir = os.getcwd()
     os.makedirs(os.path.join(root_dir, "config"), exist_ok=True)
 
-    app = QApplication(sys.argv)
-    logger_list = []
-    main_window_list = []
-    login_window = LoginWindow()
-    login_window.show()
     try:
+        app = QApplication(sys.argv)
+        logger_list = []
+        main_window_list = []
+        login_window = LoginWindow()
+        login_window.show()
         app_return = app.exec()
     except Exception as e:
         print(str(e))

@@ -22,6 +22,12 @@ class Logger:
         self._info_channel.put(message)
         if log_info:
             logging.info(message)
+            
+    def reverse_log(self, msg: str, log_info=True):
+        message = self._log_str_format(msg)
+        logging.info(message)
+        if log_info:
+            self._info_channel.put(message)
 
 
 class _IOLoggerThread(threading.Thread):

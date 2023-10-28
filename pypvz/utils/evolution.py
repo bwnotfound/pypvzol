@@ -1,4 +1,5 @@
 from os import path
+import re
 import os
 from typing import Literal
 from xml.etree.ElementTree import fromstring
@@ -53,7 +54,19 @@ class PlantEvolution:
             + f"{id}/route/{pathItem.evolution_path['id']}/shortcut/2/sig/0"
         )  # TODO: 这里的2不知道是什么意思
         xml_text = self.wr.get(url).decode("utf-8")
-        root = fromstring(xml_text)
+        try:
+            root = fromstring(xml_text)
+        except Exception as e:
+            message = re.findall(r'message="(.*)"/>', xml_text)
+            if len(message) > 0:
+                return {
+                    "success": False,
+                    "result": "进化失败。原因：" + message[0],
+                }
+            return {
+                "success": False,
+                "result": "进化失败。异常类型：" + type(e).__name__,
+            }
         if not root.find("response").find("status").text == "success":
             return {
                 "success": False,
