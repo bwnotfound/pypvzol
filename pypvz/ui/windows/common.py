@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QApplication,
     QSpinBox,
 )
+from PyQt6.QtGui import QImage, QPixmap
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -1234,3 +1235,28 @@ class PlantRelativeWindow(QMainWindow):
             return
         finally:
             self.skill_upgrade_btn.setEnabled(True)
+
+
+class ImageWindow(QMainWindow):
+    def __init__(self, image, parent=None):
+        super().__init__(parent=parent)
+        if isinstance(image, str):
+            image = QPixmap(image)
+        if not isinstance(image, QPixmap):
+            raise TypeError("图片类型错误。类型：{}".format(type(image)))
+        self.image = image
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("图片")
+
+        # 将窗口居中显示，宽度为显示器宽度的60%，高度为显示器高度的50%
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.move(int(screen_size.width() * 0.1), int(screen_size.height() * 0.1))
+        
+        main_widget = QWidget()
+        main_layout = QVBoxLayout()
+
+        main_layout.addWidget(QLabel().setPixmap(self.image))
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)

@@ -3,7 +3,6 @@ import json
 from io import BytesIO
 import os
 import logging
-import concurrent.futures
 from queue import Queue
 
 from PyQt6 import QtGui
@@ -46,6 +45,7 @@ from pypvz.ui.windows import (
     EvolutionPanelWindow,
     UpgradeQualityWindow,
     AutoSynthesisWindow,
+    AutoCompoundWindow,
 )
 
 
@@ -955,16 +955,24 @@ class FunctionPanelWindow(QMainWindow):
         heritage_btn = QPushButton("传承面板")
         heritage_btn.clicked.connect(self.heritage_btn_clicked)
         menu_layout.addWidget(heritage_btn, 3, 0)
+        
+        compound_btn = QPushButton("复合面板")
+        compound_btn.clicked.connect(self.compound_btn_clicked)
+        menu_layout.addWidget(compound_btn, 4, 0)
 
         plant_relative_btn = QPushButton("植物相关面板")
         plant_relative_btn.clicked.connect(self.plant_relative_btn_clicked)
-        menu_layout.addWidget(plant_relative_btn, 4, 0)
+        menu_layout.addWidget(plant_relative_btn, 5, 0)
 
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def compound_btn_clicked(self):
+        self.compound_window = AutoCompoundWindow(self.usersettings, parent=self)
+        self.compound_window.show()
 
     def plant_relative_btn_clicked(self):
         self.plant_relative_window = PlantRelativeWindow(self.usersettings, parent=self)
