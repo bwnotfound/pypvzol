@@ -9,3 +9,4 @@ from .task import Task
 from .upgrade import UpgradeMan, SynthesisMan, HeritageMan
 from .arena import ArenaMan
 from .serverbattle import ServerbattleMan
+from .fuben import FubenRequest

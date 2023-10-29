@@ -38,6 +38,26 @@ class RecoverMan:
             return {"success": False, "result": response.body.description}
         else:
             raise NotImplementedError
+        
+    def recover_list(self, target_id_list, choice='中级血瓶'):
+        success_num = 0
+        fail_num = 0
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [executor.submit(self.recover, id, choice) for id in target_id_list]
+
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+                if result["success"]:
+                    success_num += 1
+                else:
+                    logging.warning("回复植物血量失败: {}".format(result["result"]))
+                    fail_num += 1
+            except Exception as e:
+                logging.warning("回复植物血量异常，异常类型：{}".format(type(e).__name__))
+                fail_num += 1
+        return success_num, fail_num
 
     def recover_zero(self, need_refresh=True, choice='中级血瓶'):
         if need_refresh:

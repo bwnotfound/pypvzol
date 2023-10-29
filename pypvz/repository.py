@@ -81,18 +81,29 @@ class Repository:
         url = "/pvz/index.php/Warehouse/index/sig/0"
         cnt, max_retry = 0, 20
         while cnt < max_retry:
-            resp = self.wr.get(url)
-            resp_text = resp.decode("utf-8")
             try:
-                root = fromstring(resp_text)
-                break
-            except:
-                if resp_text.startswith("<html"):
-                    logging.info(f"刷新仓库出现问题。大概率是Cookie或者区服选择有误。以下是响应:{resp_text}")
-                    time.sleep(3)
-                    raise RuntimeError("刷新仓库出现问题")
+                resp = self.wr.get(url)
+                resp_text = resp.decode("utf-8")
+                try:
+                    root = fromstring(resp_text)
+                    break
+                except:
+                    if resp_text.startswith("<html"):
+                        logging.info(f"刷新仓库出现问题。大概率是Cookie或者区服选择有误。以下是响应:{resp_text}")
+                        time.sleep(3)
+                        raise RuntimeError("刷新仓库出现问题")
+                    cnt += 1
+                    msg = "刷新仓库失败，选择等待1秒后重试。最多再等待{}次".format(max_retry - cnt)
+                    if logger is not None:
+                        logger.log(msg)
+                    else:
+                        logging.info(msg)
+                    time.sleep(1)
+            except Exception as e:
                 cnt += 1
-                msg = "刷新仓库失败，选择等待1秒后重试。最多再等待{}次".format(max_retry - cnt)
+                msg = "刷新仓库出现异常，异常类型：{}。选择等待1秒后重试。最多再等待{}次".format(
+                    type(e).__name__, max_retry - cnt
+                )
                 if logger is not None:
                     logger.log(msg)
                 else:

@@ -72,7 +72,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         # 将窗口居中显示，宽度为显示器宽度的40%，高度为显示器高度的60%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
         self.resize(int(screen_size.width() * 0.4), int(screen_size.height() * 0.8))
-        self.move(int(screen_size.width() * 0.3), int(screen_size.height() * 0.1))
+        self.move(int(screen_size.width() * 0.3), int(screen_size.height() * 0.05))
 
         main_widget = QWidget()
         main_layout = QHBoxLayout()
@@ -157,6 +157,7 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         right_panel = QWidget()
         right_panel_layout = QVBoxLayout()
+        right_panel_layout.setSpacing(0)
         right_panel_layout.addWidget(QLabel("当前洞口的配置:"))
 
         self.enable_cave_checkbox = QCheckBox("启用当前洞口")
@@ -181,7 +182,10 @@ class Challenge4levelSettingWindow(QMainWindow):
         )
         right_panel_layout.addWidget(self.current_cave_difficulty)
 
-        right_panel_layout.addStretch(1)
+        space_widget = QWidget()
+        space_widget.setFixedHeight(10)
+        right_panel_layout.addWidget(space_widget)
+        
         right_panel_layout.addWidget(QLabel("全局挑战设置:"))
 
         cave_enabled_switch_layout = QHBoxLayout()
@@ -224,6 +228,31 @@ class Challenge4levelSettingWindow(QMainWindow):
         hp_choice_layout.addWidget(hp_choice_box)
         hp_choice_widget.setLayout(hp_choice_layout)
         right_panel_layout.addWidget(hp_choice_widget)
+        
+        self.main_plant_recover_checkbox = QCheckBox("主力血量也恢复")
+        self.main_plant_recover_checkbox.setChecked(
+            self.usersettings.challenge4Level.main_plant_recover
+        )
+        self.main_plant_recover_checkbox.stateChanged.connect(
+            self.main_plant_recover_checkbox_stateChanged
+        )
+        right_panel_layout.addWidget(self.main_plant_recover_checkbox)
+        
+        main_plant_recover_rate_layout = QHBoxLayout()
+        main_plant_recover_rate_layout.addWidget(QLabel("主力恢复百分比阈值:"))
+        self.main_plant_recover_rate_spinbox = QSpinBox()
+        self.main_plant_recover_rate_spinbox.setMinimum(0)
+        self.main_plant_recover_rate_spinbox.setMaximum(100)
+        self.main_plant_recover_rate_spinbox.setValue(
+            int(self.usersettings.challenge4Level.main_plant_recover_rate * 100)
+        )
+        self.main_plant_recover_rate_spinbox.valueChanged.connect(
+            self.main_plant_recover_rate_spinbox_valueChanged
+        )
+        main_plant_recover_rate_layout.addWidget(self.main_plant_recover_rate_spinbox)
+        main_plant_recover_rate_layout.addWidget(QLabel("%"))
+        right_panel_layout.addLayout(main_plant_recover_rate_layout)
+        
 
         widget1 = QWidget()
         widget1_layout = QHBoxLayout()
@@ -368,13 +397,24 @@ class Challenge4levelSettingWindow(QMainWindow):
             "1. 你的植物不会死亡，包括主力和炮灰\n"
             "2. 你的植物不会消失，包括主力和炮灰\n"
         )
+        warning_textbox.setFixedHeight(int(self.height() * 0.15))
         right_panel_layout.addWidget(warning_textbox)
+        
+        right_panel_layout.addStretch(1)
 
         right_panel.setLayout(right_panel_layout)
         main_layout.addWidget(right_panel)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def main_plant_recover_checkbox_stateChanged(self):
+        self.usersettings.challenge4Level.main_plant_recover = (
+            self.main_plant_recover_checkbox.isChecked()
+        )
+    
+    def main_plant_recover_rate_spinbox_valueChanged(self, value):
+        self.usersettings.challenge4Level.main_plant_recover_rate = value / 100
 
     def enable_all_cave_btn_clicked(self):
         for sc in self.usersettings.challenge4Level.caves:

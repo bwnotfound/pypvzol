@@ -70,6 +70,9 @@ class Challenge4Level:
         self.accelerate_repository_in_challenge_cave = False
 
         self.current_garden_layer = None
+        
+        self.main_plant_recover = False
+        self.main_plant_recover_rate = 0.1
 
     def add_cave(
         self, cave: Cave, friend_ids=None, difficulty=3, enabled=True, garden_layer=None
@@ -213,9 +216,15 @@ class Challenge4Level:
         cnt, max_retry = 0, 3
         success_num_all = 0
         while cnt < max_retry:
-            success_num, fail_num = self.recoverMan.recover_zero(
-                need_refresh=False, choice=self.hp_choice
-            )
+            recover_list = self.repo.hp_below(0, id_only=True)
+            if self.main_plant_recover:
+                for plant_id in self.main_plant_list:
+                    plant = self.repo.get_plant(plant_id)
+                    if plant is None:
+                        continue
+                    if plant.hp_now / plant.hp_max < self.main_plant_recover_rate:
+                        recover_list.append(plant_id)
+            success_num, fail_num = self.recoverMan.recover_list(recover_list, choice=self.hp_choice)      
             success_num_all += success_num
             if fail_num == 0:
                 break
@@ -408,7 +417,7 @@ class Challenge4Level:
                 team = self._assemble_team(sc.cave.grade)
                 if team is None:
                     continue
-                if self.need_recover or self.accelerate_repository_in_challenge_cave:
+                if self.need_recover and not self.accelerate_repository_in_challenge_cave:
                     success = self._recover()
                     if not success:
                         return
@@ -508,7 +517,7 @@ class Challenge4Level:
                 team = self._assemble_team(cave.grade)
                 if team is None:
                     continue
-                if self.need_recover or self.accelerate_repository_in_challenge_cave:
+                if self.need_recover and not self.accelerate_repository_in_challenge_cave:
                     success = self._recover()
                     if not success:
                         return
@@ -650,6 +659,8 @@ class Challenge4Level:
                     "challenge_sand_cave_only_in_disable_mode": self.challenge_sand_cave_only_in_disable_mode,
                     "need_recover": self.need_recover,
                     "accelerate_repository_in_challenge_cave": self.accelerate_repository_in_challenge_cave,
+                    "main_plant_recover": self.main_plant_recover,
+                    "main_plant_recover_rate": self.main_plant_recover_rate,
                 },
                 f,
             )

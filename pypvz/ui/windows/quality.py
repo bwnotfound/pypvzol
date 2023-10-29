@@ -229,6 +229,9 @@ class UpgradeQualityThread(QThread):
                             break
                         if result['success']:
                             break
+                        if result['error_type'] == 3:
+                            self.usersettings.logger.log("品质刷新书不足，已停止刷品")
+                            return
                         if result['error_type'] == 6:
                             self.usersettings.logger.reverse_log(
                                 "请求升品过于频繁，选择等待1秒后重试，最多再重试{}".format(max_retry - cnt),

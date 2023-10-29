@@ -21,7 +21,7 @@ from ..message import IOLogger
 from ...utils.evolution import PlantEvolution
 from ...utils.common import second2str
 from .auto_challenge import Challenge4Level
-from .manager import AutoSynthesisMan, AutoCompoundMan
+from .manager import AutoSynthesisMan, AutoCompoundMan, FubenMan
 
 class UserSettings:
     def __init__(
@@ -67,6 +67,7 @@ class UserSettings:
         self.serverbattle_man = ServerbattleMan(self.cfg)
         self.serverbattle_enabled = False
         self.auto_compound_man = AutoCompoundMan(cfg, lib, repo, self.logger)
+        self.fuben_man = FubenMan(cfg)
 
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
         while stop_channel.qsize() == 0:

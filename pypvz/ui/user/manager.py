@@ -10,6 +10,7 @@ from ... import (
     HeritageMan,
 )
 from ..message import Logger
+from ... import FubenRequest
 
 
 class AutoSynthesisMan:
@@ -618,7 +619,7 @@ class AutoCompoundMan:
                 refresh_all_signal.emit()
             if is_first:
                 is_first = False
-            continue_loop = self.compound_one_cycle(interrupt_event)
+            continue_loop = self.compound_one_cycle()
             if not continue_loop:
                 break
         self.logger.log("复合完成")
@@ -657,3 +658,15 @@ class AutoCompoundMan:
             self.set_force_compound(self.force_compound)
             self.set_chosen_attribute(self.chosen_attribute)
         self.check_data(False)
+
+
+
+
+class FubenMan:
+    
+    def __init__(self, cfg: Config):
+        self.cfg = cfg
+        self.fuben_request = FubenRequest(cfg)
+        
+    def get_caves(self, layer):
+        return self.fuben_request.get_caves(layer)
