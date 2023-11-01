@@ -194,6 +194,12 @@ class AutoSynthesisWindow(QMainWindow):
         widget6_2_layout.addWidget(self.force_synthesisi_checkbox)
         widget6_layout.addLayout(widget6_2_layout)
 
+        widget6_layout.addWidget(QLabel("以下是部分合成信息"))
+        self.information_text_box = QPlainTextEdit()
+        self.information_text_box.setReadOnly(True)
+        self.information_text_box.setMinimumHeight(int(self.height() * 0.1))
+        widget6_layout.addWidget(self.information_text_box)
+
         widget6_layout.addStretch(1)
 
         widget6.setLayout(widget6_layout)
@@ -223,26 +229,53 @@ class AutoSynthesisWindow(QMainWindow):
         exponent = int(self.exponent_line_edit.text())
         self.usersettings.auto_synthesis_man.end_exponent = exponent
 
-    def format_plant_info(self, plant):
+    def format_plant_info(self, plant, full_msg=False):
         if isinstance(plant, str):
             plant = int(plant)
         if isinstance(plant, int):
             plant = self.usersettings.repo.get_plant(plant)
         assert isinstance(plant, Plant), type(plant).__name__
-        return "{}({})[{}]-{}:{}".format(
-            plant.name(self.usersettings.lib),
-            plant.grade,
-            plant.quality_str,
-            self.usersettings.auto_synthesis_man.chosen_attribute.replace("特", ""),
-            format_number(
-                getattr(
-                    plant,
-                    self.usersettings.auto_synthesis_man.attribute2plant_attribute[
-                        self.usersettings.auto_synthesis_man.chosen_attribute
-                    ],
+        if not full_msg:
+            return "{}({})[{}]-{}:{}".format(
+                plant.name(self.usersettings.lib),
+                plant.grade,
+                plant.quality_str,
+                self.usersettings.auto_synthesis_man.chosen_attribute.replace("特", ""),
+                format_number(
+                    getattr(
+                        plant,
+                        self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+                            self.usersettings.auto_synthesis_man.chosen_attribute
+                        ],
+                    )
+                ),
+            )
+        else:
+            message = "{}({})[{}]\n".format(
+                plant.name(self.usersettings.lib),
+                plant.grade,
+                plant.quality_str,
+            )
+            for attr_name in [
+                "HP",
+                "攻击",
+                "命中",
+                "闪避",
+                "穿透",
+                "护甲",
+            ]:
+                message += "{}:{}\n".format(
+                    attr_name,
+                    format_number(
+                        getattr(
+                            plant,
+                            self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+                                attr_name
+                            ],
+                        )
+                    ),
                 )
-            ),
-        )
+            return message
 
     def get_end_value(self):
         mantissa = float(self.mantissa_line_edit.text())
@@ -265,19 +298,51 @@ class AutoSynthesisWindow(QMainWindow):
         )
 
     def refresh_tool_list(self):
+        # self.tool_list.clear()
+        # for (
+        #     item_id
+        # ) in self.usersettings.auto_synthesis_man.attribute_book_dict.values():
+        #     tool_item = self.usersettings.repo.get_tool(item_id)
+        #     if tool_item is None:
+        #         continue
+        #     item = QListWidgetItem(
+        #         "{}({})".format(
+        #             self.usersettings.lib.get_tool_by_id(item_id).name,
+        #             tool_item['amount'],
+        #         )
+        #     )
+        #     self.tool_list.addItem(item)
+
         self.tool_list.clear()
-        for (
-            item_id
-        ) in self.usersettings.auto_synthesis_man.attribute_book_dict.values():
-            tool_item = self.usersettings.repo.get_tool(item_id)
-            if tool_item is None:
-                continue
-            item = QListWidgetItem(
-                "{}({})".format(
-                    self.usersettings.lib.get_tool_by_id(item_id).name,
-                    tool_item['amount'],
-                )
+        for tool_name in [
+            "增强卷轴",
+            "特效HP合成书",
+            "HP合成书",
+            "特级攻击合成书",
+            "攻击合成书",
+            "命中合成书",
+            "闪避合成书",
+            "穿透合成书",
+            "护甲合成书",
+        ]:
+            tool = self.usersettings.repo.get_tool(
+                self.usersettings.lib.name2tool[tool_name].id
             )
+            if tool is None:
+                continue
+                # item = QListWidgetItem(
+                #     "{}({})".format(
+                #         tool_name,
+                #         0,
+                #     )
+                # )
+            else:
+                item = QListWidgetItem(
+                    "{}({})".format(
+                        tool_name,
+                        tool['amount'],
+                    )
+                )
             self.tool_list.addItem(item)
 
     def refresh_plant_list(self):
@@ -309,10 +374,19 @@ class AutoSynthesisWindow(QMainWindow):
             )
             if plant is not None:
                 self.choose_main_plant_text_box.setPlainText(
-                    self.format_plant_info(plant)
+                    self.format_plant_info(plant, full_msg=True)
                 )
                 return
         self.choose_main_plant_text_box.setPlainText("")
+
+    def refresh_information_text_box(self):
+        message = []
+        message.append(
+            "合成池植物数量：{}个".format(
+                len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id)
+            )
+        )
+        self.information_text_box.setPlainText("\n".join(message))
 
     def auto_synthesis_attribute_choice_changed(self):
         self.usersettings.auto_synthesis_man.chosen_attribute = (
@@ -332,6 +406,7 @@ class AutoSynthesisWindow(QMainWindow):
         self.refresh_plant_list()
         self.refresh_plant_pool_list()
         self.refresh_main_plant_text_box()
+        self.refresh_information_text_box()
 
     def plant_import_btn_clicked(self):
         selected_plant_id = [
@@ -346,6 +421,7 @@ class AutoSynthesisWindow(QMainWindow):
         self.usersettings.auto_synthesis_man.check_data()
         self.refresh_plant_list()
         self.refresh_plant_pool_list()
+        self.refresh_information_text_box()
 
     def main_plant_set_btn_clicked(self):
         selected_plant_id = [
@@ -451,6 +527,7 @@ class AutoSynthesisWindow(QMainWindow):
                     )
             self.refresh_plant_list()
             self.refresh_plant_pool_list()
+            self.refresh_information_text_box()
 
     def closeEvent(self, event):
         if self.run_thread is not None:
@@ -481,73 +558,15 @@ class SynthesisThread(QThread):
         self.rest_event = rest_event
         self.force_synthesis = force_synthesis
 
-    def synthesis(self):
-        try:
-            length = len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id)
-            if self.synthesis_number is not None:
-                length = min(self.synthesis_number, length)
-            if length == 0:
-                self.usersettings.logger.log("合成池为空")
-                return
-            elif length < 0:
-                self.usersettings.logger.log("合成次数不能为负数")
-                return
-            self.usersettings.auto_synthesis_man.check_data()
-            while (
-                not (
-                    len(self.usersettings.auto_synthesis_man.auto_synthesis_pool_id)
-                    == 0
-                )
-                and length > 0
-            ):
-                if self.interrupt_event.is_set():
-                    self.interrupt_event.clear()
-                    self.usersettings.logger.log("中止合成")
-                    return
-                if not self.need_synthesis():
-                    return
-                result = self.usersettings.auto_synthesis_man.synthesis(
-                    need_check=False
-                )
-                self.usersettings.logger.log(result['result'])
-                self.usersettings.auto_synthesis_man.check_data()
-                self.refresh_all_signal.emit()
-                if not result["success"]:
-                    self.usersettings.logger.log("合成异常，已跳出合成")
-                    return
-                length -= 1
-            self.usersettings.logger.log("合成完成")
-        except Exception as e:
-            self.usersettings.logger.log("合成异常。异常种类：{}".format(type(e).__name__))
-            if self.force_synthesis:
-                self.usersettings.logger.log("重启合成")
-                while True:
-                    try:
-                        if self.interrupt_event.is_set():
-                            self.interrupt_event.clear()
-                            self.usersettings.logger.log("中止合成")
-                            return
-                        self.usersettings.auto_synthesis_man.check_data()
-                        break
-                    except Exception as e:
-                        self.usersettings.logger.log(
-                            "重启异常，暂停1秒，继续重启（一直异常请手动终止）。异常种类：{}".format(type(e).__name__)
-                        )
-                        sleep(1)
-                if self.usersettings.auto_synthesis_man.main_plant_id is None:
-                    self.usersettings.logger.log("重新设置底座为合成池中最大属性的植物")
-                    plant_id = (
-                        self.usersettings.auto_synthesis_man.get_max_attribute_plant_id()
-                    )
-                    self.usersettings.auto_synthesis_man.main_plant_id = plant_id
-                    self.usersettings.auto_synthesis_man.auto_synthesis_pool_id.remove(
-                        plant_id
-                    )
-                self.synthesis()
-
     def run(self):
         try:
-            self.synthesis()
+            self.usersettings.auto_synthesis_man.synthesis_all(
+                self.usersettings.logger,
+                interrupt_event=self.interrupt_event,
+                need_synthesis=self.need_synthesis,
+                synthesis_number=self.synthesis_number,
+                refresh_signal=self.refresh_all_signal,
+            )
         finally:
             self.synthesis_finish_signal.emit()
             self.rest_event.set()

@@ -1,4 +1,5 @@
 import pickle
+import logging
 import os
 from threading import Event
 from time import sleep
@@ -78,30 +79,27 @@ class AutoSynthesisMan:
         return max_plant_id
 
     def _synthesis(self, id1, id2, attribute_name):
-        result = {
-            "success": False,
-            "result": "合成出错，请在确定底座无误后重新尝试(注意部分情况下尽管出错但是仍然合成了，请注意)。以下为详细报错原因：",
-        }
-        try:
-            response = self.synthesisMan.synthesis(
-                id1,
-                id2,
-                self.attribute_book_dict[attribute_name],
-                self.reinforce_number,
-            )
-        except RuntimeError as e:
-            result['result'] += str(e)
-            return result
+        response = self.synthesisMan.synthesis(
+            id1,
+            id2,
+            self.attribute_book_dict[attribute_name],
+            self.reinforce_number,
+        )
         if response.status != 0:
+            result = {
+                "success": False,
+                "result": "合成出错。以下为详细报错原因：",
+            }
             try:
                 result['result'] += response.body.description
             except:
                 result["result"] += str(response.body)
             return result
-        result["success"] = True
-        result['result'] = "合成成功"
-        return result
-
+        return {
+            "success": True,
+            "result": "合成成功",
+        }
+        
     def synthesis(self, need_check=True):
         if need_check:
             self.check_data(need_check)
@@ -125,11 +123,42 @@ class AutoSynthesisMan:
         if reinforce_amount < self.reinforce_number:
             return {"success": False, "result": f"增强卷轴数量不足10个(目前数量：{reinforce_amount})"}
         deputy_plant_id = list(self.auto_synthesis_pool_id)[0]
-        result = self._synthesis(
-            deputy_plant_id, self.main_plant_id, self.chosen_attribute
-        )
+        cnt, max_retry = 0, 10
+        while cnt < max_retry:
+            cnt += 1
+            try:
+                result = self._synthesis(
+                    deputy_plant_id, self.main_plant_id, self.chosen_attribute
+                )
+                if not result["success"] and "频繁" in result['result']:
+                    raise RuntimeError(result['result'])
+                break
+            except Exception as e:
+                if not self.force_synthesis:
+                    result = {
+                        "success": False,
+                        "result": "合成异常，已跳出合成。异常类型：{}".format(type(e).__name__),
+                    }
+                    break
+                self.check_data()
+                if self.main_plant_id is None:
+                    result = {
+                        "success": True,
+                        "result": "合成异常，异常类型：{}。底座植物不存在，判定为合成成功".format(
+                            type(e).__name__
+                        ),
+                    }
+                    break
+                logging.info(
+                    "合成异常。异常种类：{}。底座植物存在，判定为合成失败，暂停1秒继续合成。还能最多尝试{}次".format(
+                        type(e).__name__, max_retry - cnt
+                    )
+                )
+                sleep(1)
+
         if result['success']:
-            self.auto_synthesis_pool_id.remove(deputy_plant_id)
+            if deputy_plant_id in self.auto_synthesis_pool_id:
+                self.auto_synthesis_pool_id.remove(deputy_plant_id)
             self.main_plant_id = deputy_plant_id
             book['amount'] = max(book['amount'] - 1, 0)
             if book['amount'] == 0:
@@ -145,7 +174,7 @@ class AutoSynthesisMan:
         interrupt_event: Event = None,
         need_synthesis=None,
         synthesis_number=None,
-        refresh_all_signal=None,
+        refresh_signal=None,
     ):
         try:
             length = len(self.auto_synthesis_pool_id)
@@ -169,8 +198,8 @@ class AutoSynthesisMan:
                 result = self.synthesis(need_check=False)
                 logger.log(result['result'])
                 self.check_data()
-                if refresh_all_signal is not None:
-                    refresh_all_signal.emit()
+                if refresh_signal is not None:
+                    refresh_signal.emit()
                 if not result["success"]:
                     logger.log("合成异常，已跳出合成")
                     return
@@ -197,7 +226,8 @@ class AutoSynthesisMan:
                     logger.log("重新设置底座为合成池中最大属性的植物")
                     plant_id = self.get_max_attribute_plant_id()
                     self.main_plant_id = plant_id
-                    self.auto_synthesis_pool_id.remove(plant_id)
+                    if plant_id in self.auto_synthesis_pool_id:
+                        self.auto_synthesis_pool_id.remove(plant_id)
                 self.synthesis()
 
     def save(self, save_dir):
@@ -309,7 +339,7 @@ class AutoCompoundMan:
     def set_force_compound(self, force_compound):
         self.force_compound = force_compound
         self.auto_synthesis_man.force_synthesis = self.force_compound
-        
+
     def set_chosen_attribute(self, chosen_attribute):
         self.chosen_attribute = chosen_attribute
         self.auto_synthesis_man.chosen_attribute = self.chosen_attribute
@@ -441,11 +471,11 @@ class AutoCompoundMan:
         self.auto_synthesis_pool_id.remove(plant_id)
         return plant_id
 
-    def synthesis_plant(self, plant_id, num):
+    def synthesis_plant(self, plant_id, num, refresh_signal):
         self.export_deputy_plant_to_synthesis(num)
         self.auto_synthesis_man.main_plant_id = plant_id
         self.auto_synthesis_man.synthesis_all(
-            self.logger,
+            self.logger, refresh_signal=refresh_signal
         )
         plant_id = self.auto_synthesis_man.main_plant_id
         self.auto_synthesis_man.main_plant_id = None
@@ -502,7 +532,7 @@ class AutoCompoundMan:
         return self._exchange(id1, run)
 
     def _synthesis(self, id1, id2, book_id, reinforce_num):
-        cnt, max_retry = 0, 5
+        cnt, max_retry = 0, 10
         while cnt < max_retry:
             cnt += 1
             try:
@@ -517,6 +547,8 @@ class AutoCompoundMan:
                         "success": False,
                         "result": response.body.description,
                     }
+                    if "频繁" in result['result']:
+                        raise RuntimeError(result['result'])
                 else:
                     result = {
                         "success": True,
@@ -554,9 +586,7 @@ class AutoCompoundMan:
             }
         return result
 
-    def copy_source_plant(
-        self,
-    ):
+    def copy_source_plant(self, refresh_signal):
         copy_plant_id = self.get_deputy_plant()
         success = self.exchange_one(
             self.source_plant_id,
@@ -564,24 +594,27 @@ class AutoCompoundMan:
             self.inherit_book['id'],
             10 - self.k,
         )
+        refresh_signal.emit()
         if not success:
             self.logger.log("在复制植物时出现传承错误，中断复合")
             return None
-        self.source_plant_id = self.synthesis_plant(self.source_plant_id, self.n1)
-        copy_plant_id = self.synthesis_plant(copy_plant_id, self.n2)
+        self.source_plant_id = self.synthesis_plant(
+            self.source_plant_id, self.n1, refresh_signal
+        )
+        copy_plant_id = self.synthesis_plant(copy_plant_id, self.n2, refresh_signal)
         return copy_plant_id
 
-    def compound_one_cycle(self):
+    def compound_one_cycle(self, refresh_signal):
         self.check_data()
+        if not self.need_compound():
+            return False
         result = self.one_cycle_consume_check()
         if len(result) > 0:
             message = "统计复合一个循环所需要的材料时发现以下缺失：\n" + "\n".join(result) + "\n请补齐材料后开始复合"
             self.logger.log(message)
             return False
-        if not self.need_compound():
-            return False
         for i in range(self.m):
-            copy_plant_id = self.copy_source_plant()
+            copy_plant_id = self.copy_source_plant(refresh_signal)
             if copy_plant_id is None:
                 self.logger.log(f"复制第{i+1}个植物失败，中止复合")
             result = self._synthesis(
@@ -609,17 +642,17 @@ class AutoCompoundMan:
             return False
         return True
 
-    def compound_loop(self, interrupt_event: Event, refresh_all_signal):
+    def compound_loop(self, interrupt_event: Event, refresh_signal):
         is_first = True
         while True:
             if interrupt_event.is_set():
                 self.logger.log("手动中止复合")
                 return
             if not is_first:
-                refresh_all_signal.emit()
+                refresh_signal.emit()
             if is_first:
                 is_first = False
-            continue_loop = self.compound_one_cycle()
+            continue_loop = self.compound_one_cycle(refresh_signal)
             if not continue_loop:
                 break
         self.logger.log("复合完成")
@@ -660,13 +693,10 @@ class AutoCompoundMan:
         self.check_data(False)
 
 
-
-
 class FubenMan:
-    
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.fuben_request = FubenRequest(cfg)
-        
+
     def get_caves(self, layer):
         return self.fuben_request.get_caves(layer)

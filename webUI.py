@@ -4,6 +4,7 @@ from io import BytesIO
 import os
 import logging
 from queue import Queue
+import typing
 
 from PyQt6 import QtGui
 from PyQt6.QtWidgets import (
@@ -1224,7 +1225,7 @@ class CustomMainWindow(QMainWindow):
 
     def process_button_clicked(self):
         if self.process_button.text() == "开始":
-            self.process_stop_channel = Queue(maxsize=1)
+            self.process_stop_channel = Queue()
             self.process_button.setText("暂停")
             if self.process_stop_channel.qsize() > 0:
                 self.process_stop_channel.get()
@@ -1239,6 +1240,10 @@ class CustomMainWindow(QMainWindow):
     def function_panel_open_button_clicked(self):
         self.function_panel_window = FunctionPanelWindow(self.usersettings, parent=self)
         self.function_panel_window.show()
+        
+    def closeEvent(self, event):
+        if hasattr(self, "process_stop_channel"):
+            self.process_stop_channel.put(True)
 
 
 class LoginWindow(QMainWindow):

@@ -269,6 +269,12 @@ class AutoCompoundWindow(QMainWindow):
         illustration_btn.clicked.connect(self.illustration_btn_clicked)
         widget6_layout.addWidget(illustration_btn)
 
+        widget6_layout.addWidget(QLabel("以下是部分合成信息"))
+        self.information_text_box = QPlainTextEdit()
+        self.information_text_box.setReadOnly(True)
+        self.information_text_box.setMinimumHeight(int(self.height() * 0.1))
+        widget6_layout.addWidget(self.information_text_box)
+
         widget6_layout.addStretch(1)
 
         widget6.setLayout(widget6_layout)
@@ -418,6 +424,22 @@ class AutoCompoundWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, plant_id)
             self.plant_pool_list.addItem(item)
 
+    def refresh_information_text_box(self):
+        message = []
+        message.append(
+            "复合池植物数量：{}个".format(
+                len(self.usersettings.auto_compound_man.auto_synthesis_pool_id)
+            )
+        )
+        message.append(
+            "内置合成池植物数量：{}个".format(
+                len(
+                    self.usersettings.auto_compound_man.auto_synthesis_man.auto_synthesis_pool_id
+                )
+            )
+        )
+        self.information_text_box.setPlainText("\n".join(message))
+
     def auto_compound_attribute_choice_changed(self):
         self.usersettings.auto_compound_man.set_chosen_attribute(
             self.auto_compound_attribute_choice.currentText()
@@ -485,6 +507,8 @@ class AutoCompoundWindow(QMainWindow):
         self.refresh_liezhi_plant_textbox()
         self.refresh_receiver_plant_textbox()
         self.refresh_source_plant_textbox()
+        self.refresh_information_text_box()
+        QApplication.processEvents()
 
     def plant_import_btn_clicked(self):
         selected_plant_id = [
@@ -499,6 +523,7 @@ class AutoCompoundWindow(QMainWindow):
         self.usersettings.auto_compound_man.check_data()
         self.refresh_plant_list()
         self.refresh_plant_pool_list()
+        self.refresh_information_text_box()
 
     def set_liezhi_plant_btn_clicked(self):
         selected_plant_id = [
@@ -567,7 +592,9 @@ class AutoCompoundWindow(QMainWindow):
         try:
             self.auto_compound_single_btn.setDisabled(True)
             QApplication.processEvents()
-            self.usersettings.auto_compound_man.compound_one_cycle()
+            self.usersettings.auto_compound_man.compound_one_cycle(
+                self.refresh_all_signal
+            )
             self.usersettings.auto_compound_man.check_data()
             self.refresh_all()
         except Exception as e:
@@ -632,6 +659,7 @@ class AutoCompoundWindow(QMainWindow):
                     )
             self.refresh_plant_list()
             self.refresh_plant_pool_list()
+            self.refresh_information_text_box()
 
     def closeEvent(self, event):
         if self.run_thread is not None:
