@@ -1286,18 +1286,23 @@ class CustomMainWindow(QMainWindow):
     def refresh_repository_btn(self):
         self.usersettings.repo.refresh_repository()
         self.usersettings.logger.log("仓库刷新完成")
+        
+    def start_process(self):
+        self.process_button.setText("暂停")
+        while self.usersettings.stop_channel.qsize() > 0:
+            self.usersettings.stop_channel.get()
+        self.usersettings.logger.log("开始运行")
+        self.usersettings.start(self.finish_trigger)
+        
+    def stop_prcess(self):
+        self.process_button.setText("开始")
+        self.usersettings.stop_channel.put(True)
 
     def process_button_clicked(self):
         if self.process_button.text() == "开始":
-            self.process_stop_channel = Queue()
-            self.process_button.setText("暂停")
-            if self.process_stop_channel.qsize() > 0:
-                self.process_stop_channel.get()
-            self.usersettings.logger.log("开始运行")
-            self.usersettings.start(self.process_stop_channel, self.finish_trigger)
+            self.start_process()
         elif self.process_button.text() == "暂停":
-            self.process_button.setText("开始")
-            self.process_stop_channel.put(True)
+            self.stop_prcess()
         else:
             raise ValueError(f"Unknown button text: {self.process_button.text()}")
 
@@ -1306,9 +1311,19 @@ class CustomMainWindow(QMainWindow):
         self.function_panel_window.show()
 
     def closeEvent(self, event):
-        if hasattr(self, "process_stop_channel"):
-            self.process_stop_channel.put(True)
-
+        self.usersettings.stop_channel.put(True)
+        self.usersettings.io_logger.close()
+        try:
+            logger_list.remove(self.usersettings.io_logger)
+        except ValueError:
+            pass
+        self.usersettings.save()
+        try:
+            main_window_list.remove(self)
+        except ValueError:
+            pass
+        return super().closeEvent(event)
+        
 
 class LoginWindow(QMainWindow):
     def __init__(self):
@@ -1322,8 +1337,12 @@ class LoginWindow(QMainWindow):
         self.main_window_thread = []
 
     def init_ui(self):
-        self.resize(500, 400)
         self.setWindowTitle("登录")
+        
+        # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的60%
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.3), int(screen_size.height() * 0.6))
+        self.move(int(screen_size.width() * 0.35), int(screen_size.height() * 0.17))
 
         main_widget = QWidget()
         main_layout = QVBoxLayout()
@@ -1333,12 +1352,29 @@ class LoginWindow(QMainWindow):
         login_user_layout.addWidget(QLabel("已登录的用户(双击登录，选中按delete或backspace删除)"))
         self.login_user_list = login_user_list = QListWidget()
         login_user_list.itemDoubleClicked.connect(self.login_list_item_double_clicked)
-        login_user_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        login_user_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.refresh_login_user_list()
         login_user_layout.addWidget(login_user_list)
         login_user_widget.setLayout(login_user_layout)
         main_layout.addWidget(login_user_widget)
-
+        
+        pack_deal_widget = QWidget()
+        pack_deal_layout = QHBoxLayout()
+        login_all_btn = QPushButton("登录选中用户")
+        login_all_btn.clicked.connect(self.login_all_btn_clicked)
+        pack_deal_layout.addWidget(login_all_btn)
+        start_all_user_btn = QPushButton("开始所有用户")
+        start_all_user_btn.clicked.connect(self.start_all_user_btn_clicked)
+        pack_deal_layout.addWidget(start_all_user_btn)
+        stop_all_user_btn = QPushButton("停止所有用户")
+        stop_all_user_btn.clicked.connect(self.stop_all_user_btn_clicked)
+        pack_deal_layout.addWidget(stop_all_user_btn)
+        close_all_user_btn = QPushButton("关闭所有用户")
+        close_all_user_btn.clicked.connect(self.close_all_user_btn_clicked)
+        pack_deal_layout.addWidget(close_all_user_btn)
+        pack_deal_widget.setLayout(pack_deal_layout)
+        main_layout.addWidget(pack_deal_widget)
+        
         username_widget = QWidget()
         username_layout = QHBoxLayout()
         username_layout.addWidget(QLabel("用户名(这个随便填):"))
@@ -1373,6 +1409,27 @@ class LoginWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def login_all_btn_clicked(self):
+        selected_index = [
+            self.login_user_list.indexFromItem(item).row()
+            for item in self.login_user_list.selectedItems()
+        ]
+        for index in selected_index:
+            self.login(index)
+            
+    def start_all_user_btn_clicked(self):
+        for main_window in main_window_list:
+            main_window.start_process()
+        
+    def stop_all_user_btn_clicked(self):
+        for main_window in main_window_list:
+            main_window.stop_prcess()
+            
+    def close_all_user_btn_clicked(self):
+        copy_list = [main_window for main_window in main_window_list]
+        for main_window in copy_list:
+            main_window.close()
 
     def login_btn_clicked(self):
         # 取出当前选中的用户
@@ -1415,10 +1472,13 @@ class LoginWindow(QMainWindow):
         # 强制重新渲染login窗口元素
         QApplication.processEvents()
         self.create_main_window(Config(cfg))
+        
+    def login(self, index):
+        self.create_main_window(Config(self.configs[index]))
 
     def login_list_item_double_clicked(self, item):
         cfg_index = item.data(Qt.ItemDataRole.UserRole)
-        self.create_main_window(Config(self.configs[cfg_index]))
+        self.login(cfg_index)
 
     def create_main_window(self, cfg: Config):
         thread = GetUsersettings(cfg, root_dir)
@@ -1519,7 +1579,6 @@ def get_usersettings(cfg, logger: IOLogger, setting_dir):
 
     return usersettings
 
-
 if __name__ == "__main__":
     # 设置logging监听等级为INFO
     logging.basicConfig(level=logging.INFO)  # 如果不想让控制台输出那么多信息，可以将这一行注释掉
@@ -1530,7 +1589,7 @@ if __name__ == "__main__":
     try:
         app = QApplication(sys.argv)
         logger_list = []
-        main_window_list = []
+        main_window_list: list[CustomMainWindow] = []
         login_window = LoginWindow()
         login_window.show()
         app_return = app.exec()

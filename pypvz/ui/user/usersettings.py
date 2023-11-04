@@ -43,6 +43,8 @@ class UserSettings:
         self.save_dir = save_dir
         self.io_logger = logger
         self.logger = logger.new_logger()
+        self.stop_channel = Queue()
+        self.start_thread = None
 
         self.challenge4Level = Challenge4Level(
             cfg, user, repo, lib, caveMan, logger=self.logger
@@ -74,6 +76,7 @@ class UserSettings:
         
         self.record_repository_tool_dict = {}
         self.record_ignore_tool_id_set = set()
+        
 
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
         while stop_channel.qsize() == 0:
@@ -172,13 +175,13 @@ class UserSettings:
                 time.sleep(1)
         finished_trigger.emit()
 
-    def start(self, stop_channel: Queue, finished_trigger):
-        finish_channel = Queue(maxsize=1)
-        threading.Thread(
-            target=self._start,
-            args=(stop_channel, finished_trigger),
-        ).start()
-        return finish_channel
+    def start(self, finished_trigger):
+        if self.start_thread is None or not self.start_thread.is_alive():
+            self.start_thread =threading.Thread(
+                target=self._start,
+                args=(self.stop_channel, finished_trigger),
+            )
+            self.start_thread.start()
 
     def auto_use_item(self, stop_channel: Queue):
         self.repo.refresh_repository(logger=self.logger)
