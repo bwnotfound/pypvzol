@@ -4,7 +4,6 @@ from io import BytesIO
 import os
 import logging
 from queue import Queue
-import typing
 
 from PyQt6 import QtGui
 from PyQt6.QtWidgets import (
@@ -47,6 +46,8 @@ from pypvz.ui.windows import (
     UpgradeQualityWindow,
     AutoSynthesisWindow,
     AutoCompoundWindow,
+    RepositoryRecordWindow,
+    FubenSettingWindow,
 )
 
 
@@ -186,7 +187,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         space_widget = QWidget()
         space_widget.setFixedHeight(10)
         right_panel_layout.addWidget(space_widget)
-        
+
         right_panel_layout.addWidget(QLabel("全局挑战设置:"))
 
         cave_enabled_switch_layout = QHBoxLayout()
@@ -229,7 +230,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         hp_choice_layout.addWidget(hp_choice_box)
         hp_choice_widget.setLayout(hp_choice_layout)
         right_panel_layout.addWidget(hp_choice_widget)
-        
+
         self.main_plant_recover_checkbox = QCheckBox("主力血量也恢复")
         self.main_plant_recover_checkbox.setChecked(
             self.usersettings.challenge4Level.main_plant_recover
@@ -238,7 +239,7 @@ class Challenge4levelSettingWindow(QMainWindow):
             self.main_plant_recover_checkbox_stateChanged
         )
         right_panel_layout.addWidget(self.main_plant_recover_checkbox)
-        
+
         main_plant_recover_rate_layout = QHBoxLayout()
         main_plant_recover_rate_layout.addWidget(QLabel("主力恢复百分比阈值:"))
         self.main_plant_recover_rate_spinbox = QSpinBox()
@@ -253,7 +254,6 @@ class Challenge4levelSettingWindow(QMainWindow):
         main_plant_recover_rate_layout.addWidget(self.main_plant_recover_rate_spinbox)
         main_plant_recover_rate_layout.addWidget(QLabel("%"))
         right_panel_layout.addLayout(main_plant_recover_rate_layout)
-        
 
         widget1 = QWidget()
         widget1_layout = QHBoxLayout()
@@ -400,7 +400,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         )
         warning_textbox.setFixedHeight(int(self.height() * 0.15))
         right_panel_layout.addWidget(warning_textbox)
-        
+
         right_panel_layout.addStretch(1)
 
         right_panel.setLayout(right_panel_layout)
@@ -408,12 +408,12 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
     def main_plant_recover_checkbox_stateChanged(self):
         self.usersettings.challenge4Level.main_plant_recover = (
             self.main_plant_recover_checkbox.isChecked()
         )
-    
+
     def main_plant_recover_rate_spinbox_valueChanged(self, value):
         self.usersettings.challenge4Level.main_plant_recover_rate = value / 100
 
@@ -715,6 +715,20 @@ class SettingWindow(QMainWindow):
         challenge4level_widget.setLayout(challenge4level_layout)
         menu_layout.addWidget(challenge4level_widget, 0, 0)
 
+        fuben_widget = QWidget()
+        fuben_layout = QHBoxLayout()
+        self.fuben_checkbox = fuben_checkbox = QCheckBox("副本")
+        fuben_checkbox.setFont(normal_font)
+        fuben_checkbox.setChecked(self.usersettings.fuben_enabled)
+        fuben_checkbox.stateChanged.connect(self.fuben_checkbox_stateChanged)
+        fuben_layout.addWidget(fuben_checkbox)
+        fuben_setting_btn = QPushButton("设置")
+        fuben_setting_btn.clicked.connect(self.fuben_setting_btn_clicked)
+        fuben_layout.addWidget(fuben_setting_btn)
+        fuben_layout.addStretch(1)
+        fuben_widget.setLayout(fuben_layout)
+        menu_layout.addWidget(fuben_widget, 0, 1)
+
         shop_enable_widget = QWidget()
         shop_enable_layout = QHBoxLayout()
         self.shop_enable_checkbox = shop_enable_checkbox = QCheckBox("商店购买")
@@ -833,7 +847,31 @@ class SettingWindow(QMainWindow):
         )
         serverbattle_layout.addWidget(serverbattle_checkbox)
         serverbattle_widget.setLayout(serverbattle_layout)
-        menu_layout.addWidget(serverbattle_widget, 5, 0)
+        menu_layout.addWidget(serverbattle_widget, 4, 1)
+
+        territory_widget = QWidget()
+        territory_layout = QHBoxLayout()
+        self.territory_checkbox = territory_checkbox = QCheckBox("领地")
+        territory_checkbox.setFont(normal_font)
+        territory_checkbox.setChecked(self.usersettings.territory_enabled)
+        territory_checkbox.stateChanged.connect(self.territory_checkbox_stateChanged)
+        territory_layout.addWidget(territory_checkbox)
+        difficulty_choice_widget = QWidget()
+        difficulty_choice_layout = QHBoxLayout()
+        difficulty_choice_layout.addWidget(QLabel("难度:"))
+        self.difficulty_choice_box = difficulty_choice_box = QComboBox()
+        difficulty_choice_box.addItems(["1", "2", "3", "4"])
+        difficulty_choice_box.setCurrentIndex(
+            self.usersettings.territory_man.difficulty_choice - 1
+        )
+        difficulty_choice_box.currentIndexChanged.connect(
+            self.difficulty_choice_box_currentIndexChanged
+        )
+        difficulty_choice_layout.addWidget(difficulty_choice_box)
+        difficulty_choice_widget.setLayout(difficulty_choice_layout)
+        territory_layout.addWidget(difficulty_choice_widget)
+        territory_widget.setLayout(territory_layout)
+        menu_layout.addWidget(territory_widget, 5, 0)
 
         rest_time_input_widget = QWidget()
         rest_time_input_layout = QHBoxLayout()
@@ -880,6 +918,15 @@ class SettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def territory_checkbox_stateChanged(self):
+        self.usersettings.territory_enabled = self.territory_checkbox.isChecked()
+    
+    def difficulty_choice_box_currentIndexChanged(self, index):
+        self.usersettings.territory_man.difficulty_choice = index + 1
+
+    def fuben_checkbox_stateChanged(self):
+        self.usersettings.fuben_enabled = self.fuben_checkbox.isChecked()
 
     def serverbattle_checkbox_stateChanged(self):
         self.usersettings.serverbattle_enabled = self.serverbattle_checkbox.isChecked()
@@ -898,6 +945,10 @@ class SettingWindow(QMainWindow):
 
     def rest_time_input_box_valueChanged(self, value):
         self.usersettings.rest_time = value
+
+    def fuben_setting_btn_clicked(self):
+        self.fuben_setting_window = FubenSettingWindow(self.usersettings, parent=self)
+        self.fuben_setting_window.show()
 
     def shop_auto_buy_setting_btn_clicked(self):
         self.shop_auto_buy_setting_window = ShopAutoBuySetting(
@@ -996,7 +1047,7 @@ class FunctionPanelWindow(QMainWindow):
         heritage_btn = QPushButton("传承面板")
         heritage_btn.clicked.connect(self.heritage_btn_clicked)
         menu_layout.addWidget(heritage_btn, 3, 0)
-        
+
         compound_btn = QPushButton("复合面板")
         compound_btn.clicked.connect(self.compound_btn_clicked)
         menu_layout.addWidget(compound_btn, 4, 0)
@@ -1005,12 +1056,24 @@ class FunctionPanelWindow(QMainWindow):
         plant_relative_btn.clicked.connect(self.plant_relative_btn_clicked)
         menu_layout.addWidget(plant_relative_btn, 5, 0)
 
+        repository_tool_record_btn = QPushButton("仓库物品记录面板")
+        repository_tool_record_btn.clicked.connect(
+            self.repository_tool_record_btn_clicked
+        )
+        menu_layout.addWidget(repository_tool_record_btn, 6, 0)
+
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
+    def repository_tool_record_btn_clicked(self):
+        self.repository_tool_record_window = RepositoryRecordWindow(
+            self.usersettings, parent=self
+        )
+        self.repository_tool_record_window.show()
+
     def compound_btn_clicked(self):
         self.compound_window = AutoCompoundWindow(self.usersettings, parent=self)
         self.compound_window.show()
@@ -1092,6 +1155,7 @@ class CustomMainWindow(QMainWindow):
         user_show_layout.addWidget(QLabel().setPixmap(QPixmap.fromImage(user_face_img)))
 
         user_info_layout = QVBoxLayout()
+        user_info_layout.addWidget(QLabel(f"{self.usersettings.user.name}"))
         user_info_layout.addWidget(QLabel(f"等级: {self.usersettings.user.grade}"))
         user_info_layout.addWidget(
             QLabel(
@@ -1240,7 +1304,7 @@ class CustomMainWindow(QMainWindow):
     def function_panel_open_button_clicked(self):
         self.function_panel_window = FunctionPanelWindow(self.usersettings, parent=self)
         self.function_panel_window.show()
-        
+
     def closeEvent(self, event):
         if hasattr(self, "process_stop_channel"):
             self.process_stop_channel.put(True)

@@ -1,5 +1,6 @@
 from time import sleep
 from threading import Event
+import typing
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -17,14 +18,17 @@ from PyQt6.QtCore import Qt, pyqtSignal, QThread
 
 from ..wrapped import QLabel
 from ..user import UserSettings
-from ... import FubenRequest
 
 
 class FubenSelectWindow(QMainWindow):
-    def __init__(self, usersettings: UserSettings, parent=None):
+    def __init__(
+        self, usersettings: UserSettings, refresh_signal: pyqtSignal, parent=None
+    ):
         super().__init__(parent)
         self.usersettings = usersettings
+        self.refresh_signal = refresh_signal
         self.fuben_layer_cache = {}
+        self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle("练级设置")
@@ -63,42 +67,9 @@ class FubenSelectWindow(QMainWindow):
         cave_widget.setLayout(cave_layout)
         main_layout.addWidget(cave_widget)
 
-        # widget3 = QWidget()
-        # widget3_layout = QVBoxLayout()
-        # self.need_use_sand = QCheckBox("使用时之沙")
-        # self.need_use_sand.setChecked(False)
-        # widget3_layout.addWidget(self.need_use_sand)
-        # widget3_1_layout = QHBoxLayout()
-        # widget3_1_layout.addWidget(QLabel("洞口难度:"))
-        # self.difficulty_choice = QComboBox()
-        # difficulty = ["简单", "普通", "困难"]
-        # self.difficulty_choice.addItems(difficulty)
-        # self.difficulty_choice.setCurrentIndex(2)
-        # widget3_1_layout.addWidget(self.difficulty_choice)
-        # widget3_layout.addLayout(widget3_1_layout)
-        # if self.usersettings.cfg.server == "私服":
-        #     result = self.usersettings.challenge4Level.caveMan.switch_garden_layer(
-        #         1, self.usersettings.logger
-        #     )
-        #     widget3_2_layout = QHBoxLayout()
-        #     widget3_2_layout.addWidget(QLabel("选择花园层级:"))
-        #     self.usersettings.logger.log(result["result"])
-        #     if not result["success"]:
-        #         self.close()
-        #     self.current_garden_layer_choice = QComboBox()
-        #     self.current_garden_layer_choice.addItems(["1", "2", "3", "4"])
-        #     self.current_garden_layer_choice.setCurrentIndex(0)
-        #     self.current_garden_layer_choice.currentIndexChanged.connect(
-        #         self.current_garden_layer_choice_currentIndexChanged
-        #     )
-        #     widget3_2_layout.addWidget(self.current_garden_layer_choice)
-        #     widget3_layout.addLayout(widget3_2_layout)
-        # widget3.setLayout(widget3_layout)
-        # main_layout.addWidget(widget3)
-
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
     def cave_type_list_widget_clicked(self, item):
         self.cave_list_widget.clear()
         layer = item.data(Qt.ItemDataRole.UserRole)
@@ -107,12 +78,195 @@ class FubenSelectWindow(QMainWindow):
             self.fuben_layer_cache[layer] = caves
         else:
             caves = self.fuben_layer_cache[layer]
-        for cave in caves:
+        for i, cave in enumerate(caves):
             item = QListWidgetItem(cave.name)
-            item.setData(Qt.ItemDataRole.UserRole, cave)
+            item.setData(Qt.ItemDataRole.UserRole, (cave, layer, i + 1))
             self.cave_list_widget.addItem(item)
-            
+
     def cave_list_widget_clicked(self, item):
-        cave = item.data(Qt.ItemDataRole.UserRole)
+        cave, layer, number = item.data(Qt.ItemDataRole.UserRole)
+        self.usersettings.fuben_man.add_cave(cave, layer, number)
+        self.refresh_signal.emit()
 
 
+class FubenSettingWindow(QMainWindow):
+    refresh_signal = pyqtSignal()
+
+    def __init__(self, usersettings: UserSettings, parent=None):
+        super().__init__(parent=parent)
+        self.usersettings = usersettings
+        self.last_focus_list_widget = None
+        self.init_ui()
+        self.refresh_cave_list()
+        self.refresh_plant_list()
+        self.refresh_team_list()
+        self.refresh_signal.connect(self.refresh_cave_list)
+
+    def init_ui(self):
+        self.setWindowTitle("副本挑战设置")
+
+        # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.6), int(screen_size.height() * 0.5))
+        self.move(int(screen_size.width() * 0.2), int(screen_size.height() * 0.25))
+
+        main_widget = QWidget()
+        main_layout = QHBoxLayout()
+        main_layout.setSpacing(3)
+
+        widget1 = QWidget()
+        widget1.setMinimumWidth(int(self.width() * 0.15))
+        layout1 = QVBoxLayout()
+        layout1_1 = QHBoxLayout()
+        layout1_1.addWidget(QLabel("副本洞口"))
+        self.add_fuben_button = QPushButton("添加洞口")
+        self.add_fuben_button.clicked.connect(self.add_fuben_button_clicked)
+        layout1_1.addWidget(self.add_fuben_button)
+        layout1.addLayout(layout1_1)
+        self.fuben_list_widget = QListWidget()
+        self.fuben_list_widget.itemClicked.connect(self.fuben_list_widget_clicked)
+        self.fuben_list_widget.setSelectionMode(
+            QListWidget.SelectionMode.SingleSelection
+        )
+        layout1.addWidget(self.fuben_list_widget)
+        widget1.setLayout(layout1)
+
+        widget2 = QWidget()
+        widget2.setMinimumWidth(int(self.width() * 0.25))
+        layout2 = QVBoxLayout()
+        layout2.addWidget(QLabel("植物列表"))
+        self.plant_list = QListWidget()
+        self.plant_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        layout2.addWidget(self.plant_list)
+        widget2.setLayout(layout2)
+
+        widget3 = QWidget()
+        widget3.setMinimumWidth(int(self.width() * 0.1))
+        layout3 = QVBoxLayout()
+        self.set_plant_team_btn = QPushButton("设置为出战植物")
+        self.set_plant_team_btn.clicked.connect(self.set_plant_team_btn_clicked)
+        layout3.addWidget(self.set_plant_team_btn)
+        widget3.setLayout(layout3)
+
+        widget4 = QWidget()
+        widget4.setMinimumWidth(int(self.width() * 0.25))
+        layout4 = QVBoxLayout()
+        self.team_list_widget = QListWidget()
+        self.team_list_widget.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.team_list_widget.itemPressed.connect(self.team_list_widget_pressed)
+        layout4.addWidget(self.team_list_widget)
+        widget4.setLayout(layout4)
+
+        widget5 = QWidget()
+        widget5.setMinimumWidth(int(self.width() * 0.25))
+        layout5 = QVBoxLayout()
+        self.need_recovery_checkbox = QCheckBox("是否需要恢复:")
+        self.need_recovery_checkbox.stateChanged.connect(
+            self.need_recovery_checkbox_state_changed
+        )
+        self.need_recovery_checkbox.setChecked(
+            self.usersettings.fuben_man.need_recovery
+        )
+        layout5.addWidget(self.need_recovery_checkbox)
+        self.recovery_combo = QComboBox()
+        self.recovery_combo.addItems(["低级血瓶", "中级血瓶", "高级血瓶"])
+        self.recovery_combo.currentIndexChanged.connect(
+            self.recovery_combo_index_changed
+        )
+        layout5.addWidget(self.recovery_combo)
+        widget5.setLayout(layout5)
+        
+        main_layout.addWidget(widget1)
+        main_layout.addWidget(widget2)
+        main_layout.addWidget(widget3)
+        main_layout.addWidget(widget4)
+        main_layout.addWidget(widget5)
+        main_widget.setLayout(main_layout)
+
+        self.setCentralWidget(main_widget)
+
+    def need_recovery_checkbox_state_changed(self):
+        self.usersettings.fuben_man.need_recovery = (
+            self.need_recovery_checkbox.isChecked()
+        )
+
+    def recovery_combo_index_changed(self):
+        self.usersettings.fuben_man.recover_hp_choice = (
+            self.recovery_combo.currentText()
+        )
+        
+    def format_plant_info(self, plant):
+        if isinstance(plant, str):
+            plant = int(plant)
+        if isinstance(plant, int):
+            plant = self.usersettings.repo.get_plant(plant)
+        return "{}({})[{}]".format(
+            plant.name(self.usersettings.lib),
+            plant.grade,
+            plant.quality_str,
+        )
+
+    def refresh_plant_list(self):
+        self.plant_list.clear()
+        for plant in self.usersettings.repo.plants:
+            if plant.id in self.usersettings.fuben_man.team:
+                continue
+            item = QListWidgetItem(self.format_plant_info(plant))
+            item.setData(Qt.ItemDataRole.UserRole, plant.id)
+            self.plant_list.addItem(item)
+
+    def refresh_cave_list(self):
+        self.fuben_list_widget.clear()
+        for sc in self.usersettings.fuben_man.caves:
+            item = QListWidgetItem(sc.name)
+            item.setData(Qt.ItemDataRole.UserRole, sc.cave_id)
+            self.fuben_list_widget.addItem(item)
+
+    def refresh_team_list(self):
+        self.team_list_widget.clear()
+        for plant_id in self.usersettings.fuben_man.team:
+            plant = self.usersettings.repo.get_plant(plant_id)
+            if plant is None:
+                continue
+            item = QListWidgetItem(self.format_plant_info(plant))
+            item.setData(Qt.ItemDataRole.UserRole, plant.id)
+            self.team_list_widget.addItem(item)
+
+    def fuben_list_widget_clicked(self):
+        self.last_focus_list_widget = self.fuben_list_widget
+
+    def add_fuben_button_clicked(self):
+        self.fuben_select_window = FubenSelectWindow(self.usersettings, self.refresh_signal, self)
+        self.fuben_select_window.show()
+
+    def set_plant_team_btn_clicked(self):
+        team = [
+            item.data(Qt.ItemDataRole.UserRole)
+            for item in self.plant_list.selectedItems()
+        ]
+        self.usersettings.fuben_man.team = team
+        self.refresh_team_list()
+        self.refresh_plant_list()
+        
+    def team_list_widget_pressed(self):
+        self.last_focus_list_widget = self.team_list_widget
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Backspace or event.key() == Qt.Key.Key_Delete:
+            if self.last_focus_list_widget is None:
+                return
+            items = [
+                item.data(Qt.ItemDataRole.UserRole)
+                for item in self.last_focus_list_widget.selectedItems()
+            ]
+            if self.last_focus_list_widget == self.fuben_list_widget:
+                for cave_id in items:
+                    self.usersettings.fuben_man.delete_cave(cave_id)
+                self.refresh_cave_list()
+            elif self.last_focus_list_widget == self.team_list_widget:
+                self.usersettings.fuben_man.team = [
+                    plant_id
+                    for plant_id in self.usersettings.fuben_man.team
+                    if plant_id not in items
+                ]
+                self.refresh_team_list()

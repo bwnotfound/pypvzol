@@ -1,8 +1,7 @@
 from xml.etree.ElementTree import Element, fromstring
 import logging
 import time
-
-from pyamf import remoting, AMF0, DecodeError
+from threading import Lock
 
 from .config import Config
 from .web import WebRequest
@@ -75,9 +74,17 @@ class Repository:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.wr = WebRequest(cfg)
+        self._lock = Lock()
         self.refresh_repository()
-
+        
     def refresh_repository(self, logger=None):
+        try:
+            self._lock.acquire()
+            self._refresh_repository(logger=logger)
+        finally:
+            self._lock.release()
+    
+    def _refresh_repository(self, logger=None):
         url = "/pvz/index.php/Warehouse/index/sig/0"
         cnt, max_retry = 0, 20
         while cnt < max_retry:

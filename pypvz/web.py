@@ -1,5 +1,6 @@
 import requests
 import os
+from time import sleep
 from threading import Lock
 from hashlib import sha256
 import shutil
@@ -12,9 +13,9 @@ from pyamf import DecodeError, remoting, AMF0, AMF3
 
 from .config import Config
 
-proxies = { "http": None, "https": None}
+proxies = {"http": None, "https": None}
 
-    
+
 class TimeCounter(object):
     def __init__(self, *args):
         self.name = None
@@ -70,14 +71,15 @@ class TimeCounter(object):
     def __exit__(self, *args):
         end = perf_counter()
         self._print(end - self.start)
-        
+
+
 class LogTimeDecorator(object):
     def __init__(self, func, log_level=logging.INFO):
         self.func = func
         self.log_level = log_level
         self.start_time = None
         self.end_time = None
-        
+
     def _log(self, url):
         logging.log(
             self.log_level,
@@ -160,7 +162,9 @@ class WebRequest:
 
             if not use_cache:
                 with LogTimeDecorator(url):
-                    resp = requests.get(url, **kwargs, proxies={ "http": None, "https": None})
+                    resp = requests.get(
+                        url, **kwargs, proxies={"http": None, "https": None}
+                    )
                 check_status(resp.status_code)
                 return resp.content
 
@@ -171,7 +175,9 @@ class WebRequest:
                     content = f.read()
             else:
                 with LogTimeDecorator(url):
-                    resp = requests.get(url, **kwargs, proxies={ "http": None, "https": None})
+                    resp = requests.get(
+                        url, **kwargs, proxies={"http": None, "https": None}
+                    )
                 check_status(resp.status_code)
                 content = resp.content
                 with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
@@ -221,7 +227,7 @@ class WebRequest:
             private_cached = self.get_private_cache(url)
             if private_cached is not None:
                 return private_cached
-            
+
             if "timeout" not in kwargs:
                 kwargs["timeout"] = self.cfg.timeout
 
@@ -236,7 +242,9 @@ class WebRequest:
 
             if not use_cache:
                 with LogTimeDecorator(url):
-                    resp = requests.post(url, **kwargs, proxies={ "http": None, "https": None})
+                    resp = requests.post(
+                        url, **kwargs, proxies={"http": None, "https": None}
+                    )
                 check_status(resp.status_code)
                 return resp.content
 
@@ -247,7 +255,9 @@ class WebRequest:
                     content = f.read()
             else:
                 with LogTimeDecorator(url):
-                    resp = requests.post(url, **kwargs, proxies={ "http": None, "https": None})
+                    resp = requests.post(
+                        url, **kwargs, proxies={"http": None, "https": None}
+                    )
                 check_status(resp.status_code)
                 content = resp.content
                 with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
@@ -262,7 +272,6 @@ class WebRequest:
         if os.path.exists(self.cache_dir):
             shutil.rmtree(self.cache_dir)
             os.mkdir(self.cache_dir)
-            
 
     def _amf_post_decode(self, url, data, msg, max_retry=3):
         cnt = 0
@@ -275,6 +284,8 @@ class WebRequest:
                 cnt += 1
                 continue
             try:
+                if len(resp) == 0:
+                    raise RuntimeError("amf返回结果为空")
                 resp_ev = remoting.decode(resp)
                 break
             except DecodeError:
@@ -299,3 +310,42 @@ class WebRequest:
         except Exception as e:
             raise e
         return result
+
+    def amf_post_retry(self, body, target, url, msg, max_retry=15, logger=None, exit_on_fail=False):
+        cnt = 0
+        flag = False
+        while cnt < max_retry:
+            cnt += 1
+            try:
+                response = self.amf_post(body, target, url, msg)
+                if response.status != 0:
+                    if "频繁" in response.body.description:
+                        if logger is not None:
+                            logger.log(
+                                "{}过于频繁，选择等待1秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
+                            )
+                        sleep(1)
+                        continue
+                    if logger is not None:
+                        logger.log(
+                            "{}失败，失败原因：{}".format(msg, response.body.description)
+                        )
+                    flag = True
+                    raise RuntimeError(f"{msg}失败")
+                break
+            except Exception as e:
+                if flag and exit_on_fail:
+                    raise e
+                if logger is not None:
+                    logger.log(
+                        "{}时出现异常，异常类型：{}。选择暂停1秒后重新获取信息，最多再尝试{}次".format(
+                            msg, type(e).__name__, max_retry - cnt
+                        )
+                    )
+                sleep(1)
+        else:
+            msg = "{}失败，超过最大尝试次数{}次".format(msg, max_retry)
+            if logger is not None:
+                logger.log(msg)
+            raise RuntimeError(msg)
+        return response

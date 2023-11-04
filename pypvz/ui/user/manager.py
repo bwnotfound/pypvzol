@@ -1,4 +1,5 @@
 import pickle
+from queue import Queue
 import logging
 import os
 from threading import Event
@@ -9,9 +10,12 @@ from ... import (
     Library,
     SynthesisMan,
     HeritageMan,
+    WebRequest,
 )
 from ..message import Logger
 from ... import FubenRequest
+from ...fuben import FubenCave
+from ...utils.recover import RecoverMan
 
 
 class AutoSynthesisMan:
@@ -99,7 +103,7 @@ class AutoSynthesisMan:
             "success": True,
             "result": "合成成功",
         }
-        
+
     def synthesis(self, need_check=True):
         if need_check:
             self.check_data(need_check)
@@ -415,7 +419,7 @@ class AutoCompoundMan:
             )
         if self.use_all_exchange:
             inherit_all_book = self.repo.get_tool(self.lib.name2tool["全属性传承书"].id)
-            if inherit_all_book is None or inherit_book['amount'] == 0:
+            if inherit_all_book is None or inherit_all_book['amount'] == 0:
                 result.append("没有全属性传承书了")
         inherit_reinforce = self.inherit_reinforce
         if inherit_reinforce is None:
@@ -693,10 +697,202 @@ class AutoCompoundMan:
         self.check_data(False)
 
 
+class SingleFubenCave:
+    def __init__(self, cave: FubenCave, layer, number, use_sand=False, enabled=True):
+        self.name = cave.name
+        self.cave_id = cave.cave_id
+        self.rest_count = cave.rest_count
+        self.layer = layer
+        self.number = number
+        self.use_sand = use_sand
+        self.enabled = enabled
+
+
 class FubenMan:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, repo: Repository, logger: Logger):
         self.cfg = cfg
+        self.repo = repo
+        self.logger = logger
         self.fuben_request = FubenRequest(cfg)
+        self.recover_man = RecoverMan(cfg, repo)
+        self.caves: list[SingleFubenCave] = []
+        self.team = []
+        self.show_lottery = False
+        self.need_recovery = False
+        self.recover_hp_choice = "中级血瓶"
+
+    def add_cave(self, cave: FubenCave, layer, number, use_sand=False, enabled=True):
+        for sc in self.caves:
+            if cave.cave_id == sc.cave_id:
+                return
+        sc = SingleFubenCave(cave, layer, number, use_sand, enabled)
+        self.caves.append(sc)
+
+    def delete_cave(self, cave_id):
+        self.caves = list(filter(lambda x: x.cave_id != cave_id, self.caves))
 
     def get_caves(self, layer):
-        return self.fuben_request.get_caves(layer)
+        return self.fuben_request.get_caves(layer, self.logger)
+
+    def _recover(self):
+        cnt, max_retry = 0, 5
+        success_num_all = 0
+        while cnt < max_retry:
+            recover_list = list(
+                filter(
+                    lambda x: x is not None and x.hp_now == 0,
+                    [self.repo.get_plant(plant_id) for plant_id in self.team],
+                )
+            )
+            if len(recover_list) == 0:
+                return True
+            success_num, fail_num = self.recover_man.recover_list(
+                recover_list, choice=self.recover_hp_choice
+            )
+            success_num_all += success_num
+            if fail_num == 0:
+                break
+            self.logger.log("尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num))
+            self.repo.refresh_repository(logger=self.logger)
+            cnt += 1
+        else:
+            self.logger.log("尝试恢复植物血量失败，退出运行")
+            return False
+        if success_num_all > 0:
+            self.logger.log("成功给{}个植物回复血量".format(success_num_all))
+        return True
+
+    def auto_challenge(self, stop_channel: Queue):
+        _cave_map = {}
+
+        def get_fuben_cave(layer, number) -> FubenCave:
+            caves = _cave_map.get(layer, None)
+            if caves is None:
+                _cave_map[layer] = caves = self.fuben_request.get_caves(
+                    layer, self.logger
+                )
+            assert number >= 1 and number <= len(caves)
+            return caves[number - 1]
+
+        for sc in self.caves:
+            if not sc.enabled:
+                continue
+            cave = get_fuben_cave(sc.layer, sc.number)
+            if cave.rest_count == 0:
+                continue
+            challenge_count = cave.rest_count if cave.rest_count > 0 else 1
+            for _ in range(challenge_count):
+                if self.need_recovery:
+                    if not self._recover():
+                        return
+                message = "挑战副本:{}".format(
+                    cave.name,
+                )
+                try:
+                    result = self.fuben_request.challenge(
+                        sc.cave_id, self.team, logger=self.logger
+                    )
+                except Exception as e:
+                    self.logger.log("副本挑战异常，异常类型：{}".format(type(e).__name__))
+                    return
+                success, result = result["success"], result["result"]
+                if not success:
+                    message = message + "失败. 原因: {}.".format(result)
+                    self.logger.log(message)
+                    return
+                else:
+                    message = message + "成功. "
+                message = message + "挑战结果：{}".format(
+                    "胜利" if result['is_winning'] else "失败"
+                )
+                self.logger.log(message)
+                if stop_channel.qsize() > 0:
+                    return
+
+    def save(self, save_dir):
+        save_path = os.path.join(save_dir, "auto_fuben")
+        with open(save_path, "wb") as f:
+            pickle.dump(
+                {
+                    "caves": self.caves,
+                    "team": self.team,
+                    "show_lottery": self.show_lottery,
+                    "need_recovery": self.need_recovery,
+                    "recover_hp_choice": self.recover_hp_choice,
+                },
+                f,
+            )
+
+    def load(self, load_dir):
+        load_path = os.path.join(load_dir, "auto_fuben")
+        if os.path.exists(load_path):
+            with open(load_path, "rb") as f:
+                d = pickle.load(f)
+            for k, v in d.items():
+                if hasattr(self, k):
+                    setattr(self, k, v)
+
+
+class TerritoryMan:
+    def __init__(self, cfg: Config, logger: Logger):
+        self.cfg = cfg
+        self.logger = logger
+        self.wr = WebRequest(cfg)
+        self.difficulty_choice = 3
+
+    def challenge(self):
+        body = [float(2000 + self.difficulty_choice), [], float(1), float(0)]
+        response = self.wr.amf_post_retry(
+            body,
+            "api.territory.challenge",
+            "/pvz/amf/",
+            "挑战领地",
+            logger=self.logger,
+            exit_on_fail=True,
+        )
+        if response.status != 0:
+            return {"success": False, "result": response.body.description}
+        else:
+            return {"success": True, "result": response.body}
+
+    def auto_challenge(self, stop_channel: Queue):
+        while True:
+            message = f"挑战领地难度{self.difficulty_choice}"
+            try:
+                result = self.challenge()
+            except Exception as e:
+                self.logger.log("挑战领地异常，异常类型：{}".format(type(e).__name__))
+                return
+            success, result = result["success"], result["result"]
+            if not success:
+                message = message + "失败. 原因: {}.".format(result)
+                self.logger.log(message)
+                return
+            else:
+                message = message + "成功. "
+            message = message + "挑战结果：{}".format(
+                "胜利" if result['fight']['is_winning'] else "失败"
+            )
+            message = message + ". 现在荣誉: {}".format(result['honor'])
+            self.logger.log(message)
+            if stop_channel.qsize() > 0:
+                return
+
+    def save(self, save_dir):
+        save_path = os.path.join(save_dir, "auto_territory")
+        with open(save_path, "wb") as f:
+            pickle.dump(
+                {
+                    "difficulty_choice": self.difficulty_choice,
+                },
+                f,
+            )
+
+    def load(self, load_dir):
+        load_path = os.path.join(load_dir, "auto_territory")
+        if os.path.exists(load_path):
+            with open(load_path, "rb") as f:
+                d = pickle.load(f)
+            for k, v in d.items():
+                if hasattr(self, k):
+                    setattr(self, k, v)

@@ -21,7 +21,7 @@ from ..message import IOLogger
 from ...utils.evolution import PlantEvolution
 from ...utils.common import second2str
 from .auto_challenge import Challenge4Level
-from .manager import AutoSynthesisMan, AutoCompoundMan, FubenMan
+from .manager import AutoSynthesisMan, AutoCompoundMan, FubenMan, TerritoryMan
 
 class UserSettings:
     def __init__(
@@ -67,7 +67,13 @@ class UserSettings:
         self.serverbattle_man = ServerbattleMan(self.cfg)
         self.serverbattle_enabled = False
         self.auto_compound_man = AutoCompoundMan(cfg, lib, repo, self.logger)
-        self.fuben_man = FubenMan(cfg)
+        self.fuben_man = FubenMan(cfg, repo, self.logger)
+        self.fuben_enabled = False
+        self.territory_man = TerritoryMan(cfg, self.logger)
+        self.territory_enabled = False
+        
+        self.record_repository_tool_dict = {}
+        self.record_ignore_tool_id_set = set()
 
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
         while stop_channel.qsize() == 0:
@@ -138,6 +144,20 @@ class UserSettings:
                     self.logger.log(f"自动使用道具失败，异常种类:{type(e).__name__}。跳过自动使用道具")
                 if stop_channel.qsize() > 0:
                     break
+            if self.fuben_enabled:
+                try:
+                    self.fuben_man.auto_challenge(stop_channel)
+                except Exception as e:
+                    self.logger.log(f"自动副本挑战失败，异常种类:{type(e).__name__}。跳过自动副本挑战")
+                if stop_channel.qsize() > 0:
+                    break
+            if self.territory_enabled:
+                try:
+                    self.territory_man.auto_challenge(stop_channel)
+                except Exception as e:
+                    self.logger.log(f"自动领地挑战失败，异常种类:{type(e).__name__}。跳过自动领地挑战")
+                if stop_channel.qsize() > 0:
+                    break
             if self.challenge4Level_enabled:
                 try:
                     self.challenge4Level.auto_challenge(stop_channel)
@@ -199,6 +219,10 @@ class UserSettings:
                     "timeout": self.cfg.timeout,
                     "millsecond_delay": self.cfg.millsecond_delay,
                     "serverbattle_enabled": self.serverbattle_enabled,
+                    "record_repository_tool_dict": self.record_repository_tool_dict,
+                    "record_ignore_tool_id_set": self.record_ignore_tool_id_set,
+                    "fuben_enabled": self.fuben_enabled,
+                    "territory_enabled": self.territory_enabled,
                 },
                 f,
             )
@@ -206,6 +230,8 @@ class UserSettings:
         self.auto_synthesis_man.save(self.save_dir)
         self.heritage_man.save(self.save_dir)
         self.auto_compound_man.save(self.save_dir)
+        self.fuben_man.save(self.save_dir)
+        self.territory_man.save(self.save_dir)
 
     def load(self):
         self.challenge4Level.load(self.save_dir)
@@ -224,3 +250,5 @@ class UserSettings:
         self.auto_synthesis_man.load(self.save_dir)
         self.heritage_man.load(self.save_dir)
         self.auto_compound_man.load(self.save_dir)
+        self.fuben_man.load(self.save_dir)
+        self.territory_man.load(self.save_dir)

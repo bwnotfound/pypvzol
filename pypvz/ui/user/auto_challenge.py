@@ -70,7 +70,7 @@ class Challenge4Level:
         self.accelerate_repository_in_challenge_cave = False
 
         self.current_garden_layer = None
-        
+
         self.main_plant_recover = False
         self.main_plant_recover_rate = 0.1
 
@@ -224,7 +224,9 @@ class Challenge4Level:
                         continue
                     if plant.hp_now / plant.hp_max < self.main_plant_recover_rate:
                         recover_list.append(plant_id)
-            success_num, fail_num = self.recoverMan.recover_list(recover_list, choice=self.hp_choice)      
+            success_num, fail_num = self.recoverMan.recover_list(
+                recover_list, choice=self.hp_choice
+            )
             success_num_all += success_num
             if fail_num == 0:
                 break
@@ -417,7 +419,10 @@ class Challenge4Level:
                 team = self._assemble_team(sc.cave.grade)
                 if team is None:
                     continue
-                if self.need_recover and not self.accelerate_repository_in_challenge_cave:
+                if (
+                    self.need_recover
+                    and not self.accelerate_repository_in_challenge_cave
+                ):
                     success = self._recover()
                     if not success:
                         return
@@ -486,6 +491,9 @@ class Challenge4Level:
                         return
                     continue
 
+                message = message + "挑战结果：{}".format(
+                    "胜利" if result['is_winning'] else "失败"
+                )
                 message = message + self.format_upgrade_message(team, result)
                 self.logger.log(message)
                 if self.pop_after_100:
@@ -517,7 +525,10 @@ class Challenge4Level:
                 team = self._assemble_team(cave.grade)
                 if team is None:
                     continue
-                if self.need_recover and not self.accelerate_repository_in_challenge_cave:
+                if (
+                    self.need_recover
+                    and not self.accelerate_repository_in_challenge_cave
+                ):
                     success = self._recover()
                     if not success:
                         return
@@ -551,6 +562,9 @@ class Challenge4Level:
                     self.logger.log(message)
                     return
                 has_challenged = True
+                message = message + "挑战结果：{}".format(
+                    "胜利" if result['is_winning'] else "失败"
+                )
                 message = message + self.format_upgrade_message(team, result)
                 self.logger.log(message)
                 if self.pop_after_100:

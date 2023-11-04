@@ -42,7 +42,8 @@ class RecoverMan:
     def recover_list(self, target_id_list, choice='中级血瓶'):
         success_num = 0
         fail_num = 0
-
+        if len(target_id_list) == 0:
+            return success_num, fail_num
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [executor.submit(self.recover, id, choice) for id in target_id_list]
 
