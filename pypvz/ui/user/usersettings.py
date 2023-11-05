@@ -21,7 +21,15 @@ from ..message import IOLogger
 from ...utils.evolution import PlantEvolution
 from ...utils.common import second2str
 from .auto_challenge import Challenge4Level
-from .manager import AutoSynthesisMan, AutoCompoundMan, FubenMan, TerritoryMan
+from .manager import (
+    AutoSynthesisMan,
+    AutoCompoundMan,
+    FubenMan,
+    TerritoryMan,
+    DailyMan,
+    GardenMan,
+)
+
 
 class UserSettings:
     def __init__(
@@ -73,10 +81,12 @@ class UserSettings:
         self.fuben_enabled = False
         self.territory_man = TerritoryMan(cfg, self.logger)
         self.territory_enabled = False
-        
         self.record_repository_tool_dict = {}
         self.record_ignore_tool_id_set = set()
-        
+        self.daily_enabled = False
+        self.daily_man = DailyMan(cfg, self.logger)
+        self.garden_man = GardenMan(cfg, lib, self.logger)
+        self.garden_enabled = False
 
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
         while stop_channel.qsize() == 0:
@@ -90,6 +100,51 @@ class UserSettings:
                     self.logger.log("购买完成")
                 except Exception as e:
                     self.logger.log(f"购买失败，异常种类:{type(e).__name__}。跳过购买")
+                if stop_channel.qsize() > 0:
+                    break
+            if self.auto_use_item_enabled:
+                try:
+                    self.auto_use_item(stop_channel)
+                except Exception as e:
+                    self.logger.log(f"自动使用道具失败，异常种类:{type(e).__name__}。跳过自动使用道具")
+                if stop_channel.qsize() > 0:
+                    break
+            if self.daily_enabled:
+                try:
+                    self.daily_man.daily_sign()
+                    self.daily_man.vip_reward_acquire()
+                    self.logger.log("每日签到完成")
+                except Exception as e:
+                    self.logger.log(f"每日签到失败，异常种类:{type(e).__name__}。跳过每日签到")
+                if stop_channel.qsize() > 0:
+                    break
+            if self.task_enabled:
+                try:
+                    self.task.refresh_task()
+                    for i, enable in enumerate(self.enable_list):
+                        if not enable:
+                            continue
+                        tasks = self.task.task_list[i]
+                        for task in tasks:
+                            if task.state == 1:
+                                result = self.task.claim_reward(task, self.lib)
+                                self.logger.log(result['result'])
+                except Exception as e:
+                    self.logger.log(f"领取任务奖励失败，异常种类:{type(e).__name__}。跳过领取任务奖励")
+                if stop_channel.qsize() > 0:
+                    break
+            if self.garden_enabled:
+                try:
+                    self.garden_man.auto_challenge(stop_channel)
+                except Exception as e:
+                    self.logger.log(f"自动花园挑战失败，异常种类:{type(e).__name__}。跳过自动花园挑战")
+                if stop_channel.qsize() > 0:
+                    break
+            if self.territory_enabled:
+                try:
+                    self.territory_man.auto_challenge(stop_channel)
+                except Exception as e:
+                    self.logger.log(f"自动领地挑战失败，异常种类:{type(e).__name__}。跳过自动领地挑战")
                 if stop_channel.qsize() > 0:
                     break
             if self.serverbattle_enabled:
@@ -106,19 +161,11 @@ class UserSettings:
                     break
                 if stop_channel.qsize() > 0:
                     break
-            if self.task_enabled:
+            if self.fuben_enabled:
                 try:
-                    self.task.refresh_task()
-                    for i, enable in enumerate(self.enable_list):
-                        if not enable:
-                            continue
-                        tasks = self.task.task_list[i]
-                        for task in tasks:
-                            if task.state == 1:
-                                result = self.task.claim_reward(task, self.lib)
-                                self.logger.log(result['result'])
+                    self.fuben_man.auto_challenge(stop_channel)
                 except Exception as e:
-                    self.logger.log(f"领取任务奖励失败，异常种类:{type(e).__name__}。跳过领取任务奖励")
+                    self.logger.log(f"自动副本挑战失败，异常种类:{type(e).__name__}。跳过自动副本挑战")
                 if stop_channel.qsize() > 0:
                     break
             if self.arena_enabled:
@@ -140,27 +187,6 @@ class UserSettings:
                     self.logger.log(f"竞技场挑战失败，异常种类:{type(e).__name__}。跳过竞技场挑战")
                 if stop_channel.qsize() > 0:
                     break
-            if self.auto_use_item_enabled:
-                try:
-                    self.auto_use_item(stop_channel)
-                except Exception as e:
-                    self.logger.log(f"自动使用道具失败，异常种类:{type(e).__name__}。跳过自动使用道具")
-                if stop_channel.qsize() > 0:
-                    break
-            if self.fuben_enabled:
-                try:
-                    self.fuben_man.auto_challenge(stop_channel)
-                except Exception as e:
-                    self.logger.log(f"自动副本挑战失败，异常种类:{type(e).__name__}。跳过自动副本挑战")
-                if stop_channel.qsize() > 0:
-                    break
-            if self.territory_enabled:
-                try:
-                    self.territory_man.auto_challenge(stop_channel)
-                except Exception as e:
-                    self.logger.log(f"自动领地挑战失败，异常种类:{type(e).__name__}。跳过自动领地挑战")
-                if stop_channel.qsize() > 0:
-                    break
             if self.challenge4Level_enabled:
                 try:
                     self.challenge4Level.auto_challenge(stop_channel)
@@ -177,7 +203,7 @@ class UserSettings:
 
     def start(self, finished_trigger):
         if self.start_thread is None or not self.start_thread.is_alive():
-            self.start_thread =threading.Thread(
+            self.start_thread = threading.Thread(
                 target=self._start,
                 args=(self.stop_channel, finished_trigger),
             )
@@ -226,6 +252,8 @@ class UserSettings:
                     "record_ignore_tool_id_set": self.record_ignore_tool_id_set,
                     "fuben_enabled": self.fuben_enabled,
                     "territory_enabled": self.territory_enabled,
+                    "daily_enabled": self.daily_enabled,
+                    "garden_enabled": self.garden_enabled,
                 },
                 f,
             )
@@ -235,6 +263,7 @@ class UserSettings:
         self.auto_compound_man.save(self.save_dir)
         self.fuben_man.save(self.save_dir)
         self.territory_man.save(self.save_dir)
+        self.garden_man.save(self.save_dir)
 
     def load(self):
         self.challenge4Level.load(self.save_dir)
@@ -255,3 +284,4 @@ class UserSettings:
         self.auto_compound_man.load(self.save_dir)
         self.fuben_man.load(self.save_dir)
         self.territory_man.load(self.save_dir)
+        self.garden_man.load(self.save_dir)

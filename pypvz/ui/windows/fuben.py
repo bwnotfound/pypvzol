@@ -1,6 +1,3 @@
-from time import sleep
-from threading import Event
-import typing
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -11,10 +8,9 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QComboBox,
     QCheckBox,
-    QApplication,
 )
 from PyQt6 import QtGui
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from ..wrapped import QLabel
 from ..user import UserSettings
@@ -270,3 +266,4 @@ class FubenSettingWindow(QMainWindow):
                     if plant_id not in items
                 ]
                 self.refresh_team_list()
+                self.refresh_plant_list()

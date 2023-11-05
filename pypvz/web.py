@@ -219,7 +219,15 @@ class WebRequest:
             sleep(0.1)
         return [x[0] for x in result_list]
 
-    def post(self, url, use_cache=False, init_header=True, url_format=True, **kwargs):
+    def post(
+        self,
+        url,
+        use_cache=False,
+        init_header=True,
+        url_format=True,
+        exit_response=False,
+        **kwargs,
+    ):
         try:
             self.cfg.acquire()
             if url_format:
@@ -241,12 +249,21 @@ class WebRequest:
                 self.init_header(kwargs["headers"])
 
             if not use_cache:
+                if not exit_response:
+                    with LogTimeDecorator(url):
+                        resp = requests.post(
+                            url, **kwargs, proxies={"http": None, "https": None}
+                        )
+                    check_status(resp.status_code)
+                    return resp.content
                 with LogTimeDecorator(url):
                     resp = requests.post(
-                        url, **kwargs, proxies={"http": None, "https": None}
+                        url, stream=True, **kwargs, proxies={"http": None, "https": None}
                     )
                 check_status(resp.status_code)
-                return resp.content
+                for _ in resp.iter_content(chunk_size=16):
+                    break
+                return
 
             assert self.cache_dir is not None
             url_hash = self.hash(url)
@@ -273,12 +290,18 @@ class WebRequest:
             shutil.rmtree(self.cache_dir)
             os.mkdir(self.cache_dir)
 
-    def _amf_post_decode(self, url, data, msg, max_retry=3):
+    def _amf_post_decode(
+        self, url, data, msg, max_retry=3, exit_on_fail=False, exit_response=False
+    ):
         cnt = 0
         while cnt < max_retry:
             try:
-                resp = self.post(url, data=data)
-            except requests.exceptions.ConnectTimeout:
+                resp = self.post(url, data=data, exit_response=exit_response)
+                if exit_response:
+                    return
+            except requests.exceptions.ConnectTimeout as e:
+                if exit_on_fail:
+                    raise e
                 logging.warning("请求{}超时，选择等待0.5秒后重试".format(msg))
                 sleep(0.5)
                 cnt += 1
@@ -288,11 +311,15 @@ class WebRequest:
                     raise RuntimeError("amf返回结果为空")
                 resp_ev = remoting.decode(resp)
                 break
-            except DecodeError:
+            except DecodeError as e:
+                if exit_on_fail:
+                    raise e
                 cnt += 1
                 logging.info("重新尝试请求{}，选择等待0.5秒后重试".format(msg))
                 sleep(0.5)
-            except OSError:
+            except OSError as e:
+                if exit_on_fail:
+                    raise e
                 cnt += 1
                 logging.info("重新尝试请求{}，选择等待0.5秒后重试".format(msg))
                 sleep(0.5)
@@ -300,24 +327,61 @@ class WebRequest:
             raise RuntimeError("请求{}失败，超过最大尝试次数{}次".format(msg, max_retry))
         return resp_ev["/1"]
 
-    def amf_post(self, body, target, url, msg, max_retry=3):
+    def amf_post(
+        self,
+        body,
+        target,
+        url,
+        msg,
+        max_retry=3,
+        exit_on_fail=False,
+        exit_response=False,
+    ):
         req = remoting.Request(target=target, body=body)
         ev = remoting.Envelope(AMF3)
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
         try:
-            result = self._amf_post_decode(url, bin_msg.getvalue(), msg, max_retry)
+            result = self._amf_post_decode(
+                url,
+                bin_msg.getvalue(),
+                msg,
+                max_retry,
+                exit_on_fail=exit_on_fail,
+                exit_response=exit_response,
+            )
+            if exit_response:
+                return
         except Exception as e:
             raise e
         return result
 
-    def amf_post_retry(self, body, target, url, msg, max_retry=15, logger=None, exit_on_fail=False):
+    def amf_post_retry(
+        self,
+        body,
+        target,
+        url,
+        msg,
+        max_retry=15,
+        logger=None,
+        exit_on_fail=False,
+        exit_response=False,
+    ):
         cnt = 0
         flag = False
         while cnt < max_retry:
             cnt += 1
             try:
-                response = self.amf_post(body, target, url, msg)
+                response = self.amf_post(
+                    body,
+                    target,
+                    url,
+                    msg,
+                    exit_on_fail=exit_on_fail,
+                    exit_response=exit_response,
+                )
+                if exit_response:
+                    return
                 if response.status != 0:
                     if "频繁" in response.body.description:
                         if logger is not None:
@@ -334,7 +398,7 @@ class WebRequest:
                     raise RuntimeError(f"{msg}失败")
                 break
             except Exception as e:
-                if flag and exit_on_fail:
+                if (flag and exit_on_fail) or isinstance(e, RuntimeError):
                     raise e
                 if logger is not None:
                     logger.log(

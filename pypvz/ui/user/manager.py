@@ -896,3 +896,136 @@ class TerritoryMan:
             for k, v in d.items():
                 if hasattr(self, k):
                     setattr(self, k, v)
+
+
+class DailyMan:
+    def __init__(self, cfg, logger: Logger):
+        self.cfg = cfg
+        self.wr = WebRequest(cfg)
+        self.logger = logger
+
+    def vip_reward_acquire(self):
+        try:
+            response = self.wr.amf_post_retry(
+                [],
+                "api.vip.awards",
+                "/pvz/amf/",
+                "vip每日奖励",
+                logger=self.logger,
+                exit_on_fail=True,
+            )
+        except Exception as e:
+            self.logger.log("领取vip每日奖励异常，异常类型：{}".format(type(e).__name__))
+            return
+        if response.status != 0:
+            return {"success": False, "result": response.body.description}
+        else:
+            return {"success": True, "result": response.body}
+
+    def daily_sign(self):
+        try:
+            response = self.wr.amf_post_retry(
+                [],
+                "api.active.sign",
+                "/pvz/amf/",
+                "每日签到",
+                logger=self.logger,
+                exit_on_fail=True,
+            )
+        except Exception as e:
+            self.logger.log("每日签到异常，异常类型：{}".format(type(e).__name__))
+            return
+        if response.status != 0:
+            return {"success": False, "result": response.body.description}
+        else:
+            return {"success": True, "result": response.body}
+
+
+class GardenMan:
+    def __init__(self, cfg: Config, lib: Library, logger: Logger):
+        self.cfg = cfg
+        self.lib = lib
+        self.wr = WebRequest(cfg)
+        self.logger = logger
+        self.team = []
+
+    def challenge_boss(self):
+        if self.team is None or len(self.team) == 0:
+            self.logger.log("未设置队伍")
+            return False
+        try:
+            self.wr.amf_post_retry(
+                [float(1), float(3), float(2), self.team],
+                "api.garden.challenge",
+                "/pvz/amf/",
+                "挑战花园boss",
+                logger=self.logger,
+                exit_on_fail=True,
+                exit_response=True,
+            )
+        except Exception as e:
+            self.logger.log("挑战花园boss异常，异常类型：{}".format(type(e).__name__))
+            return False
+        return True
+
+    def get_lottery(self):
+        response = self.wr.amf_post_retry(
+            [],
+            "api.reward.lottery",
+            "/pvz/amf/",
+            "获取战利品",
+            logger=self.logger,
+            exit_on_fail=True,
+        )
+        if response.status != 0:
+            return {"success": False, "result": response.body.description}
+        else:
+            return {"success": True, "result": response.body}
+
+    def auto_challenge(self, stop_channel: Queue):
+        while True:
+            failure = False
+            message = "挑战花园boss"
+            try:
+                status = self.challenge_boss()
+                if not status:
+                    return
+            except Exception as e:
+                self.logger.log("挑战花园boss异常，异常类型：{}".format(type(e).__name__))
+                return
+
+            lottery_result = self.get_lottery()
+            if lottery_result["success"] and len(lottery_result["result"]["tools"]) > 0:
+                lottery_list = []
+                for item in lottery_result["result"]["tools"]:
+                    id, amount = int(item["id"]), int(item["amount"])
+                    lib_tool = self.lib.get_tool_by_id(id)
+                    if lib_tool is None:
+                        continue
+                    lottery_list.append("{}({})".format(lib_tool.name, amount))
+                message = message + "成功.\n\t战利品: {}".format(" ".join(lottery_list))
+            else:
+                message = message + "失败. 失败原因：{}".format(lottery_result["result"])
+                failure = True
+            self.logger.log(message)
+            if stop_channel.qsize() > 0 or failure:
+                return
+
+    def save(self, save_dir):
+        save_path = os.path.join(save_dir, "auto_garden")
+        with open(save_path, "wb") as f:
+            pickle.dump(
+                {
+                    "team": self.team,
+                },
+                f,
+            )
+
+    def load(self, load_dir):
+        load_path = os.path.join(load_dir, "auto_garden")
+        if os.path.exists(load_path):
+            with open(load_path, "rb") as f:
+                d = pickle.load(f)
+            for k, v in d.items():
+                if hasattr(self, k):
+                    setattr(self, k, v)

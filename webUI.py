@@ -48,6 +48,7 @@ from pypvz.ui.windows import (
     AutoCompoundWindow,
     RepositoryRecordWindow,
     FubenSettingWindow,
+    GardenChallengeSettingWindow,
 )
 
 
@@ -106,7 +107,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         top_layout.addStretch(1)
         self.friend_list = friend_list = QListWidget()
         friend_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        friend_list.itemClicked.connect(self.friend_list_item_clicked)
+        friend_list.itemPressed.connect(self.friend_list_item_clicked)
         friend_list_panel_layout.addLayout(top_layout)
         friend_list_panel_layout.addWidget(friend_list)
         friend_list_panel.setLayout(friend_list_panel_layout)
@@ -124,7 +125,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         top_layout.addWidget(btn)
         self.main_plant_list = main_plant_list = QListWidget()
         main_plant_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        main_plant_list.itemClicked.connect(self.main_plant_list_item_clicked)
+        main_plant_list.itemPressed.connect(self.main_plant_list_item_clicked)
         main_plant_list.itemSelectionChanged.connect(
             self.main_plant_list_item_selection_changed
         )
@@ -145,7 +146,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         top_layout.addWidget(btn)
         self.trash_plant_list = trash_plant_list = QListWidget()
         trash_plant_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        trash_plant_list.itemClicked.connect(self.trash_plant_list_item_clicked)
+        trash_plant_list.itemPressed.connect(self.trash_plant_list_item_clicked)
         trash_plant_list.itemSelectionChanged.connect(
             self.trash_plant_list_item_selection_changed
         )
@@ -848,6 +849,18 @@ class SettingWindow(QMainWindow):
         serverbattle_layout.addWidget(serverbattle_checkbox)
         serverbattle_widget.setLayout(serverbattle_layout)
         menu_layout.addWidget(serverbattle_widget, 4, 1)
+        
+        daily_widget = QWidget()
+        daily_layout = QHBoxLayout()
+        self.daily_checkbox = daily_checkbox = QCheckBox("日常签到和vip")
+        daily_checkbox.setFont(normal_font)
+        daily_checkbox.setChecked(self.usersettings.daily_enabled)
+        daily_checkbox.stateChanged.connect(
+            self.daily_checkbox_stateChanged
+        )
+        daily_layout.addWidget(daily_checkbox)
+        daily_widget.setLayout(daily_layout)
+        menu_layout.addWidget(daily_widget, 4, 2)
 
         territory_widget = QWidget()
         territory_layout = QHBoxLayout()
@@ -870,8 +883,28 @@ class SettingWindow(QMainWindow):
         difficulty_choice_layout.addWidget(difficulty_choice_box)
         difficulty_choice_widget.setLayout(difficulty_choice_layout)
         territory_layout.addWidget(difficulty_choice_widget)
+        territory_layout.addStretch(1)
         territory_widget.setLayout(territory_layout)
         menu_layout.addWidget(territory_widget, 5, 0)
+        
+        # self.garden_checkbox = QCheckBox("自动花园boss")
+        # self.garden_checkbox.setFont(normal_font)
+        # self.garden_checkbox.setChecked(self.usersettings.garden_enabled)
+        # self.garden_checkbox.stateChanged.connect(self.garden_checkbox_stateChanged)
+        # menu_layout.addWidget(self.garden_checkbox, 5, 1)
+        garden_widget = QWidget()
+        garden_layout = QHBoxLayout()
+        self.garden_checkbox = garden_checkbox = QCheckBox("自动花园boss")
+        garden_checkbox.setFont(normal_font)
+        garden_checkbox.setChecked(self.usersettings.garden_enabled)
+        garden_checkbox.stateChanged.connect(self.garden_checkbox_stateChanged)
+        garden_layout.addWidget(garden_checkbox)
+        setting_btn = QPushButton("设置")
+        setting_btn.clicked.connect(self.garden_setting_btn_clicked)
+        garden_layout.addWidget(setting_btn)
+        garden_layout.addStretch(1)
+        garden_widget.setLayout(garden_layout)
+        menu_layout.addWidget(garden_widget, 5, 1)
 
         rest_time_input_widget = QWidget()
         rest_time_input_layout = QHBoxLayout()
@@ -918,6 +951,16 @@ class SettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def garden_setting_btn_clicked(self):
+        self.garden_setting_window = GardenChallengeSettingWindow(self.usersettings, parent=self)
+        self.garden_setting_window.show()
+    
+    def garden_checkbox_stateChanged(self):
+        self.usersettings.garden_enabled = self.garden_checkbox.isChecked()
+        
+    def daily_checkbox_stateChanged(self):
+        self.usersettings.daily_enabled = self.daily_checkbox.isChecked()
         
     def territory_checkbox_stateChanged(self):
         self.usersettings.territory_enabled = self.territory_checkbox.isChecked()
