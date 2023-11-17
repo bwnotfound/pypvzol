@@ -1,7 +1,7 @@
 import requests
 import os
 from time import sleep
-from threading import Lock
+from random import sample
 from hashlib import sha256
 import shutil
 from time import perf_counter
@@ -14,7 +14,18 @@ from pyamf import DecodeError, remoting, AMF0, AMF3
 from .config import Config
 
 proxies = {"http": None, "https": None}
-
+proxies = None
+freq_event = threading.Event()
+freq_event.set()
+_freq_lock = threading.Lock()
+def sleep_freq(t):
+    try:
+        _freq_lock.acquire()
+        freq_event.clear()
+        sleep(t)
+    finally:
+        _freq_lock.release()
+        freq_event.set()
 
 class TimeCounter(object):
     def __init__(self, *args):
@@ -118,14 +129,20 @@ def async_gather(future_list):
 class WebRequest:
     def __init__(self, cfg: Config, cache_dir=None):
         self.cfg = cfg
-        self.user_agent = "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.2; WOW64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729; Zoom 3.6.0)"
+        self.user_agent = ""
         self.cache_dir = cache_dir
+        self.session = requests.Session()
 
     def init_header(self, header):
-        header["user-agent"] = self.user_agent
+        user_agent = [
+            "Mozilla/5.0 (Windows NT 10.0;............/92.0.4515.131 Safari/537.36 SLBrowser/8.0.1.5162 SLBChan/11",
+            "Mozilla/5.0 (Windows N............e Gecko) Chrome/103.0.5060.114 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64............WIFI MicroMessenger/7.0.20.1781(0x6700143B) WindowsWechat(0x63090618) XWEB/8259 Flue"
+        ]
+        header["user-agent"] = sample(user_agent, 1)[0]
         header["cookie"] = self.cfg.cookie
         header["host"] = self.cfg.host
-        header["Connection"] = "close"
+        # header["Connection"] = "close"
 
     def hash(self, s):
         assert isinstance(s, str)
@@ -162,8 +179,8 @@ class WebRequest:
 
             if not use_cache:
                 with LogTimeDecorator(url):
-                    resp = requests.get(
-                        url, **kwargs, proxies={"http": None, "https": None}
+                    resp = self.session.get(
+                        url, **kwargs, proxies=proxies
                     )
                 check_status(resp.status_code)
                 return resp.content
@@ -175,8 +192,8 @@ class WebRequest:
                     content = f.read()
             else:
                 with LogTimeDecorator(url):
-                    resp = requests.get(
-                        url, **kwargs, proxies={"http": None, "https": None}
+                    resp = self.session.get(
+                        url, **kwargs, proxies=proxies
                     )
                 check_status(resp.status_code)
                 content = resp.content
@@ -188,7 +205,7 @@ class WebRequest:
 
     def get_async(self, *args, **kwargs):
         def run():
-            return self.get(*args, **kwargs)
+            return self.get_retry(*args, **kwargs)
 
         return run
 
@@ -251,14 +268,17 @@ class WebRequest:
             if not use_cache:
                 if not exit_response:
                     with LogTimeDecorator(url):
-                        resp = requests.post(
-                            url, **kwargs, proxies={"http": None, "https": None}
+                        resp = self.session.post(
+                            url, **kwargs, proxies=proxies
                         )
                     check_status(resp.status_code)
                     return resp.content
                 with LogTimeDecorator(url):
-                    resp = requests.post(
-                        url, stream=True, **kwargs, proxies={"http": None, "https": None}
+                    resp = self.session.post(
+                        url,
+                        stream=True,
+                        **kwargs,
+                        proxies=proxies,
                     )
                 check_status(resp.status_code)
                 for _ in resp.iter_content(chunk_size=16):
@@ -272,8 +292,8 @@ class WebRequest:
                     content = f.read()
             else:
                 with LogTimeDecorator(url):
-                    resp = requests.post(
-                        url, **kwargs, proxies={"http": None, "https": None}
+                    resp = self.session.post(
+                        url, **kwargs, proxies=proxies
                     )
                 check_status(resp.status_code)
                 content = resp.content
@@ -289,6 +309,40 @@ class WebRequest:
         if os.path.exists(self.cache_dir):
             shutil.rmtree(self.cache_dir)
             os.mkdir(self.cache_dir)
+
+    def get_retry(
+        self,
+        url,
+        use_cache=False,
+        init_header=True,
+        url_format=True,
+        max_retry=15,
+        **kwargs,
+    ):
+        cnt = 0
+        while cnt < max_retry:
+            cnt += 1
+            try:
+                response = self.get(
+                    url,
+                    use_cache=use_cache,
+                    init_header=init_header,
+                    url_format=url_format,
+                    **kwargs,
+                )
+                break
+            except Exception as e:
+                logging.info(
+                    "重新尝试请求{}，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
+                        url, max_retry - cnt, type(e).__name__
+                    )
+                )
+                sleep(1)
+        else:
+            msg = "尝试请求{}失败，超过最大尝试次数{}次".format(url, max_retry)
+            logging.info(msg)
+            raise RuntimeError(msg)
+        return response
 
     def _amf_post_decode(
         self, url, data, msg, max_retry=3, exit_on_fail=False, exit_response=False
@@ -372,6 +426,7 @@ class WebRequest:
         while cnt < max_retry:
             cnt += 1
             try:
+                freq_event.wait()
                 response = self.amf_post(
                     body,
                     target,
@@ -388,7 +443,14 @@ class WebRequest:
                             logger.log(
                                 "{}过于频繁，选择等待1秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
                             )
-                        sleep(1)
+                        sleep_freq(1)
+                        continue
+                    if "更新" in response.body.description:
+                        if logger is not None:
+                            logger.log(
+                                "{}的时候服务器频繁，选择等待5秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
+                            )
+                        sleep_freq(5)
                         continue
                     if logger is not None:
                         logger.log(

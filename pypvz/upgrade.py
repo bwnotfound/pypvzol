@@ -33,7 +33,7 @@ class UpgradeMan:
 
     def upgrade_quality(self, plant_id):
         body = [float(plant_id)]
-        response = self.wr.amf_post(
+        response = self.wr.amf_post_retry(
             body, 'api.apiorganism.qualityUp', "/pvz/amf/", "升级品质"
         )
         result = {

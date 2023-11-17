@@ -3,7 +3,10 @@ import json
 from io import BytesIO
 import os
 import logging
-from queue import Queue
+import concurrent.futures
+import threading
+import multiprocessing
+import typing
 
 from PyQt6 import QtGui
 from PyQt6.QtWidgets import (
@@ -26,7 +29,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
 )
 from PyQt6.QtGui import QImage, QPixmap, QTextCursor
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, pyqtSignal
 from PIL import Image
 
 from pypvz import WebRequest, Config, User, CaveMan, Repository, Library
@@ -49,6 +52,8 @@ from pypvz.ui.windows import (
     RepositoryRecordWindow,
     FubenSettingWindow,
     GardenChallengeSettingWindow,
+    GameWindow,
+    run_game_window,
 )
 
 
@@ -849,15 +854,13 @@ class SettingWindow(QMainWindow):
         serverbattle_layout.addWidget(serverbattle_checkbox)
         serverbattle_widget.setLayout(serverbattle_layout)
         menu_layout.addWidget(serverbattle_widget, 4, 1)
-        
+
         daily_widget = QWidget()
         daily_layout = QHBoxLayout()
         self.daily_checkbox = daily_checkbox = QCheckBox("日常签到和vip")
         daily_checkbox.setFont(normal_font)
         daily_checkbox.setChecked(self.usersettings.daily_enabled)
-        daily_checkbox.stateChanged.connect(
-            self.daily_checkbox_stateChanged
-        )
+        daily_checkbox.stateChanged.connect(self.daily_checkbox_stateChanged)
         daily_layout.addWidget(daily_checkbox)
         daily_widget.setLayout(daily_layout)
         menu_layout.addWidget(daily_widget, 4, 2)
@@ -886,7 +889,7 @@ class SettingWindow(QMainWindow):
         territory_layout.addStretch(1)
         territory_widget.setLayout(territory_layout)
         menu_layout.addWidget(territory_widget, 5, 0)
-        
+
         # self.garden_checkbox = QCheckBox("自动花园boss")
         # self.garden_checkbox.setFont(normal_font)
         # self.garden_checkbox.setChecked(self.usersettings.garden_enabled)
@@ -951,20 +954,22 @@ class SettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
     def garden_setting_btn_clicked(self):
-        self.garden_setting_window = GardenChallengeSettingWindow(self.usersettings, parent=self)
+        self.garden_setting_window = GardenChallengeSettingWindow(
+            self.usersettings, parent=self
+        )
         self.garden_setting_window.show()
-    
+
     def garden_checkbox_stateChanged(self):
         self.usersettings.garden_enabled = self.garden_checkbox.isChecked()
-        
+
     def daily_checkbox_stateChanged(self):
         self.usersettings.daily_enabled = self.daily_checkbox.isChecked()
-        
+
     def territory_checkbox_stateChanged(self):
         self.usersettings.territory_enabled = self.territory_checkbox.isChecked()
-    
+
     def difficulty_choice_box_currentIndexChanged(self, index):
         self.usersettings.territory_man.difficulty_choice = index + 1
 
@@ -1188,6 +1193,7 @@ class CustomMainWindow(QMainWindow):
                     self.usersettings.user.face_url,
                     init_header="pvzol" in self.usersettings.cfg.host,
                     url_format=False,
+                    use_cache=True,
                 )
             )
         )
@@ -1329,14 +1335,14 @@ class CustomMainWindow(QMainWindow):
     def refresh_repository_btn(self):
         self.usersettings.repo.refresh_repository()
         self.usersettings.logger.log("仓库刷新完成")
-        
+
     def start_process(self):
         self.process_button.setText("暂停")
         while self.usersettings.stop_channel.qsize() > 0:
             self.usersettings.stop_channel.get()
         self.usersettings.logger.log("开始运行")
         self.usersettings.start(self.finish_trigger)
-        
+
     def stop_prcess(self):
         self.process_button.setText("开始")
         self.usersettings.stop_channel.put(True)
@@ -1366,9 +1372,11 @@ class CustomMainWindow(QMainWindow):
         except ValueError:
             pass
         return super().closeEvent(event)
-        
+
 
 class LoginWindow(QMainWindow):
+    get_usersettings_finish_signal = pyqtSignal(tuple)
+
     def __init__(self):
         super().__init__()
         self.configs = []
@@ -1377,11 +1385,13 @@ class LoginWindow(QMainWindow):
             with open(self.cfg_path, "r", encoding="utf-8") as f:
                 self.configs = json.load(f)
         self.init_ui()
+        self.get_usersettings_finish_signal.connect(self.get_usersettings_finished)
         self.main_window_thread = []
+        self.game_queue = None
 
     def init_ui(self):
         self.setWindowTitle("登录")
-        
+
         # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的60%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
         self.resize(int(screen_size.width() * 0.3), int(screen_size.height() * 0.6))
@@ -1400,7 +1410,7 @@ class LoginWindow(QMainWindow):
         login_user_layout.addWidget(login_user_list)
         login_user_widget.setLayout(login_user_layout)
         main_layout.addWidget(login_user_widget)
-        
+
         pack_deal_widget = QWidget()
         pack_deal_layout = QHBoxLayout()
         login_all_btn = QPushButton("登录选中用户")
@@ -1415,9 +1425,12 @@ class LoginWindow(QMainWindow):
         close_all_user_btn = QPushButton("关闭所有用户")
         close_all_user_btn.clicked.connect(self.close_all_user_btn_clicked)
         pack_deal_layout.addWidget(close_all_user_btn)
+        game_start_btn = QPushButton("启动选中用户游戏")
+        game_start_btn.clicked.connect(self.game_start_btn_clicked)
+        pack_deal_layout.addWidget(game_start_btn)
         pack_deal_widget.setLayout(pack_deal_layout)
         main_layout.addWidget(pack_deal_widget)
-        
+
         username_widget = QWidget()
         username_layout = QHBoxLayout()
         username_layout.addWidget(QLabel("用户名(这个随便填):"))
@@ -1452,7 +1465,23 @@ class LoginWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
+    def start_game_window(self, index):
+        cfg = Config(self.configs[index])
+        if self.game_queue is None:
+            self.game_queue = multiprocessing.Queue(maxsize=16)
+            multiprocessing.Process(target=run_game_window, args=(self.game_queue,)).start()
+            
+        self.game_queue.put((cfg.cookie, 1.5))
+
+    def game_start_btn_clicked(self):
+        selected_index = [
+            self.login_user_list.indexFromItem(item).row()
+            for item in self.login_user_list.selectedItems()
+        ]
+        for index in selected_index:
+            self.start_game_window(index)
+
     def login_all_btn_clicked(self):
         selected_index = [
             self.login_user_list.indexFromItem(item).row()
@@ -1460,15 +1489,15 @@ class LoginWindow(QMainWindow):
         ]
         for index in selected_index:
             self.login(index)
-            
+
     def start_all_user_btn_clicked(self):
         for main_window in main_window_list:
             main_window.start_process()
-        
+
     def stop_all_user_btn_clicked(self):
         for main_window in main_window_list:
             main_window.stop_prcess()
-            
+
     def close_all_user_btn_clicked(self):
         copy_list = [main_window for main_window in main_window_list]
         for main_window in copy_list:
@@ -1515,7 +1544,7 @@ class LoginWindow(QMainWindow):
         # 强制重新渲染login窗口元素
         QApplication.processEvents()
         self.create_main_window(Config(cfg))
-        
+
     def login(self, index):
         self.create_main_window(Config(self.configs[index]))
 
@@ -1524,8 +1553,7 @@ class LoginWindow(QMainWindow):
         self.login(cfg_index)
 
     def create_main_window(self, cfg: Config):
-        thread = GetUsersettings(cfg, root_dir)
-        thread.finish_trigger.connect(self.get_usersettings_finished)
+        thread = GetUsersettings(cfg, root_dir, self.get_usersettings_finish_signal)
         self.main_window_thread.append(thread)
         thread.start()
 
@@ -1558,15 +1586,18 @@ class LoginWindow(QMainWindow):
             self.configs.pop(cfg_index)
             self.save_config()
             self.refresh_login_user_list()
+            
+    def closeEvent(self, event):
+        if self.game_queue is not None:
+            self.game_queue.put_nowait(None)
+        return super().closeEvent(event)
 
-
-class GetUsersettings(QThread):
-    finish_trigger = pyqtSignal(tuple)
-
-    def __init__(self, cfg: Config, root_dir):
+class GetUsersettings(threading.Thread):
+    def __init__(self, cfg: Config, root_dir, finish_trigger):
         super().__init__()
         self.cfg = cfg
         self.root_dir = root_dir
+        self.finish_trigger = finish_trigger
 
     def run(self):
         data_dir = os.path.join(
@@ -1588,20 +1619,22 @@ class GetUsersettings(QThread):
         self.finish_trigger.emit((usersettings, cache_dir))
 
 
-def get_usersettings(cfg, logger: IOLogger, setting_dir):
-    # results = []
-    # with concurrent.futures.ThreadPoolExecutor() as executor:
-    #     futures = []
-    #     futures.append(executor.submit(User, cfg))
-    #     futures.append(executor.submit(Library, cfg))
-    #     futures.append(executor.submit(Repository, cfg))
+def get_usersettings(cfg: Config, logger: IOLogger, setting_dir):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        futures = []
+        futures.append(executor.submit(User, cfg))
+        futures.append(executor.submit(Library, cfg))
+        futures.append(executor.submit(Repository, cfg))
 
-    #     for future in futures:
-    #         results.append(future.result())
+    concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
 
-    user: User = User(cfg)
-    lib: Library = Library(cfg)
-    repo: Repository = Repository(cfg)
+    user: User = futures[0].result()
+    lib: Library = futures[1].result()
+    repo: Repository = futures[2].result()
+
+    # user: User = User(cfg)
+    # lib: Library = Library(cfg)
+    # repo: Repository = Repository(cfg)
 
     caveMan: CaveMan = CaveMan(cfg, lib)
 
@@ -1621,6 +1654,7 @@ def get_usersettings(cfg, logger: IOLogger, setting_dir):
         usersettings.load()
 
     return usersettings
+
 
 if __name__ == "__main__":
     # 设置logging监听等级为INFO

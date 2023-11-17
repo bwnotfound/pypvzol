@@ -29,16 +29,21 @@ class Config:
         self.millsecond_delay = 0
         self._lock = Lock()
         self.last_time = 0
+        self.wait_requests_over = False
     
     def acquire(self):
         self._lock.acquire()
         now = perf_counter()
         if now - self.last_time < self.millsecond_delay / 1000:
             sleep((self.millsecond_delay / 1000) - (now - self.last_time))
+        if not self.wait_requests_over:
+            self._lock.release()
+            self.last_time = perf_counter()
         
     def release(self):
-        self._lock.release()
-        self.last_time = perf_counter()
+        if self.wait_requests_over:
+            self._lock.release()
+            self.last_time = perf_counter()
             
     @property
     def username(self):

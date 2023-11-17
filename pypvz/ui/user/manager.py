@@ -258,7 +258,7 @@ class AutoSynthesisMan:
             for k, v in d.items():
                 if hasattr(self, k):
                     setattr(self, k, v)
-        self.check_data()
+        self.check_data(False)
 
 
 class AutoCompoundMan:
