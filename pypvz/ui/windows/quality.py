@@ -24,6 +24,7 @@ from ...upgrade import UpgradeMan
 class UpgradeQualityWindow(QMainWindow):
     upgrade_finish_signal = pyqtSignal()
     refresh_signal = pyqtSignal(Event)
+    upgrade_quality_stoped_signal = pyqtSignal()
 
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
@@ -35,6 +36,7 @@ class UpgradeQualityWindow(QMainWindow):
         self.run_thread = None
         self.refresh_signal.connect(self.refresh_plant_list)
         self.upgrade_finish_signal.connect(self.upgrade_finish)
+        self.upgrade_quality_stoped_signal.connect(self.upgrade_quality_stoped)
         self.force_upgrade = True
         self.pool_size = 3
         self.init_ui()
@@ -168,7 +170,7 @@ class UpgradeQualityWindow(QMainWindow):
                 self.upgrade_quality_btn.setEnabled(True)
         elif self.upgrade_quality_btn.text() == "中止刷品":
             self.interrupt_event.set()
-            WaitEventThread(self.rest_event, self.upgrade_quality_stoped).start()
+            WaitEventThread(self.rest_event, self.upgrade_quality_stoped_signal).start()
         else:
             self.upgrade_quality_btn.setEnabled(True)
             raise RuntimeError(f"未知按钮文本：{self.upgrade_quality_btn.text()}")
