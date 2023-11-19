@@ -305,11 +305,12 @@ class AutoCompoundMan:
         self.repo = repo
         self.logger = logger
         self.auto_synthesis_man = AutoSynthesisMan(cfg, lib, repo)
-        self.heitage_man = HeritageMan(cfg, lib)
+        self.heritage_man = HeritageMan(cfg, lib)
         self.liezhi_plant_id = None
         self.receiver_plant_id = None
         self.source_plant_id = None
         self.use_all_exchange = True
+        self.allow_inherite2target = True
         self.auto_synthesis_pool_id = set()
         self.n1, self.n2, self.k, self.m = 2, 1, 5, 3
         self.chosen_attribute = "HP特"
@@ -562,13 +563,13 @@ class AutoCompoundMan:
 
     def exchange_one(self, id1, id2, book_id, num):
         def run():
-            return self.heitage_man.exchange_one(id1, id2, book_id, num)
+            return self.heritage_man.exchange_one(id1, id2, book_id, num)
 
         return self._exchange(id1, run)
 
     def exchange_all(self, id1, id2):
         def run():
-            return self.heitage_man.exchange_all(id1, id2)
+            return self.heritage_man.exchange_all(id1, id2)
 
         return self._exchange(id1, run)
 
@@ -666,21 +667,22 @@ class AutoCompoundMan:
                 self.logger.log("合成异常，中止复合")
                 return False
             self.logger.log("复制第{}个植物成功".format(i + 1))
-        if not self.use_all_exchange:
-            success = self.exchange_one(
-                self.liezhi_plant_id,
-                self.receiver_plant_id,
-                self.inherit_book['id'],
-                10,
-            )
-        else:
-            success = self.exchange_all(
-                self.liezhi_plant_id,
-                self.receiver_plant_id,
-            )
-        if not success:
-            self.logger.log("在将劣质双格满传给主力时出现传承错误，中断复合")
-            return False
+        if self.allow_inherite2target:
+            if not self.use_all_exchange:
+                success = self.exchange_one(
+                    self.liezhi_plant_id,
+                    self.receiver_plant_id,
+                    self.inherit_book['id'],
+                    10,
+                )
+            else:
+                success = self.exchange_all(
+                    self.liezhi_plant_id,
+                    self.receiver_plant_id,
+                )
+            if not success:
+                self.logger.log("在将劣质双格满传给主力时出现传承错误，中断复合")
+                return False
         return True
 
     def compound_loop(self, interrupt_event: Event, refresh_signal):
@@ -717,6 +719,7 @@ class AutoCompoundMan:
                     "end_mantissa": self.end_mantissa,
                     "end_exponent": self.end_exponent,
                     "force_compound": self.force_compound,
+                    "allow_inherite2target": self.allow_inherite2target,
                 },
                 f,
             )

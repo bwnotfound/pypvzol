@@ -175,6 +175,18 @@ class AutoCompoundWindow(QMainWindow):
         use_all_exchange_layout.addWidget(self.use_all_exchange_checkbox)
         widget3_layout.addLayout(use_all_exchange_layout)
 
+        allow_inherite2target_layout = QHBoxLayout()
+        allow_inherite2target_layout.addWidget(QLabel("劣质传承到主力上"))
+        self.allow_inherite2target_checkbox = QCheckBox()
+        self.allow_inherite2target_checkbox.setChecked(
+            self.usersettings.auto_compound_man.allow_inherite2target
+        )
+        self.allow_inherite2target_checkbox.stateChanged.connect(
+            self.allow_inherite2target_checkbox_value_changed
+        )
+        allow_inherite2target_layout.addWidget(self.allow_inherite2target_checkbox)
+        widget3_layout.addLayout(allow_inherite2target_layout)
+
         widget3_layout.addStretch(1)
         widget3.setLayout(widget3_layout)
         main_layout.addWidget(widget3)
@@ -281,6 +293,11 @@ class AutoCompoundWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def allow_inherite2target_checkbox_value_changed(self):
+        self.usersettings.auto_compound_man.allow_inherite2target = (
+            self.allow_inherite2target_checkbox.isChecked()
+        )
 
     def illustration_btn_clicked(self):
         ImageWindow("data/复合通用方案.png", self).show()

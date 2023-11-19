@@ -1373,7 +1373,7 @@ class LoginWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.configs = []
-        self.cfg_path = os.path.join(root_dir, "config/config.json")
+        self.cfg_path = os.path.join(root_dir, "data/config/config.json")
         if os.path.exists(self.cfg_path):
             with open(self.cfg_path, "r", encoding="utf-8") as f:
                 self.configs = json.load(f)
@@ -1594,7 +1594,7 @@ class GetUsersettings(threading.Thread):
 
     def run(self):
         data_dir = os.path.join(
-            self.root_dir, f"data/{self.cfg.username}/{self.cfg.region}/{self.cfg.host}"
+            self.root_dir, f"data/user/{self.cfg.username}/{self.cfg.region}/{self.cfg.host}"
         )
         os.makedirs(data_dir, exist_ok=True)
         cache_dir = os.path.join(data_dir, "cache")
@@ -1654,7 +1654,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)  # 如果不想让控制台输出那么多信息，可以将这一行注释掉
     # 取root_dir为可执行文件的目录
     root_dir = os.getcwd()
-    os.makedirs(os.path.join(root_dir, "config"), exist_ok=True)
+    data_dir = os.path.join(root_dir, "data")
+    os.makedirs(data_dir, exist_ok=True)
+    os.makedirs(os.path.join(data_dir, "config"), exist_ok=True)
 
     try:
         app = QApplication(sys.argv)
