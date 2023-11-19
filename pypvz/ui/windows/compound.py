@@ -394,7 +394,7 @@ class AutoCompoundWindow(QMainWindow):
             if attr_name == chosen_attr_name:
                 continue
             attr = getattr(plant, attr_name)
-            if attr > 100000000:
+            if attr > 500000000:
                 result = False
                 break
         else:

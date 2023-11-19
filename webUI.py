@@ -1089,7 +1089,7 @@ class FunctionPanelWindow(QMainWindow):
         heritage_btn.clicked.connect(self.heritage_btn_clicked)
         menu_layout.addWidget(heritage_btn, 3, 0)
 
-        compound_btn = QPushButton("复合面板")
+        compound_btn = QPushButton("自动复合面板")
         compound_btn.clicked.connect(self.compound_btn_clicked)
         menu_layout.addWidget(compound_btn, 4, 0)
 
