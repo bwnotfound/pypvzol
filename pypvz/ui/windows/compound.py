@@ -20,7 +20,7 @@ from ..wrapped import QLabel
 from ..user import UserSettings
 from ...utils.common import format_number
 from ...repository import Plant
-from .common import ImageWindow
+from .common import ImageWindow, require_permission
 
 
 class AutoCompoundWindow(QMainWindow):
@@ -359,6 +359,56 @@ class AutoCompoundWindow(QMainWindow):
                 )
             return message
 
+    def _check_plant(self, plant):
+        result = None
+        chosen_attr_name = (
+            self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+                self.usersettings.auto_synthesis_man.chosen_attribute
+            ]
+        )
+        for (
+            attr_dict_name
+        ) in self.usersettings.auto_synthesis_man.attribute2plant_attribute.keys():
+            attr_name = self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+                attr_dict_name
+            ]
+            if attr_name == chosen_attr_name:
+                continue
+            attr = getattr(plant, attr_name)
+            if attr > 100000000:
+                result = False
+                break
+        else:
+            result = True
+        need_continue = None
+        if not result:
+            need_continue = require_permission(
+                "植物{}部分数据超过设定，请确认是否继续：".format(
+                    self.format_plant_info(plant, full_msg=True)
+                )
+            )
+        else:
+            need_continue = True
+        return need_continue
+
+    def check_data(self):
+        source_plant = self.usersettings.repo.get_plant(
+            self.usersettings.auto_compound_man.source_plant_id
+        )
+        if source_plant is not None:
+            if not self._check_plant(source_plant):
+                self.usersettings.logger.log("合成数据检查出异常，停止合成")
+                return False
+        for deputy_plant_id in list(
+            self.usersettings.auto_compound_man.auto_synthesis_pool_id
+        ):
+            deputy_plant = self.usersettings.repo.get_plant(deputy_plant_id)
+            if deputy_plant is not None:
+                if not self._check_plant(deputy_plant):
+                    self.usersettings.logger.log("合成数据检查出异常，停止合成")
+                    return False
+        return True
+
     def refresh_tool_list(self):
         self.tool_list.clear()
         for tool_name in [
@@ -592,6 +642,8 @@ class AutoCompoundWindow(QMainWindow):
         try:
             self.auto_compound_single_btn.setDisabled(True)
             QApplication.processEvents()
+            if not self.check_data():
+                return
             self.usersettings.auto_compound_man.compound_one_cycle(
                 self.refresh_all_signal
             )
@@ -607,6 +659,8 @@ class AutoCompoundWindow(QMainWindow):
             self.auto_compound_btn.setDisabled(True)
             QApplication.processEvents()
             if self.auto_compound_btn.text() == "全部复合":
+                if not self.check_data():
+                    return
                 self.auto_compound_btn.setText("停止复合")
                 self.run_thread = compoundThread(
                     self.usersettings,
