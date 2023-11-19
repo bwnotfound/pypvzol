@@ -192,3 +192,11 @@ api.garden.challenge
 
 8. api.vip.awards
     vip奖励领取，直接发送就行
+
+9. api.territory.quit
+    一键下领地，请求参数为float(user_id)
+    返回数据是/1/onStatus，description是"重置所有植物成功!"
+
+10. api.territory.challenge
+    上植物，请求参数为[float(user_id),[int(plant_id)].float(1),float(0)]
+    user_id为1001！1005，对应植物一~五

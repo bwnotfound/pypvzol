@@ -1,4 +1,3 @@
-from time import sleep
 from threading import Event
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -26,7 +25,7 @@ from .common import ImageWindow
 
 class AutoCompoundWindow(QMainWindow):
     compound_finish_signal = pyqtSignal()
-    refresh_all_signal = pyqtSignal()
+    refresh_all_signal = pyqtSignal(Event)
 
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
@@ -500,7 +499,7 @@ class AutoCompoundWindow(QMainWindow):
             self.format_plant_info(plant, full_msg=True)
         )
 
-    def refresh_all(self):
+    def refresh_all(self, event: Event = None):
         self.refresh_tool_list()
         self.refresh_plant_list()
         self.refresh_plant_pool_list()
@@ -508,7 +507,8 @@ class AutoCompoundWindow(QMainWindow):
         self.refresh_receiver_plant_textbox()
         self.refresh_source_plant_textbox()
         self.refresh_information_text_box()
-        QApplication.processEvents()
+        if event is not None:
+            event.set()
 
     def plant_import_btn_clicked(self):
         selected_plant_id = [

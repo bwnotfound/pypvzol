@@ -5,4 +5,5 @@ from .compound import AutoCompoundWindow
 from .record import RepositoryRecordWindow
 from .fuben import FubenSettingWindow
 from .garden import GardenChallengeSettingWindow
-from .flash_web import GameWindow, run_game_window
+from .territory import TerritorySettingWindow
+# from .flash_web import GameWindow, run_game_window

@@ -18,6 +18,8 @@ proxies = None
 freq_event = threading.Event()
 freq_event.set()
 _freq_lock = threading.Lock()
+
+
 def sleep_freq(t):
     try:
         _freq_lock.acquire()
@@ -26,6 +28,7 @@ def sleep_freq(t):
     finally:
         _freq_lock.release()
         freq_event.set()
+
 
 class TimeCounter(object):
     def __init__(self, *args):
@@ -137,7 +140,7 @@ class WebRequest:
         user_agent = [
             "Mozilla/5.0 (Windows NT 10.0;............/92.0.4515.131 Safari/537.36 SLBrowser/8.0.1.5162 SLBChan/11",
             "Mozilla/5.0 (Windows N............e Gecko) Chrome/103.0.5060.114 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64............WIFI MicroMessenger/7.0.20.1781(0x6700143B) WindowsWechat(0x63090618) XWEB/8259 Flue"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64............WIFI MicroMessenger/7.0.20.1781(0x6700143B) WindowsWechat(0x63090618) XWEB/8259 Flue",
         ]
         header["user-agent"] = sample(user_agent, 1)[0]
         header["cookie"] = self.cfg.cookie
@@ -179,9 +182,7 @@ class WebRequest:
 
             if not use_cache:
                 with LogTimeDecorator(url):
-                    resp = self.session.get(
-                        url, **kwargs, proxies=proxies
-                    )
+                    resp = self.session.get(url, **kwargs, proxies=proxies)
                 check_status(resp.status_code)
                 return resp.content
 
@@ -192,9 +193,7 @@ class WebRequest:
                     content = f.read()
             else:
                 with LogTimeDecorator(url):
-                    resp = self.session.get(
-                        url, **kwargs, proxies=proxies
-                    )
+                    resp = self.session.get(url, **kwargs, proxies=proxies)
                 check_status(resp.status_code)
                 content = resp.content
                 with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
@@ -268,9 +267,7 @@ class WebRequest:
             if not use_cache:
                 if not exit_response:
                     with LogTimeDecorator(url):
-                        resp = self.session.post(
-                            url, **kwargs, proxies=proxies
-                        )
+                        resp = self.session.post(url, **kwargs, proxies=proxies)
                     check_status(resp.status_code)
                     return resp.content
                 with LogTimeDecorator(url):
@@ -292,9 +289,7 @@ class WebRequest:
                     content = f.read()
             else:
                 with LogTimeDecorator(url):
-                    resp = self.session.post(
-                        url, **kwargs, proxies=proxies
-                    )
+                    resp = self.session.post(url, **kwargs, proxies=proxies)
                 check_status(resp.status_code)
                 content = resp.content
                 with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
@@ -350,7 +345,12 @@ class WebRequest:
         cnt = 0
         while cnt < max_retry:
             try:
-                resp = self.post(url, data=data, exit_response=exit_response)
+                resp = self.post(
+                    url,
+                    data=data,
+                    exit_response=exit_response,
+                    headers={"Content-Type": "application/x-amf"},
+                )
                 if exit_response:
                     return
             except requests.exceptions.ConnectTimeout as e:
@@ -420,6 +420,7 @@ class WebRequest:
         logger=None,
         exit_on_fail=False,
         exit_response=False,
+        on_result=False,
     ):
         cnt = 0
         flag = False
@@ -441,24 +442,29 @@ class WebRequest:
                     if "频繁" in response.body.description:
                         if logger is not None:
                             logger.log(
-                                "{}过于频繁，选择等待1秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
+                                "{}过于频繁，选择等待3秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
                             )
-                        sleep_freq(1)
+                        sleep_freq(3)
                         continue
                     if "更新" in response.body.description:
                         if logger is not None:
                             logger.log(
-                                "{}的时候服务器频繁，选择等待5秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
+                                "{}的时候服务器频繁，选择等待5秒后重试。最多再等待{}次".format(
+                                    msg, max_retry - cnt
+                                )
                             )
                         sleep_freq(5)
                         continue
-                    if logger is not None:
-                        logger.log(
-                            "{}失败，失败原因：{}".format(msg, response.body.description)
-                        )
-                    flag = True
-                    raise RuntimeError(f"{msg}失败")
+                    if on_result:
+                        if logger is not None:
+                            logger.log(
+                                "{}失败，失败原因：{}".format(msg, response.body.description)
+                            )
+                        flag = True
+                        raise RuntimeError(f"{msg}失败")
                 break
+            except RuntimeError as e:
+                raise e
             except Exception as e:
                 if (flag and exit_on_fail) or isinstance(e, RuntimeError):
                     raise e

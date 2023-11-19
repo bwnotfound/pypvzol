@@ -1,4 +1,6 @@
 import logging
+import threading
+from queue import Queue
 from copy import deepcopy
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -15,7 +17,7 @@ from PyQt6.QtWidgets import (
     QApplication,
     QSpinBox,
 )
-from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtGui import QPixmap
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -1253,10 +1255,73 @@ class ImageWindow(QMainWindow):
         # 将窗口居中显示，宽度为显示器宽度的60%，高度为显示器高度的50%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
         self.move(int(screen_size.width() * 0.1), int(screen_size.height() * 0.1))
-        
+
         main_widget = QWidget()
         main_layout = QVBoxLayout()
 
         main_layout.addWidget(QLabel().setPixmap(self.image))
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+
+class RequirePermissionWindow(QMainWindow):
+    def __init__(self, msg, finish_queue):
+        super().__init__()
+        self.msg = msg
+        self.finish_queue = finish_queue
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("警告：请确认操作！")
+
+        # 将窗口居中显示，宽度为显示器宽度的35%，高度为显示器高度的25%
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.35), int(screen_size.height() * 0.25))
+        self.move(int(screen_size.width() * 0.325), int(screen_size.height() * 0.375))
+
+        main_widget = QWidget()
+        main_layout = QVBoxLayout()
+
+        msg_label = QLabel(self.msg)
+        msg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(msg_label)
+
+        btn_layout = QHBoxLayout()
+        accept_btn = QPushButton("确认")
+        accept_btn.clicked.connect(self.accept_btn_clicked)
+        btn_layout.addWidget(accept_btn)
+        refuse_btn = QPushButton("取消")
+        refuse_btn.clicked.connect(self.refuse_btn_clicked)
+        btn_layout.addWidget(refuse_btn)
+        main_layout.addLayout(btn_layout)
+
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+    def accept_btn_clicked(self):
+        self.finish_queue.put(True)
+        self.close()
+
+    def refuse_btn_clicked(self):
+        self.finish_queue.put(False)
+        self.close()
+
+
+_permission_window = []
+
+
+def require_permission(msg):
+    global _permission_window
+    finish_queue = Queue()
+    window = RequirePermissionWindow(msg, finish_queue)
+    window.show()
+    _permission_window = [w for w in _permission_window if w.isVisible()]
+    _permission_window.append(window)
+    while True:
+        try:
+            return finish_queue.get_nowait()
+        except Exception:
+            QApplication.processEvents()
+
+
+

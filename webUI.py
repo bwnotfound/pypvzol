@@ -52,8 +52,9 @@ from pypvz.ui.windows import (
     RepositoryRecordWindow,
     FubenSettingWindow,
     GardenChallengeSettingWindow,
-    GameWindow,
-    run_game_window,
+    TerritorySettingWindow,
+    # GameWindow,
+    # run_game_window,
 )
 
 
@@ -872,20 +873,11 @@ class SettingWindow(QMainWindow):
         territory_checkbox.setChecked(self.usersettings.territory_enabled)
         territory_checkbox.stateChanged.connect(self.territory_checkbox_stateChanged)
         territory_layout.addWidget(territory_checkbox)
-        difficulty_choice_widget = QWidget()
-        difficulty_choice_layout = QHBoxLayout()
-        difficulty_choice_layout.addWidget(QLabel("难度:"))
-        self.difficulty_choice_box = difficulty_choice_box = QComboBox()
-        difficulty_choice_box.addItems(["1", "2", "3", "4"])
-        difficulty_choice_box.setCurrentIndex(
-            self.usersettings.territory_man.difficulty_choice - 1
-        )
-        difficulty_choice_box.currentIndexChanged.connect(
-            self.difficulty_choice_box_currentIndexChanged
-        )
-        difficulty_choice_layout.addWidget(difficulty_choice_box)
-        difficulty_choice_widget.setLayout(difficulty_choice_layout)
-        territory_layout.addWidget(difficulty_choice_widget)
+        
+        self.territory_setting_btn = QPushButton("设置")
+        self.territory_setting_btn.clicked.connect(self.territory_setting_btn_clicked)
+        territory_layout.addWidget(self.territory_setting_btn)
+        
         territory_layout.addStretch(1)
         territory_widget.setLayout(territory_layout)
         menu_layout.addWidget(territory_widget, 5, 0)
@@ -954,6 +946,10 @@ class SettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+    
+    def territory_setting_btn_clicked(self):
+        self.territory_setting_window = TerritorySettingWindow(self.usersettings, parent=self)
+        self.territory_setting_window.show()
 
     def garden_setting_btn_clicked(self):
         self.garden_setting_window = GardenChallengeSettingWindow(
@@ -969,9 +965,6 @@ class SettingWindow(QMainWindow):
 
     def territory_checkbox_stateChanged(self):
         self.usersettings.territory_enabled = self.territory_checkbox.isChecked()
-
-    def difficulty_choice_box_currentIndexChanged(self, index):
-        self.usersettings.territory_man.difficulty_choice = index + 1
 
     def fuben_checkbox_stateChanged(self):
         self.usersettings.fuben_enabled = self.fuben_checkbox.isChecked()
@@ -1425,9 +1418,9 @@ class LoginWindow(QMainWindow):
         close_all_user_btn = QPushButton("关闭所有用户")
         close_all_user_btn.clicked.connect(self.close_all_user_btn_clicked)
         pack_deal_layout.addWidget(close_all_user_btn)
-        game_start_btn = QPushButton("启动选中用户游戏")
-        game_start_btn.clicked.connect(self.game_start_btn_clicked)
-        pack_deal_layout.addWidget(game_start_btn)
+        # game_start_btn = QPushButton("启动选中用户游戏")
+        # game_start_btn.clicked.connect(self.game_start_btn_clicked)
+        # pack_deal_layout.addWidget(game_start_btn)
         pack_deal_widget.setLayout(pack_deal_layout)
         main_layout.addWidget(pack_deal_widget)
 
@@ -1466,21 +1459,21 @@ class LoginWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
-    def start_game_window(self, index):
-        cfg = Config(self.configs[index])
-        if self.game_queue is None:
-            self.game_queue = multiprocessing.Queue(maxsize=16)
-            multiprocessing.Process(target=run_game_window, args=(self.game_queue,)).start()
-            
-        self.game_queue.put((cfg.cookie, 1.5))
+    # def start_game_window(self, index):
+    #     cfg = Config(self.configs[index])
+    #     if self.game_queue is None:
+    #         self.game_queue = multiprocessing.Queue(maxsize=16)
+    #         multiprocessing.Process(target=run_game_window, args=(self.game_queue,)).start()
+    #     self.game_queue.put((cfg.cookie, 1.5))
+    #     print(self.game_queue.qsize())
 
-    def game_start_btn_clicked(self):
-        selected_index = [
-            self.login_user_list.indexFromItem(item).row()
-            for item in self.login_user_list.selectedItems()
-        ]
-        for index in selected_index:
-            self.start_game_window(index)
+    # def game_start_btn_clicked(self):
+    #     selected_index = [
+    #         self.login_user_list.indexFromItem(item).row()
+    #         for item in self.login_user_list.selectedItems()
+    #     ]
+    #     for index in selected_index:
+    #         self.start_game_window(index)
 
     def login_all_btn_clicked(self):
         selected_index = [

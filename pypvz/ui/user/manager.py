@@ -16,6 +16,7 @@ from ..message import Logger
 from ... import FubenRequest
 from ...fuben import FubenCave
 from ...utils.recover import RecoverMan
+from ..wrapped import signal_block_emit
 
 
 class AutoSynthesisMan:
@@ -66,6 +67,19 @@ class AutoSynthesisMan:
             if self.repo.get_plant(deputy_plant_id) is None:
                 self.auto_synthesis_pool_id.remove(deputy_plant_id)
 
+    def check_data_retry(self, interrupt_event, logger, refresh_repo=True):
+        while True:
+            try:
+                if interrupt_event is not None and interrupt_event.is_set():
+                    interrupt_event.clear()
+                    logger.log("中止合成")
+                    return
+                self.check_data(refresh_repo=refresh_repo)
+                break
+            except Exception as e:
+                logger.log("重启异常，暂停1秒，继续重启（一直异常请手动终止）。异常种类：{}".format(type(e).__name__))
+                sleep(1)
+
     def get_max_attribute_plant_id(self):
         auto_synthesis_pool_id = list(self.auto_synthesis_pool_id)
         max_attribute_value = 0
@@ -99,9 +113,17 @@ class AutoSynthesisMan:
             except:
                 result["result"] += str(response.body)
             return result
+        if "fight" not in response.body:
+            result = {
+                "success": False,
+                "result": "合成出错。以下为详细报错原因：",
+            }
+            result['result'] += str(response.body)
+            return result
         return {
             "success": True,
             "result": "合成成功",
+            "body": response.body,
         }
 
     def synthesis(self, need_check=True):
@@ -137,6 +159,12 @@ class AutoSynthesisMan:
                 if not result["success"] and "频繁" in result['result']:
                     raise RuntimeError(result['result'])
                 break
+            except RuntimeError as e:
+                if "amf返回结果为空" in str(e):
+                    return {
+                        "success": False,
+                        "result": "合成异常，已跳出合成。异常信息：{}".format(str(e)),
+                    }
             except Exception as e:
                 if not self.force_synthesis:
                     result = {
@@ -161,15 +189,25 @@ class AutoSynthesisMan:
                 sleep(1)
 
         if result['success']:
-            if deputy_plant_id in self.auto_synthesis_pool_id:
-                self.auto_synthesis_pool_id.remove(deputy_plant_id)
+            body = result['body']
+            self.auto_synthesis_pool_id.remove(deputy_plant_id)
+            deputy_plant = self.repo.get_plant(deputy_plant_id)
+            deputy_plant.fight += int(body['fight'])
+            deputy_plant.hp_max += int(body['hp'])
+            deputy_plant.attack += int(body['attack'])
+            deputy_plant.armor += int(body['miss'])
+            deputy_plant.piercing += int(body['precision'])
+            deputy_plant.miss += int(body['new_miss'])
+            deputy_plant.precision += int(body['new_precision'])
+            deputy_plant.speed += int(body['speed'])
+            self.repo.remove_plant(self.main_plant_id)
             self.main_plant_id = deputy_plant_id
+            reinforce['amount'] = max(reinforce['amount'] - self.reinforce_number, 0)
+            if reinforce['amount'] == 0:
+                self.repo.remove_tool(reinforce['id'])
             book['amount'] = max(book['amount'] - 1, 0)
             if book['amount'] == 0:
-                for i, tool in enumerate(self.repo.tools):
-                    if tool['id'] == book['id']:
-                        self.repo.tools.pop(i)
-                        break
+                self.repo.remove_tool(book['id'])
         return result
 
     def synthesis_all(
@@ -191,6 +229,7 @@ class AutoSynthesisMan:
                 logger.log("合成次数不能为负数")
                 return
             self.check_data()
+            signal_block_emit(refresh_signal)
             while not (len(self.auto_synthesis_pool_id) == 0) and length > 0:
                 if interrupt_event is not None and interrupt_event.is_set():
                     interrupt_event.clear()
@@ -201,9 +240,8 @@ class AutoSynthesisMan:
                         return
                 result = self.synthesis(need_check=False)
                 logger.log(result['result'])
-                self.check_data()
-                if refresh_signal is not None:
-                    refresh_signal.emit()
+                self.check_data(False)
+                signal_block_emit(refresh_signal)
                 if not result["success"]:
                     logger.log("合成异常，已跳出合成")
                     return
@@ -213,26 +251,25 @@ class AutoSynthesisMan:
             logger.log("合成异常。异常种类：{}".format(type(e).__name__))
             if self.force_synthesis:
                 logger.log("重启合成")
-                while True:
-                    try:
-                        if interrupt_event is not None and interrupt_event.is_set():
-                            interrupt_event.clear()
-                            logger.log("中止合成")
-                            return
-                        self.check_data()
-                        break
-                    except Exception as e:
-                        logger.log(
-                            "重启异常，暂停1秒，继续重启（一直异常请手动终止）。异常种类：{}".format(type(e).__name__)
-                        )
-                        sleep(1)
+                self.check_data_retry(interrupt_event, logger)
                 if self.main_plant_id is None:
                     logger.log("重新设置底座为合成池中最大属性的植物")
                     plant_id = self.get_max_attribute_plant_id()
                     self.main_plant_id = plant_id
                     if plant_id in self.auto_synthesis_pool_id:
                         self.auto_synthesis_pool_id.remove(plant_id)
-                self.synthesis()
+                self.synthesis_all(
+                    logger,
+                    interrupt_event=interrupt_event,
+                    need_synthesis=need_synthesis,
+                    synthesis_number=synthesis_number,
+                    refresh_signal=refresh_signal,
+                )
+            else:
+                if refresh_signal is not None:
+                    self.check_data_retry(interrupt_event, logger)
+                    signal_block_emit(refresh_signal)
+                logger.log("合成异常，已跳出合成")
 
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "user_autosynthesisman")
@@ -598,7 +635,7 @@ class AutoCompoundMan:
             self.inherit_book['id'],
             10 - self.k,
         )
-        refresh_signal.emit()
+        signal_block_emit(refresh_signal)
         if not success:
             self.logger.log("在复制植物时出现传承错误，中断复合")
             return None
@@ -653,7 +690,7 @@ class AutoCompoundMan:
                 self.logger.log("手动中止复合")
                 return
             if not is_first:
-                refresh_signal.emit()
+                signal_block_emit(refresh_signal)
             if is_first:
                 is_first = False
             continue_loop = self.compound_one_cycle(refresh_signal)
@@ -834,11 +871,22 @@ class FubenMan:
 
 
 class TerritoryMan:
-    def __init__(self, cfg: Config, logger: Logger):
+    def __init__(self, cfg: Config, repo: Repository, logger: Logger):
         self.cfg = cfg
+        self.repo = repo
         self.logger = logger
         self.wr = WebRequest(cfg)
         self.difficulty_choice = 3
+        self.team = []
+
+    def check_data(self, refresh_repo=True):
+        if refresh_repo:
+            self.repo.refresh_repository()
+        self.team = [
+            plant_id
+            for plant_id in self.team
+            if self.repo.get_plant(plant_id) is not None
+        ]
 
     def challenge(self):
         body = [float(2000 + self.difficulty_choice), [], float(1), float(0)]
@@ -878,12 +926,78 @@ class TerritoryMan:
             if stop_channel.qsize() > 0:
                 return
 
+    def release_plant(self, user_id):
+        body = [float(user_id)]
+        # response = self.wr.amf_post_retry(
+        #     body,
+        #     "api.territory.quit",
+        #     "/pvz/amf/",
+        #     "释放领地",
+        #     logger=self.logger,
+        #     exit_on_fail=True,
+        # )
+
+        cnt, max_retry = 0, 20
+        while cnt < max_retry:
+            cnt += 1
+            response = self.wr.amf_post(
+                body,
+                "api.territory.quit",
+                "/pvz/amf/",
+                "释放领地",
+                exit_on_fail=True,
+            )
+            if response.status != 0:
+                if "频繁" in response.body.description:
+                    self.logger.log(
+                        "{}过于频繁，选择等待3秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
+                    )
+                    sleep(3)
+                    continue
+                if "更新" in response.body.description:
+                    self.logger.log(
+                        "{}的时候服务器频繁，选择等待5秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
+                    )
+                    sleep(5)
+                    continue
+                if response.body.description == "重置所有植物成功!":
+                    return {
+                        "success": True,
+                        "result": "释放领地所有植物成功",
+                    }
+            try:
+                return {"success": False, "result": response.body.description}
+            except:
+                return {"success": False, "result": str(response.body)}
+        else:
+            msg = "{}失败，超过最大尝试次数{}次".format(msg, max_retry)
+            self.logger.log(msg)
+            raise RuntimeError(msg)
+
+    def upload_team(self):
+        if len(self.team) > 5:
+            logging.warning("上场植物数超过5，但上场植物数只能小于等于5")
+        for i, plant_id in enumerate(self.team[:5]):
+            body = [float(f"100{i+1}"), [int(plant_id)], float(1), float(0)]
+            response = self.wr.amf_post_retry(
+                body,
+                "api.territory.challenge",
+                "/pvz/amf/",
+                "上领地植物",
+                logger=self.logger,
+                exit_on_fail=True,
+            )
+            if response.status != 0:
+                return {"success": False, "result": response.body.description}
+        return {"success": True, "result": "共上场{}个植物".format(len(self.team))}
+
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "auto_territory")
         with open(save_path, "wb") as f:
             pickle.dump(
                 {
                     "difficulty_choice": self.difficulty_choice,
+                    "team": self.team,
                 },
                 f,
             )
@@ -942,12 +1056,22 @@ class DailyMan:
 
 
 class GardenMan:
-    def __init__(self, cfg: Config, lib: Library, logger: Logger):
+    def __init__(self, cfg: Config, repo: Repository, lib: Library, logger: Logger):
         self.cfg = cfg
+        self.repo = repo
         self.lib = lib
         self.wr = WebRequest(cfg)
         self.logger = logger
         self.team = []
+
+    def check_data(self, refresh_repo=True):
+        if refresh_repo:
+            self.repo.refresh_repository()
+        self.team = [
+            plant_id
+            for plant_id in self.team
+            if self.repo.get_plant(plant_id) is not None
+        ]
 
     def challenge_boss(self):
         if self.team is None or len(self.team) == 0:
@@ -962,6 +1086,7 @@ class GardenMan:
                 logger=self.logger,
                 exit_on_fail=True,
                 exit_response=True,
+                on_result=True,
             )
         except Exception as e:
             self.logger.log("挑战花园boss异常，异常类型：{}".format(type(e).__name__))

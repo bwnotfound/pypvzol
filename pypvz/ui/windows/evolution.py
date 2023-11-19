@@ -15,11 +15,12 @@ from PyQt6.QtWidgets import (
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 
-from ..wrapped import QLabel
+from ..wrapped import QLabel, signal_block_emit
 from ..user import UserSettings
 
+
 class EvolutionPanelWindow(QMainWindow):
-    refresh_path_panel_signal = pyqtSignal()
+    refresh_path_panel_signal = pyqtSignal(Event)
     refresh_plant_list_signal = pyqtSignal()
     evolution_finish_signal = pyqtSignal()
 
@@ -138,7 +139,7 @@ class EvolutionPanelWindow(QMainWindow):
     def force_evolution_checkbox_stateChanged(self):
         self.force_evolution = self.force_evolution_checkbox.isChecked()
 
-    def refresh_evolution_path_list(self):
+    def refresh_evolution_path_list(self, event: Event = None):
         self.evolution_path_list.clear()
         for i, path in enumerate(
             self.usersettings.plant_evolution.saved_evolution_paths
@@ -149,6 +150,8 @@ class EvolutionPanelWindow(QMainWindow):
             )
             item.setData(Qt.ItemDataRole.UserRole, i)
             self.evolution_path_list.addItem(item)
+        if event is not None:
+            event.set()
 
     def evolution_start_btn_clicked(self):
         try:
@@ -170,7 +173,7 @@ class EvolutionPanelWindow(QMainWindow):
             self.usersettings.logger.log(str(e))
         finally:
             self.evolution_start_btn.setEnabled(True)
-            
+
     def refresh_plant_list(self):
         self.plant_list.clear()
         for plant in self.usersettings.repo.plants:
@@ -234,7 +237,7 @@ class EvolutionPanelThread(QThread):
         self.refresh_signal = refresh_signal
         self.rest_event = rest_event
         self.force_evolution = force_evolution
-        
+
     def evolution(self):
         try:
             if self.current_evolution_path_index is None:
@@ -248,14 +251,14 @@ class EvolutionPanelThread(QThread):
                     self.current_evolution_path_index, plant_id
                 )
                 self.usersettings.logger.log(result["result"])
-            self.refresh_signal.emit()
+            signal_block_emit(self.refresh_signal)
         except Exception as e:
             if not self.force_evolution:
                 raise e
             self.usersettings.logger.log("进化异常中断，选择暂停1秒重试。异常种类：" + type(e).__name__)
             sleep(1)
             self.usersettings.repo.refresh_repository()
-            
+
     def run(self):
         try:
             self.evolution()

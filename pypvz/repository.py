@@ -160,6 +160,26 @@ class Repository:
             id = int(id)
         tool = self.id2tool.get(id, None)
         return tool
+    
+    def remove_plant(self, id):
+        if isinstance(id, str):
+            id = int(id)
+        plant = self.id2plant.get(id, None)
+        if plant is None:
+            return False
+        self.plants.remove(plant)
+        self.id2plant.pop(id)
+        return True
+
+    def remove_tool(self, id):
+        if isinstance(id, str):
+            id = int(id)
+        tool = self.id2tool.get(id, None)
+        if tool is None:
+            return False
+        self.tools.remove(tool)
+        self.id2tool.pop(id)
+        return True
 
     def use_item(self, tool_id, amount, lib: Library):
         body = [float(tool_id), float(amount)]

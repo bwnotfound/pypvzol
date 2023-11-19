@@ -79,16 +79,17 @@ class UserSettings:
         self.auto_compound_man = AutoCompoundMan(cfg, lib, repo, self.logger)
         self.fuben_man = FubenMan(cfg, repo, self.logger)
         self.fuben_enabled = False
-        self.territory_man = TerritoryMan(cfg, self.logger)
+        self.territory_man = TerritoryMan(cfg, repo, self.logger)
         self.territory_enabled = False
         self.record_repository_tool_dict = {}
         self.record_ignore_tool_id_set = set()
         self.daily_enabled = False
         self.daily_man = DailyMan(cfg, self.logger)
-        self.garden_man = GardenMan(cfg, lib, self.logger)
+        self.garden_man = GardenMan(cfg, repo, lib, self.logger)
         self.garden_enabled = False
 
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
+        self.repo.refresh_repository(self.logger)
         while stop_channel.qsize() == 0:
             if self.shop_enabled:
                 try:
@@ -134,6 +135,7 @@ class UserSettings:
                 if stop_channel.qsize() > 0:
                     break
             if self.garden_enabled:
+                self.garden_man.check_data(False)
                 try:
                     self.garden_man.auto_challenge(stop_channel)
                 except Exception as e:
@@ -141,10 +143,22 @@ class UserSettings:
                 if stop_channel.qsize() > 0:
                     break
             if self.territory_enabled:
+                self.territory_man.check_data(False)
                 try:
-                    self.territory_man.auto_challenge(stop_channel)
+                    result = self.territory_man.upload_team()
+                    self.logger.log(result['result'])
                 except Exception as e:
-                    self.logger.log(f"自动领地挑战失败，异常种类:{type(e).__name__}。跳过自动领地挑战")
+                    self.logger.log(f"上领地植物失败，异常种类:{type(e).__name__}。跳过领地挑战")
+                else:
+                    try:
+                        self.territory_man.auto_challenge(stop_channel)
+                    except Exception as e:
+                        self.logger.log(f"自动领地挑战失败，异常种类:{type(e).__name__}。跳过自动领地挑战")
+                try:
+                    result = self.territory_man.release_plant(self.user.id)
+                    self.logger.log(result['result'])
+                except Exception as e:
+                    self.logger.log(f"领地释放植物失败，异常种类:{type(e).__name__}。")
                 if stop_channel.qsize() > 0:
                     break
             if self.serverbattle_enabled:

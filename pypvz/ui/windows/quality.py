@@ -16,14 +16,14 @@ from PyQt6.QtWidgets import (
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ..wrapped import QLabel
+from ..wrapped import QLabel, signal_block_emit
 from ..user import UserSettings
 from ...upgrade import UpgradeMan
 
 
 class UpgradeQualityWindow(QMainWindow):
     upgrade_finish_signal = pyqtSignal()
-    refresh_signal = pyqtSignal()
+    refresh_signal = pyqtSignal(Event)
 
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
@@ -117,7 +117,7 @@ class UpgradeQualityWindow(QMainWindow):
     def force_upgrade_checkbox_state_changed(self):
         self.force_upgrade = self.force_upgrade_checkbox.isChecked()
 
-    def refresh_plant_list(self):
+    def refresh_plant_list(self, event: Event = None):
         self.plant_list.clear()
         for plant in self.usersettings.repo.plants:
             item = QListWidgetItem(
@@ -125,6 +125,8 @@ class UpgradeQualityWindow(QMainWindow):
             )
             item.setData(Qt.ItemDataRole.UserRole, plant.id)
             self.plant_list.addItem(item)
+        if event is not None:
+            event.set()
 
     def upgrade_quality_btn_clicked(self):
         try:
@@ -169,7 +171,7 @@ class UpgradeQualityWindow(QMainWindow):
 
     def upgrade_finish(self):
         self.usersettings.repo.refresh_repository()
-        self.refresh_signal.emit()
+        self.refresh_signal.emit(Event())
         self.upgrade_quality_btn.setText("全部刷品")
         self.run_thread = None
         self.interrupt_event.clear()
@@ -282,7 +284,7 @@ class UpgradeQualityThread(Thread):
                     result['quality_name'],
                 )
                 self.usersettings.logger.reverse_log(msg, self.need_show_all_info)
-            self.refresh_signal.emit()
+            signal_block_emit(self.refresh_signal)
         except Exception as e:
             self.usersettings.logger.log(f"刷品过程中出现异常，已停止。原因种类：{type(e).__name__}")
             has_failure = True

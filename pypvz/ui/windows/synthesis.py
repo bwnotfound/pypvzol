@@ -1,5 +1,5 @@
-from time import sleep
 from threading import Event
+import threading
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -15,17 +15,18 @@ from PyQt6.QtWidgets import (
     QLineEdit,
 )
 from PyQt6 import QtGui
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from ..wrapped import QLabel
 from ..user import UserSettings
 from ...utils.common import format_number
 from ...repository import Plant
+from .common import require_permission
 
 
 class AutoSynthesisWindow(QMainWindow):
     synthesis_finish_signal = pyqtSignal()
-    refresh_all_signal = pyqtSignal()
+    refresh_all_signal = pyqtSignal(Event)
 
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
@@ -282,12 +283,7 @@ class AutoSynthesisWindow(QMainWindow):
         exponent = int(self.exponent_line_edit.text())
         return mantissa * (10 ** (exponent + 8))
 
-    def get_main_plant_attribute(self):
-        if self.usersettings.auto_synthesis_man.main_plant_id is None:
-            return None
-        plant = self.usersettings.repo.get_plant(
-            self.usersettings.auto_synthesis_man.main_plant_id
-        )
+    def get_plant_attribute(self, plant):
         if plant is None:
             return None
         return getattr(
@@ -297,22 +293,15 @@ class AutoSynthesisWindow(QMainWindow):
             ],
         )
 
-    def refresh_tool_list(self):
-        # self.tool_list.clear()
-        # for (
-        #     item_id
-        # ) in self.usersettings.auto_synthesis_man.attribute_book_dict.values():
-        #     tool_item = self.usersettings.repo.get_tool(item_id)
-        #     if tool_item is None:
-        #         continue
-        #     item = QListWidgetItem(
-        #         "{}({})".format(
-        #             self.usersettings.lib.get_tool_by_id(item_id).name,
-        #             tool_item['amount'],
-        #         )
-        #     )
-        #     self.tool_list.addItem(item)
+    def get_main_plant_attribute(self):
+        if self.usersettings.auto_synthesis_man.main_plant_id is None:
+            return None
+        main_plant = self.usersettings.repo.get_plant(
+            self.usersettings.auto_synthesis_man.main_plant_id
+        )
+        return self.get_plant_attribute(main_plant)
 
+    def refresh_tool_list(self):
         self.tool_list.clear()
         for tool_name in [
             "增强卷轴",
@@ -330,12 +319,6 @@ class AutoSynthesisWindow(QMainWindow):
             )
             if tool is None:
                 continue
-                # item = QListWidgetItem(
-                #     "{}({})".format(
-                #         tool_name,
-                #         0,
-                #     )
-                # )
             else:
                 item = QListWidgetItem(
                     "{}({})".format(
@@ -401,12 +384,14 @@ class AutoSynthesisWindow(QMainWindow):
             self.reinforce_number_choice.currentText()
         )
 
-    def refresh_all(self):
+    def refresh_all(self, event: Event=None):
         self.refresh_tool_list()
         self.refresh_plant_list()
         self.refresh_plant_pool_list()
         self.refresh_main_plant_text_box()
         self.refresh_information_text_box()
+        if event is not None:
+            event.set()
 
     def plant_import_btn_clicked(self):
         selected_plant_id = [
@@ -455,11 +440,63 @@ class AutoSynthesisWindow(QMainWindow):
             return False
         return True
 
+    def _check_plant(self, plant):
+        result = None
+        chosen_attr_name = (
+            self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+                self.usersettings.auto_synthesis_man.chosen_attribute
+            ]
+        )
+        for (
+            attr_dict_name
+        ) in self.usersettings.auto_synthesis_man.attribute2plant_attribute.keys():
+            attr_name = self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+                attr_dict_name
+            ]
+            if attr_name == chosen_attr_name:
+                continue
+            attr = getattr(plant, attr_name)
+            if attr > 100000000:
+                result = False
+                break
+        else:
+            result = True
+        need_continue = None
+        if not result:
+            need_continue = require_permission(
+                "植物{}部分数据超过设定，请确认是否继续：".format(
+                    self.format_plant_info(plant, full_msg=True)
+                )
+            )
+        else:
+            need_continue = True
+        return need_continue
+
+    def check_data(self):
+        main_plant = self.usersettings.repo.get_plant(
+            self.usersettings.auto_synthesis_man.main_plant_id
+        )
+        if main_plant is not None:
+            if not self._check_plant(main_plant):
+                self.usersettings.logger.log("合成数据检查出异常，停止合成")
+                return False
+        for deputy_plant_id in list(
+            self.usersettings.auto_synthesis_man.auto_synthesis_pool_id
+        ):
+            deputy_plant = self.usersettings.repo.get_plant(deputy_plant_id)
+            if deputy_plant is not None:
+                if not self._check_plant(deputy_plant):
+                    self.usersettings.logger.log("合成数据检查出异常，停止合成")
+                    return False
+        return True
+
     def auto_synthesis_single_btn_clicked(self):
         self.auto_synthesis_single_btn.setDisabled(True)
         QApplication.processEvents()
         try:
             if not self.need_synthesis():
+                return
+            if not self.check_data():
                 return
             result = self.usersettings.auto_synthesis_man.synthesis()
             self.usersettings.logger.log(result['result'])
@@ -475,6 +512,8 @@ class AutoSynthesisWindow(QMainWindow):
             self.auto_synthesis_btn.setDisabled(True)
             QApplication.processEvents()
             if self.auto_synthesis_btn.text() == "全部合成":
+                if not self.check_data():
+                    return
                 self.auto_synthesis_btn.setText("停止合成")
                 self.run_thread = SynthesisThread(
                     self.usersettings,
@@ -536,7 +575,7 @@ class AutoSynthesisWindow(QMainWindow):
         super().closeEvent(event)
 
 
-class SynthesisThread(QThread):
+class SynthesisThread(threading.Thread):
     def __init__(
         self,
         usersettings: UserSettings,
