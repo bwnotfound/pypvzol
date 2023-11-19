@@ -71,7 +71,6 @@ class AutoSynthesisMan:
         while True:
             try:
                 if interrupt_event is not None and interrupt_event.is_set():
-                    interrupt_event.clear()
                     logger.log("中止合成")
                     return
                 self.check_data(refresh_repo=refresh_repo)
@@ -232,7 +231,6 @@ class AutoSynthesisMan:
             signal_block_emit(refresh_signal)
             while not (len(self.auto_synthesis_pool_id) == 0) and length > 0:
                 if interrupt_event is not None and interrupt_event.is_set():
-                    interrupt_event.clear()
                     logger.log("中止合成")
                     return
                 if need_synthesis is not None:

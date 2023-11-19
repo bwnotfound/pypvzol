@@ -1,4 +1,4 @@
-from threading import Event
+from threading import Event, Thread
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 
-from ..wrapped import QLabel
+from ..wrapped import QLabel, WaitEventThread
 from ..user import UserSettings
 from ...utils.common import format_number
 from ...repository import Plant
@@ -26,6 +26,7 @@ from .common import ImageWindow, require_permission
 class AutoCompoundWindow(QMainWindow):
     compound_finish_signal = pyqtSignal()
     refresh_all_signal = pyqtSignal(Event)
+    compound_stoped_signal = pyqtSignal()
 
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
@@ -36,6 +37,7 @@ class AutoCompoundWindow(QMainWindow):
         self.run_thread = None
         self.refresh_all_signal.connect(self.refresh_all)
         self.compound_finish_signal.connect(self.compound_finish)
+        self.compound_stoped_signal.connect(self.compound_stoped)
         self.init_ui()
         self.refresh_all()
 
@@ -379,14 +381,14 @@ class AutoCompoundWindow(QMainWindow):
     def _check_plant(self, plant):
         result = None
         chosen_attr_name = (
-            self.usersettings.auto_synthesis_man.attribute2plant_attribute[
-                self.usersettings.auto_synthesis_man.chosen_attribute
+            self.usersettings.auto_compound_man.attribute2plant_attribute[
+                self.usersettings.auto_compound_man.chosen_attribute
             ]
         )
         for (
             attr_dict_name
-        ) in self.usersettings.auto_synthesis_man.attribute2plant_attribute.keys():
-            attr_name = self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+        ) in self.usersettings.auto_compound_man.attribute2plant_attribute.keys():
+            attr_name = self.usersettings.auto_compound_man.attribute2plant_attribute[
                 attr_dict_name
             ]
             if attr_name == chosen_attr_name:
@@ -670,16 +672,20 @@ class AutoCompoundWindow(QMainWindow):
             self.usersettings.logger.log("合成异常。异常种类：{}".format(type(e).__name__))
         finally:
             self.auto_compound_single_btn.setEnabled(True)
+            
+    def compound_stoped(self):
+        self.auto_compound_btn.setText("全部复合")
+        self.auto_compound_btn.setEnabled(True)
 
     def auto_compound_btn_clicked(self):
-        try:
-            self.auto_compound_btn.setDisabled(True)
-            QApplication.processEvents()
-            if self.auto_compound_btn.text() == "全部复合":
+        self.auto_compound_btn.setDisabled(True)
+        QApplication.processEvents()
+        if self.auto_compound_btn.text() == "全部复合":
+            try:
                 if not self.check_data():
                     return
                 self.auto_compound_btn.setText("停止复合")
-                self.run_thread = compoundThread(
+                self.run_thread = CompoundThread(
                     self.usersettings,
                     self.compound_finish_signal,
                     self.interrupt_event,
@@ -688,22 +694,24 @@ class AutoCompoundWindow(QMainWindow):
                 )
                 self.rest_event.clear()
                 self.run_thread.start()
-            elif self.auto_compound_btn.text() == "停止复合":
-                self.interrupt_event.set()
-                self.rest_event.wait()
-                self.auto_compound_btn.setText("全部复合")
-            else:
-                raise NotImplementedError(
-                    "全部复合按钮文本：{} 未知".format(self.auto_compound_btn.text())
-                )
-        finally:
+            finally:
+                self.auto_compound_btn.setEnabled(True)
+        elif self.auto_compound_btn.text() == "停止复合":
+            self.interrupt_event.set()
+            WaitEventThread(self.rest_event, self.compound_stoped_signal).start()
+        else:
             self.auto_compound_btn.setEnabled(True)
+            raise NotImplementedError(
+                "全部复合按钮文本：{} 未知".format(self.auto_compound_btn.text())
+            )
+        
 
     def compound_finish(self):
         self.usersettings.auto_compound_man.check_data()
         self.refresh_all()
         self.auto_compound_btn.setText("全部复合")
         self.run_thread = None
+        self.interrupt_event.clear()
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
@@ -735,11 +743,11 @@ class AutoCompoundWindow(QMainWindow):
     def closeEvent(self, event):
         if self.run_thread is not None:
             self.interrupt_event.set()
-            self.rest_event.wait()
+            # self.rest_event.wait()
         super().closeEvent(event)
+        
 
-
-class compoundThread(QThread):
+class CompoundThread(Thread):
     def __init__(
         self,
         usersettings: UserSettings,

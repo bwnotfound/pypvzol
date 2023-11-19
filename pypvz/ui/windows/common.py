@@ -2,6 +2,7 @@ import logging
 import threading
 from queue import Queue
 from copy import deepcopy
+import typing
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -1305,6 +1306,11 @@ class RequirePermissionWindow(QMainWindow):
     def refuse_btn_clicked(self):
         self.finish_queue.put(False)
         self.close()
+    
+    def closeEvent(self, event):
+        self.finish_queue.put(False)
+        self.close()
+        return super().closeEvent(event)
 
 
 _permission_window = []

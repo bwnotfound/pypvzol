@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ..wrapped import QLabel, signal_block_emit
+from ..wrapped import QLabel, signal_block_emit, WaitEventThread
 from ..user import UserSettings
 from ...upgrade import UpgradeMan
 
@@ -80,7 +80,7 @@ class UpgradeQualityWindow(QMainWindow):
         layout1.addWidget(upgrade_quality_btn)
 
         right_layout.addLayout(layout1)
-        
+
         pool_layout = QHBoxLayout()
         pool_layout.addWidget(QLabel("刷品并发数"))
         self.pool_size_combobox = QComboBox()
@@ -110,7 +110,7 @@ class UpgradeQualityWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
     def pool_size_combobox_current_index_changed(self):
         self.pool_size = self.pool_size_combobox.currentIndex() + 1
 
@@ -128,11 +128,15 @@ class UpgradeQualityWindow(QMainWindow):
         if event is not None:
             event.set()
 
+    def upgrade_quality_stoped(self):
+        self.upgrade_quality_btn.setText("全部刷品")
+        self.upgrade_quality_btn.setEnabled(True)
+
     def upgrade_quality_btn_clicked(self):
-        try:
-            self.upgrade_quality_btn.setDisabled(True)
-            QApplication.processEvents()
-            if self.upgrade_quality_btn.text() == "全部刷品":
+        self.upgrade_quality_btn.setDisabled(True)
+        QApplication.processEvents()
+        if self.upgrade_quality_btn.text() == "全部刷品":
+            try:
                 selected_items = self.plant_list.selectedItems()
                 if len(selected_items) == 0:
                     self.usersettings.logger.log("请先选择一个植物")
@@ -160,14 +164,14 @@ class UpgradeQualityWindow(QMainWindow):
                 )
                 self.rest_event.clear()
                 self.run_thread.start()
-            elif self.upgrade_quality_btn.text() == "中止刷品":
-                self.upgrade_quality_btn.setText("全部刷品")
-                self.interrupt_event.set()
-                self.rest_event.wait()
-            else:
-                raise RuntimeError(f"未知按钮文本：{self.upgrade_quality_btn.text()}")
-        finally:
+            finally:
+                self.upgrade_quality_btn.setEnabled(True)
+        elif self.upgrade_quality_btn.text() == "中止刷品":
+            self.interrupt_event.set()
+            WaitEventThread(self.rest_event, self.upgrade_quality_stoped).start()
+        else:
             self.upgrade_quality_btn.setEnabled(True)
+            raise RuntimeError(f"未知按钮文本：{self.upgrade_quality_btn.text()}")
 
     def upgrade_finish(self):
         self.usersettings.repo.refresh_repository()

@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ..wrapped import QLabel
+from ..wrapped import QLabel, WaitEventThread
 from ..user import UserSettings
 from ...utils.common import format_number
 from ...repository import Plant
@@ -27,6 +27,7 @@ from .common import require_permission
 class AutoSynthesisWindow(QMainWindow):
     synthesis_finish_signal = pyqtSignal()
     refresh_all_signal = pyqtSignal(Event)
+    synthesis_stoped_signal = pyqtSignal()
 
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
@@ -37,6 +38,7 @@ class AutoSynthesisWindow(QMainWindow):
         self.run_thread = None
         self.refresh_all_signal.connect(self.refresh_all)
         self.synthesis_finish_signal.connect(self.synthesis_finish)
+        self.synthesis_stoped_signal.connect(self.synthesis_stoped)
         self.init_ui()
         self.refresh_all()
 
@@ -384,7 +386,7 @@ class AutoSynthesisWindow(QMainWindow):
             self.reinforce_number_choice.currentText()
         )
 
-    def refresh_all(self, event: Event=None):
+    def refresh_all(self, event: Event = None):
         self.refresh_tool_list()
         self.refresh_plant_list()
         self.refresh_plant_pool_list()
@@ -507,11 +509,15 @@ class AutoSynthesisWindow(QMainWindow):
         finally:
             self.auto_synthesis_single_btn.setEnabled(True)
 
+    def synthesis_stoped(self):
+        self.auto_synthesis_btn.setText("全部合成")
+        self.auto_synthesis_btn.setEnabled(True)
+
     def auto_synthesis_btn_clicked(self):
-        try:
-            self.auto_synthesis_btn.setDisabled(True)
-            QApplication.processEvents()
-            if self.auto_synthesis_btn.text() == "全部合成":
+        self.auto_synthesis_btn.setDisabled(True)
+        QApplication.processEvents()
+        if self.auto_synthesis_btn.text() == "全部合成":
+            try:
                 if not self.check_data():
                     return
                 self.auto_synthesis_btn.setText("停止合成")
@@ -526,20 +532,21 @@ class AutoSynthesisWindow(QMainWindow):
                 )
                 self.rest_event.clear()
                 self.run_thread.start()
-            elif self.auto_synthesis_btn.text() == "停止合成":
-                self.interrupt_event.set()
-                self.rest_event.wait()
-                self.auto_synthesis_btn.setText("全部合成")
-            else:
-                raise NotImplementedError(
-                    "全部合成按钮文本：{} 未知".format(self.auto_synthesis_btn.text())
-                )
-        finally:
+            finally:
+                self.auto_synthesis_btn.setEnabled(True)
+        elif self.auto_synthesis_btn.text() == "停止合成":
+            self.interrupt_event.set()
+            WaitEventThread(self.rest_event, self.synthesis_stoped_signal).start()
+        else:
             self.auto_synthesis_btn.setEnabled(True)
+            raise NotImplementedError(
+                "全部合成按钮文本：{} 未知".format(self.auto_synthesis_btn.text())
+            )
 
     def synthesis_finish(self):
         self.auto_synthesis_btn.setText("全部合成")
         self.run_thread = None
+        self.interrupt_event.clear()
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
@@ -571,7 +578,7 @@ class AutoSynthesisWindow(QMainWindow):
     def closeEvent(self, event):
         if self.run_thread is not None:
             self.interrupt_event.set()
-            self.rest_event.wait()
+            # self.rest_event.wait()
         super().closeEvent(event)
 
 

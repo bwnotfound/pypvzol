@@ -33,3 +33,13 @@ def signal_block_emit(refresh_signal, *args):
     event = threading.Event()
     refresh_signal.emit(*args, event)
     event.wait()
+    
+class WaitEventThread(threading.Thread):
+    def __init__(self, event, signal):
+        super().__init__()
+        self.event = event
+        self.signal = signal
+    
+    def run(self):
+        self.event.wait()
+        self.signal.emit()
