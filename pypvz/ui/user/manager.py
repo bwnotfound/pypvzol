@@ -52,7 +52,7 @@ class AutoSynthesisMan:
         }
         self.end_mantissa = 1.0
         self.end_exponent = 0
-        self.force_synthesis = False
+        self.force_synthesis = True
 
     def check_data(self, refresh_repo=True):
         if refresh_repo:
