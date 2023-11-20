@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
 )
 from PyQt6 import QtGui
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from ..wrapped import QLabel, WaitEventThread
 from ..user import UserSettings
@@ -188,6 +188,12 @@ class AutoCompoundWindow(QMainWindow):
         )
         allow_inherite2target_layout.addWidget(self.allow_inherite2target_checkbox)
         widget3_layout.addLayout(allow_inherite2target_layout)
+
+        self.remove_abnormal_plant_btn = QPushButton("移除池中异常植物")
+        self.remove_abnormal_plant_btn.clicked.connect(
+            self.remove_abnormal_plant_btn_clicked
+        )
+        widget3_layout.addWidget(self.remove_abnormal_plant_btn)
 
         widget3_layout.addStretch(1)
         widget3.setLayout(widget3_layout)
@@ -378,7 +384,7 @@ class AutoCompoundWindow(QMainWindow):
                 )
             return message
 
-    def _check_plant(self, plant):
+    def _check_plant(self, plant, full_check=False, alert=True):
         result = None
         chosen_attr_name = (
             self.usersettings.auto_compound_man.attribute2plant_attribute[
@@ -391,7 +397,7 @@ class AutoCompoundWindow(QMainWindow):
             attr_name = self.usersettings.auto_compound_man.attribute2plant_attribute[
                 attr_dict_name
             ]
-            if attr_name == chosen_attr_name:
+            if attr_name == chosen_attr_name and not full_check:
                 continue
             attr = getattr(plant, attr_name)
             if attr > 500000000:
@@ -399,16 +405,19 @@ class AutoCompoundWindow(QMainWindow):
                 break
         else:
             result = True
-        need_continue = None
-        if not result:
-            need_continue = require_permission(
-                "植物{}部分数据超过设定，请确认是否继续：".format(
-                    self.format_plant_info(plant, full_msg=True)
+        if alert:
+            need_continue = None
+            if not result:
+                need_continue = require_permission(
+                    "植物{}部分数据超过设定，请确认是否继续：".format(
+                        self.format_plant_info(plant, full_msg=True)
+                    )
                 )
-            )
+            else:
+                need_continue = True
+            return need_continue
         else:
-            need_continue = True
-        return need_continue
+            return result
 
     def check_data(self):
         source_plant = self.usersettings.repo.get_plant(
@@ -423,10 +432,28 @@ class AutoCompoundWindow(QMainWindow):
         ):
             deputy_plant = self.usersettings.repo.get_plant(deputy_plant_id)
             if deputy_plant is not None:
-                if not self._check_plant(deputy_plant):
+                if not self._check_plant(deputy_plant, full_check=True):
                     self.usersettings.logger.log("合成数据检查出异常，停止合成")
                     return False
         return True
+
+    def remove_abnormal_plant_btn_clicked(self):
+        cnt = 0
+        for deputy_plant_id in list(
+            self.usersettings.auto_compound_man.auto_synthesis_pool_id
+        ):
+            deputy_plant = self.usersettings.repo.get_plant(deputy_plant_id)
+            if deputy_plant is None or not self._check_plant(
+                deputy_plant, full_check=True, alert=False
+            ):
+                if not self._check_plant(deputy_plant, full_check=True, alert=False):
+                    self.usersettings.auto_compound_man.auto_synthesis_pool_id.remove(
+                        deputy_plant_id
+                    )
+                    cnt += 1
+        self.usersettings.logger.log("移除了{}个异常植物".format(cnt))
+        if cnt > 0:
+            self.refresh_all()
 
     def refresh_tool_list(self):
         self.tool_list.clear()
@@ -672,7 +699,7 @@ class AutoCompoundWindow(QMainWindow):
             self.usersettings.logger.log("合成异常。异常种类：{}".format(type(e).__name__))
         finally:
             self.auto_compound_single_btn.setEnabled(True)
-            
+
     def compound_stoped(self):
         self.auto_compound_btn.setText("全部复合")
         self.auto_compound_btn.setEnabled(True)
@@ -704,7 +731,6 @@ class AutoCompoundWindow(QMainWindow):
             raise NotImplementedError(
                 "全部复合按钮文本：{} 未知".format(self.auto_compound_btn.text())
             )
-        
 
     def compound_finish(self):
         self.usersettings.auto_compound_man.check_data()
@@ -745,7 +771,7 @@ class AutoCompoundWindow(QMainWindow):
             self.interrupt_event.set()
             # self.rest_event.wait()
         super().closeEvent(event)
-        
+
 
 class CompoundThread(Thread):
     def __init__(

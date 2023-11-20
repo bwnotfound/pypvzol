@@ -54,7 +54,7 @@ class Task:
 
     def refresh_task(self):
         body = []
-        response = self.wr.amf_post(body, "api.duty.getAll", "/pvz/amf/", "刷新任务")
+        response = self.wr.amf_post_retry(body, "api.duty.getAll", "/pvz/amf/", "刷新任务")
         if response.status == 0:
             pass
         elif response.status == 1:

@@ -873,11 +873,11 @@ class SettingWindow(QMainWindow):
         territory_checkbox.setChecked(self.usersettings.territory_enabled)
         territory_checkbox.stateChanged.connect(self.territory_checkbox_stateChanged)
         territory_layout.addWidget(territory_checkbox)
-        
+
         self.territory_setting_btn = QPushButton("设置")
         self.territory_setting_btn.clicked.connect(self.territory_setting_btn_clicked)
         territory_layout.addWidget(self.territory_setting_btn)
-        
+
         territory_layout.addStretch(1)
         territory_widget.setLayout(territory_layout)
         menu_layout.addWidget(territory_widget, 5, 0)
@@ -946,9 +946,11 @@ class SettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-    
+
     def territory_setting_btn_clicked(self):
-        self.territory_setting_window = TerritorySettingWindow(self.usersettings, parent=self)
+        self.territory_setting_window = TerritorySettingWindow(
+            self.usersettings, parent=self
+        )
         self.territory_setting_window.show()
 
     def garden_setting_btn_clicked(self):
@@ -1579,11 +1581,12 @@ class LoginWindow(QMainWindow):
             self.configs.pop(cfg_index)
             self.save_config()
             self.refresh_login_user_list()
-            
+
     def closeEvent(self, event):
         if self.game_queue is not None:
             self.game_queue.put_nowait(None)
         return super().closeEvent(event)
+
 
 class GetUsersettings(threading.Thread):
     def __init__(self, cfg: Config, root_dir, finish_trigger):
@@ -1594,7 +1597,8 @@ class GetUsersettings(threading.Thread):
 
     def run(self):
         data_dir = os.path.join(
-            self.root_dir, f"data/user/{self.cfg.username}/{self.cfg.region}/{self.cfg.host}"
+            self.root_dir,
+            f"data/user/{self.cfg.username}/{self.cfg.region}/{self.cfg.host}",
         )
         os.makedirs(data_dir, exist_ok=True)
         cache_dir = os.path.join(data_dir, "cache")
