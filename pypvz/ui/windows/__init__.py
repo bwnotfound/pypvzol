@@ -6,4 +6,5 @@ from .record import RepositoryRecordWindow
 from .fuben import FubenSettingWindow
 from .garden import GardenChallengeSettingWindow
 from .territory import TerritorySettingWindow
+from .auto_pipeline import PipelineSettingWindow
 # from .flash_web import GameWindow, run_game_window

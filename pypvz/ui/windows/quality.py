@@ -18,8 +18,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from ..wrapped import QLabel, signal_block_emit, WaitEventThread
 from ..user import UserSettings
-from ...upgrade import UpgradeMan
-
+from ... import Repository, UpgradeMan, Library
 
 class UpgradeQualityWindow(QMainWindow):
     upgrade_finish_signal = pyqtSignal()
@@ -152,7 +151,9 @@ class UpgradeQualityWindow(QMainWindow):
                 )
                 self.upgrade_quality_btn.setText("中止刷品")
                 self.run_thread = UpgradeQualityThread(
-                    self.usersettings,
+                    self.usersettings.repo,
+                    self.usersettings.lib,
+                    self.usersettings.logger,
                     self.upgradeMan,
                     selected_plant_id,
                     target_quality_index,
@@ -192,7 +193,9 @@ class UpgradeQualityWindow(QMainWindow):
 class UpgradeQualityThread(Thread):
     def __init__(
         self,
-        usersettings: UserSettings,
+        repo: Repository,
+        lib: Library,
+        logger,
         upgrade_man: UpgradeMan,
         selected_plant_id,
         target_quality_index,
@@ -205,7 +208,9 @@ class UpgradeQualityThread(Thread):
         pool_size=3,
     ):
         super().__init__()
-        self.usersettings = usersettings
+        self.repo = repo
+        self.lib = lib
+        self.logger = logger
         self.upgrade_man = upgrade_man
         self.need_show_all_info = need_show_all_info
         self.selected_plant_id = selected_plant_id
@@ -222,12 +227,12 @@ class UpgradeQualityThread(Thread):
         try:
             if self.interrupt_event.is_set():
                 return True
-            plant = self.usersettings.repo.get_plant(plant_id)
+            plant = self.repo.get_plant(plant_id)
             if plant is None:
                 return True
             if plant.quality_index >= self.target_quality_index:
-                self.usersettings.logger.reverse_log(
-                    f"{plant.name(self.usersettings.lib)}({plant.grade})品质已大于等于目标品质",
+                self.logger.reverse_log(
+                    f"{plant.name(self.lib)}({plant.grade})品质已大于等于目标品质",
                     self.need_show_all_info,
                 )
                 return True
@@ -241,7 +246,7 @@ class UpgradeQualityThread(Thread):
                     try:
                         result = self.upgrade_man.upgrade_quality(plant_id)
                     except Exception as e:
-                        self.usersettings.logger.reverse_log(
+                        self.logger.reverse_log(
                             f"刷品异常，已跳过该植物，同时暂停1秒。原因种类：{type(e).__name__}",
                             self.need_show_all_info,
                         )
@@ -251,23 +256,23 @@ class UpgradeQualityThread(Thread):
                     if result['success']:
                         break
                     if result['error_type'] == 3:
-                        self.usersettings.logger.log("品质刷新书不足，已停止刷品")
+                        self.logger.log("品质刷新书不足，已停止刷品")
                         return True
                     if result['error_type'] == 6:
-                        self.usersettings.logger.reverse_log(
+                        self.logger.reverse_log(
                             "请求升品过于频繁，选择等待1秒后重试，最多再重试{}".format(max_retry - cnt),
                             self.need_show_all_info,
                         )
                         sleep(1)
                         continue
                     else:
-                        self.usersettings.logger.reverse_log(
+                        self.logger.reverse_log(
                             result['result'] + "。已跳过该植物", self.need_show_all_info
                         )
                         error_flag = True
                         break
                 else:
-                    self.usersettings.logger.reverse_log(
+                    self.logger.reverse_log(
                         "重试次数过多，放弃升级品质，跳过该植物", self.need_show_all_info
                     )
                     error_flag = True
@@ -280,19 +285,19 @@ class UpgradeQualityThread(Thread):
                 plant.quality_index = cur_quality_index
                 plant.quality_str = result['quality_name']
                 if cur_quality_index >= self.target_quality_index:
-                    self.usersettings.logger.log(
-                        f"{plant.name(self.usersettings.lib)}({plant.grade})升品完成"
+                    self.logger.log(
+                        f"{plant.name(self.lib)}({plant.grade})升品完成"
                     )
                     break
                 msg = "{}({})升品成功。当前品质：{}".format(
-                    plant.name(self.usersettings.lib),
+                    plant.name(self.lib),
                     plant.grade,
                     result['quality_name'],
                 )
-                self.usersettings.logger.reverse_log(msg, self.need_show_all_info)
+                self.logger.reverse_log(msg, self.need_show_all_info)
             signal_block_emit(self.refresh_signal)
         except Exception as e:
-            self.usersettings.logger.log(f"刷品过程中出现异常，已停止。原因种类：{type(e).__name__}")
+            self.logger.log(f"刷品过程中出现异常，已停止。原因种类：{type(e).__name__}")
             has_failure = True
         if has_failure and self.force_upgrade:
             return False
@@ -301,7 +306,7 @@ class UpgradeQualityThread(Thread):
     def upgrade_quality(self):
         plant_id_set = set(self.selected_plant_id)
         while True:
-            self.usersettings.repo.refresh_repository()
+            self.repo.refresh_repository()
             plant_id_list = list(plant_id_set)
             futures = [
                 self.pool.submit(self._upgrade_quality, plant_id)
@@ -312,7 +317,7 @@ class UpgradeQualityThread(Thread):
                     plant_id_set.remove(plant_id_list[i])
             if len(plant_id_set) == 0 or not self.force_upgrade:
                 break
-            self.usersettings.logger.log(
+            self.logger.log(
                 "刷品过程中出现异常，重启刷品，一共还剩{}个植物需重新刷品".format(len(plant_id_set))
             )
 
@@ -324,5 +329,6 @@ class UpgradeQualityThread(Thread):
             self.upgrade_quality()
         finally:
             self.pool.shutdown()
-            self.upgrade_finish_signal.emit()
+            if self.upgrade_finish_signal is not None:
+                self.upgrade_finish_signal.emit()
             self.rest_event.set()

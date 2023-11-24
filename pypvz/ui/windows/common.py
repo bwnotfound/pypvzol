@@ -239,14 +239,14 @@ class AddCaveWindow(QMainWindow):
         result = self._caves.get(format_name)
         if result is None:
             if cave_type <= 3:
-                caves = self.usersettings.caveMan.get_caves(
+                caves = self.usersettings.challenge4Level.caveMan.get_caves(
                     self.usersettings.user.id,
                     cave_type,
                     cave_layer,
                     logger=self.usersettings.logger,
                 )
             elif cave_type == 4:
-                caves = self.usersettings.caveMan.get_caves(
+                caves = self.usersettings.challenge4Level.caveMan.get_caves(
                     cave_layer, cave_type, logger=self.usersettings.logger
                 )
             else:
@@ -617,7 +617,7 @@ class ChallengeGardenCaveSetting(QMainWindow):
         if friend_id not in self.usersettings.user.friendMan.id2garden_cave:
             self.usersettings.user.friendMan.id2garden_cave[
                 friend_id
-            ] = self.usersettings.caveMan.get_garden_cave(friend_id)
+            ] = self.usersettings.challenge4Level.caveMan.get_garden_cave(friend_id)
         garden_cave = self.usersettings.user.friendMan.id2garden_cave[friend_id]
         friend = self.usersettings.user.friendMan.id2friend[friend_id]
         if garden_cave is None:

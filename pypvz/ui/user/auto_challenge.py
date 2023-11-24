@@ -33,7 +33,6 @@ class Challenge4Level:
         user: User,
         repo: Repository,
         lib: Library,
-        caveMan: CaveMan,
         free_max=10,
         logger: Logger = None,
     ):
@@ -42,7 +41,7 @@ class Challenge4Level:
         self.friendman = user.friendMan
         self.repo = repo
         self.lib = lib
-        self.caveMan = caveMan
+        self.caveMan = CaveMan(cfg, lib)
         self.recoverMan = RecoverMan(cfg, repo)
         self.logger = logger
 

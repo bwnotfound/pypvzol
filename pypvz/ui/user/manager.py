@@ -430,7 +430,7 @@ class AutoCompoundMan:
     def one_cycle_consume_check(self):
         result = []
         inherit_book_num_required = self.m + (0 if self.use_all_exchange else 1)
-        inherit_reinforce_num_required = self.k * self.m + (
+        inherit_reinforce_num_required = (10 - self.k) * self.m + (
             0 if self.use_all_exchange else 10
         )
         synthesis_book_num_required = (self.n1 + self.n2 + 1) * self.m

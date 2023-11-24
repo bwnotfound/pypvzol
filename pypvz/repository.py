@@ -191,7 +191,7 @@ class Repository:
 
     def use_item(self, tool_id, amount, lib: Library):
         body = [float(tool_id), float(amount)]
-        response = self.wr.amf_post(body, "api.tool.useOf", "/pvz/amf/", "使用物品")
+        response = self.wr.amf_post_retry(body, "api.tool.useOf", "/pvz/amf/", "使用物品")
         if response.status == 0:
             return {
                 "success": True,
@@ -207,7 +207,7 @@ class Repository:
 
     def sell_item(self, tool_id, amount, lib: Library):
         body = [float(1), float(tool_id), float(amount)]
-        response = self.wr.amf_post(body, "api.shop.sell", "/pvz/amf/", "出售物品")
+        response = self.wr.amf_post_retry(body, "api.shop.sell", "/pvz/amf/", "出售物品")
         if response.status == 0:
             return {
                 "success": True,
@@ -277,3 +277,34 @@ class Repository:
             "result": result,
             "open_amount": open_amount,
         }
+        
+    def use_tool(self, tool_id, amount, lib: Library):
+        lib_tool = lib.get_tool_by_id(tool_id)
+        if lib_tool is None:
+            return
+        if lib_tool.type == 3:
+            return self.open_box(tool_id, amount, lib)
+        else:
+            return self.use_item(tool_id, amount, lib)
+
+    # def use_all_tool(self, tool_id, lib: Library, logger=None):
+    #     repo_tool = self.get_tool(tool_id)
+    #     if repo_tool is None:
+    #         return
+    #     tool_type = lib.get_tool_by_id(tool_id).type
+    #     if tool_type == 3:
+    #         while repo_tool['amount'] > 0:
+    #             result = self.open_box(
+    #                 tool_id, 99999, self
+    #             )
+    #             if logger is not None:
+    #                 logger.log(result['result'])
+    #             if not result['success']:
+    #                 break
+    #             repo_tool['amount'] -= result['open_amount']
+    #     else:
+    #         result = self.use_item(
+    #             tool_id, repo_tool['amount'], self
+    #         )
+    #         if logger is not None:
+    #             logger.log(result['result'])

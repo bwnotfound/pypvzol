@@ -713,7 +713,7 @@ class AutoCompoundWindow(QMainWindow):
                     return
                 self.auto_compound_btn.setText("停止复合")
                 self.run_thread = CompoundThread(
-                    self.usersettings,
+                    self.usersettings.auto_compound_man,
                     self.compound_finish_signal,
                     self.interrupt_event,
                     self.refresh_all_signal,
@@ -776,14 +776,14 @@ class AutoCompoundWindow(QMainWindow):
 class CompoundThread(Thread):
     def __init__(
         self,
-        usersettings: UserSettings,
+        auto_compound_man,
         compound_finish_signal,
         interrupt_event: Event,
         refresh_all_signal,
         rest_event: Event,
     ):
         super().__init__()
-        self.usersettings = usersettings
+        self.auto_compound_man = auto_compound_man
         self.compound_finish_signal = compound_finish_signal
         self.interrupt_event = interrupt_event
         self.refresh_all_signal = refresh_all_signal
@@ -791,7 +791,7 @@ class CompoundThread(Thread):
 
     def run(self):
         try:
-            self.usersettings.auto_compound_man.compound_loop(
+            self.auto_compound_man.compound_loop(
                 self.interrupt_event, self.refresh_all_signal
             )
         finally:

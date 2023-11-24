@@ -53,6 +53,7 @@ from pypvz.ui.windows import (
     FubenSettingWindow,
     GardenChallengeSettingWindow,
     TerritorySettingWindow,
+    PipelineSettingWindow,
     # GameWindow,
     # run_game_window,
 )
@@ -1094,22 +1095,30 @@ class FunctionPanelWindow(QMainWindow):
         compound_btn = QPushButton("自动复合面板")
         compound_btn.clicked.connect(self.compound_btn_clicked)
         menu_layout.addWidget(compound_btn, 4, 0)
+        
+        auto_pipeline_btn = QPushButton("全自动面板")
+        auto_pipeline_btn.clicked.connect(self.auto_pipeline_btn_clicked)
+        menu_layout.addWidget(auto_pipeline_btn, 5, 0)
 
         plant_relative_btn = QPushButton("植物相关面板")
         plant_relative_btn.clicked.connect(self.plant_relative_btn_clicked)
-        menu_layout.addWidget(plant_relative_btn, 5, 0)
+        menu_layout.addWidget(plant_relative_btn, 6, 0)
 
         repository_tool_record_btn = QPushButton("仓库物品记录面板")
         repository_tool_record_btn.clicked.connect(
             self.repository_tool_record_btn_clicked
         )
-        menu_layout.addWidget(repository_tool_record_btn, 6, 0)
+        menu_layout.addWidget(repository_tool_record_btn, 7, 0)
 
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def auto_pipeline_btn_clicked(self):
+        self.auto_pipeline_window = PipelineSettingWindow(self.usersettings, parent=self)
+        self.auto_pipeline_window.show()
 
     def repository_tool_record_btn_clicked(self):
         self.repository_tool_record_window = RepositoryRecordWindow(
@@ -1629,18 +1638,11 @@ def get_usersettings(cfg: Config, logger: IOLogger, setting_dir):
     lib: Library = futures[1].result()
     repo: Repository = futures[2].result()
 
-    # user: User = User(cfg)
-    # lib: Library = Library(cfg)
-    # repo: Repository = Repository(cfg)
-
-    caveMan: CaveMan = CaveMan(cfg, lib)
-
     usersettings = UserSettings(
         cfg,
         repo,
         lib,
         user,
-        caveMan,
         logger,
         setting_dir,
     )

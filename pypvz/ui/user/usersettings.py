@@ -11,7 +11,6 @@ from ... import (
     Repository,
     Library,
     User,
-    CaveMan,
     Task,
     ArenaMan,
     HeritageMan,
@@ -29,6 +28,7 @@ from .manager import (
     DailyMan,
     GardenMan,
 )
+from . import PipelineMan
 
 
 class UserSettings:
@@ -38,7 +38,6 @@ class UserSettings:
         repo: Repository,
         lib: Library,
         user: User,
-        caveMan: CaveMan,
         logger: IOLogger,
         save_dir=None,
     ):
@@ -47,16 +46,13 @@ class UserSettings:
         self.repo = repo
         self.lib = lib
         self.user = user
-        self.caveMan = caveMan
         self.save_dir = save_dir
         self.io_logger = logger
         self.logger = logger.new_logger()
         self.stop_channel = Queue()
         self.start_thread = None
 
-        self.challenge4Level = Challenge4Level(
-            cfg, user, repo, lib, caveMan, logger=self.logger
-        )
+        self.challenge4Level = Challenge4Level(cfg, user, repo, lib, logger=self.logger)
         self.challenge4Level_enabled = True
         self.shop_enabled = False
 
@@ -87,6 +83,8 @@ class UserSettings:
         self.daily_man = DailyMan(cfg, self.logger)
         self.garden_man = GardenMan(cfg, repo, lib, self.logger)
         self.garden_enabled = False
+        
+        self.pipeline_man = PipelineMan(cfg, lib, repo, user, self.logger)
 
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
         self.repo.refresh_repository(self.logger)
@@ -278,6 +276,7 @@ class UserSettings:
         self.fuben_man.save(self.save_dir)
         self.territory_man.save(self.save_dir)
         self.garden_man.save(self.save_dir)
+        self.pipeline_man.save(self.save_dir)
 
     def load(self):
         self.challenge4Level.load(self.save_dir)
@@ -299,3 +298,4 @@ class UserSettings:
         self.fuben_man.load(self.save_dir)
         self.territory_man.load(self.save_dir)
         self.garden_man.load(self.save_dir)
+        self.pipeline_man.load(self.save_dir)
