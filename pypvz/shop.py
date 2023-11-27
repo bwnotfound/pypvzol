@@ -11,6 +11,10 @@ class Good:
         self.num = int(root['num'])
         self.price = int(root['price'])
         self.shop_type = shop_type
+    
+    @property
+    def is_plant(self):
+        return self.type == 'organisms'
 
 class PurchaseItem:
     def __init__(self, good: Good, amount: int):
@@ -63,6 +67,8 @@ class Shop:
         body = [float(item_id), float(amount)]
         response = self.wr.amf_post_retry(body, "api.shop.buy", "/pvz/amf/", "购买物品")
         if response.status == 0:
-            return {"success": True, "result": response.body}
+            if response.body['status'] == 'success':
+                return {"success": True, "result": response.body}
+            return {"success": False, "result": response.body['status']}
         else:
             return {"success": False, "result": response.body.description}

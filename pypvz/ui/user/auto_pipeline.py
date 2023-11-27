@@ -27,20 +27,6 @@ class Pipeline:
         pass
 
 
-class _PurchaseItem:
-    def __init__(self, root, amount):
-        self.amount = amount
-        self.id = root['id']
-        if root['type'] == "organisms":
-            self.pid = root['p_id']
-            self.type = 0
-        elif root['type'] == "tool":
-            self.tool_id = root['tool_id']
-            self.type = 1
-        else:
-            raise NotImplementedError
-
-
 class Purchase(Pipeline):
     def __init__(self, cfg: Config, lib: Library, repo: Repository, logger: Logger):
         super().__init__("购买植物")
@@ -54,37 +40,18 @@ class Purchase(Pipeline):
         self.shop = Shop(cfg)
         self.shop_auto_buy_dict: dict[int, PurchaseItem] = dict()
 
-        self.purchase_plant_list: list[_PurchaseItem] = []
-
-    def purchase(self, item: _PurchaseItem):
-        body = [float(item.id), float(item.amount)]
-        response = self.wr.amf_post_retry(
-            body,
-            "api.shop.buy",
-            "/pvz/amf/",
-            "购买物品",
-            logger=self.logger,
-        )
-        if response.status == 0 and response.body['status'] == 'success':
-            return {
-                "success": True,
-                "result": str(response.body),
-            }
-        else:
-            return {
-                "success": False,
-                "result": str(response.body),
-            }
+    def purchase(self, item: PurchaseItem):
+        return self.shop.buy(item.good.id, item.amount)
 
     def run(self, stop_channel: Queue):
         pre_id2plant = self.repo.id2plant
-        for item in self.purchase_plant_list:
+        for purchase_item in self.shop_auto_buy_dict.values():
             if stop_channel.qsize() != 0:
                 return {
                     "success": False,
                     "info": "用户终止",
                 }
-            result = self.purchase(item)
+            result = self.purchase(purchase_item)
 
             if not result['success']:
                 self.logger.log()
@@ -94,31 +61,32 @@ class Purchase(Pipeline):
                 }
         self.repo.refresh_repository()
         purchased_plant_list = []
-        for item in self.purchase_plant_list:
+        for purchase_item in self.shop_auto_buy_dict.values():
             if stop_channel.qsize() != 0:
                 return {
                     "success": False,
                     "info": "用户终止",
                 }
-            if item.type != 0:
+            good = purchase_item.good
+            if not good.is_plant:
                 continue
             pre_len = len(purchased_plant_list)
             for plant in self.repo.plants:
-                if plant.pid == item.pid and plant.id not in pre_id2plant:
+                if plant.pid == good.p_id and plant.id not in pre_id2plant:
                     purchased_plant_list.append(plant)
-            if item.amount != len(purchased_plant_list) - pre_len:
+            if purchase_item.amount != len(purchased_plant_list) - pre_len:
                 return {
                     "success": False,
                     "info": "购买失败，原因：尝试购买{}，预计购买{}个，实际购买{}个".format(
-                        self.lib.get_plant_by_id(item.pid).name,
-                        item.amount,
+                        self.lib.get_plant_by_id(good.p_id).name,
+                        purchase_item.amount,
                         len(purchased_plant_list) - pre_len,
                     ),
                 }
         return {
             "success": True,
             "info": "购买成功",
-            "result": [item for item in self.purchase_plant_list if item.type == 0],
+            "result": purchased_plant_list,
         }
 
     def setting_window(self):
@@ -132,13 +100,12 @@ class Purchase(Pipeline):
 class OpenBox(Pipeline):
     def __init__(self, cfg: Config, lib: Library, repo: Repository, logger: Logger):
         super().__init__("开魔神箱")
-
         self.cfg = cfg
         self.lib = lib
         self.repo = repo
         self.logger = logger
 
-        self.box_id = 0
+        self.box_id = 756
         self.amount = 0
 
     def use_tool(self):
@@ -147,6 +114,11 @@ class OpenBox(Pipeline):
     def run(self, stop_channel: Queue):
         pre_id2plant = self.repo.id2plant
         result = self.repo.use_tool(self.box_id, self.amount, self.lib)
+        if result is None:
+            return {
+                "success": False,
+                "info": "使用物品失败，原因：未知",
+            }
         if not result['success']:
             return {
                 "success": False,

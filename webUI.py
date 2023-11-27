@@ -5,8 +5,7 @@ import os
 import logging
 import concurrent.futures
 import threading
-import multiprocessing
-import typing
+import shutil
 
 from PyQt6 import QtGui
 from PyQt6.QtWidgets import (
@@ -1588,12 +1587,42 @@ class LoginWindow(QMainWindow):
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Backspace or event.key() == Qt.Key.Key_Delete:
             if len(self.login_user_list.selectedItems()) == 0:
+                logging.warning("未选中任何用户")
                 return
-            assert len(self.login_user_list.selectedItems()) == 1
-            cfg_index = self.login_user_list.selectedItems()[0].data(
-                Qt.ItemDataRole.UserRole
-            )
-            self.configs.pop(cfg_index)
+            cfg_indices = [
+                item.data(Qt.ItemDataRole.UserRole)
+                for item in self.login_user_list.selectedItems()
+            ]
+            new_configs = []
+            for i in range(len(self.configs)):
+                if i not in cfg_indices:
+                    new_configs.append(self.configs[i])
+                else:
+                    logging.info(f"删除用户: {self.configs[i]['username']}")
+                    shutil.rmtree(
+                        os.path.join(
+                            root_dir,
+                            f"data/user/{self.configs[i]['username']}/{self.configs[i]['region']}",
+                        )
+                    )
+                    if (
+                        len(
+                            os.listdir(
+                                os.path.join(
+                                    root_dir,
+                                    f"data/user/{self.configs[i]['username']}",
+                                )
+                            )
+                        )
+                        == 0
+                    ):
+                        shutil.rmtree(
+                            os.path.join(
+                                root_dir,
+                                f"data/user/{self.configs[i]['username']}",
+                            )
+                        )
+            self.configs = new_configs
             self.save_config()
             self.refresh_login_user_list()
 
