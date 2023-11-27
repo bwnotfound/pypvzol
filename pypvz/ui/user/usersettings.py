@@ -42,7 +42,7 @@ class UserSettings:
         save_dir=None,
     ):
         self.cfg = cfg
-        self.friendman = user.friendMan
+        self.friendMan = user.friendMan
         self.repo = repo
         self.lib = lib
         self.user = user
@@ -86,7 +86,7 @@ class UserSettings:
         
         self.pipeline_man = PipelineMan(cfg, lib, repo, user, self.logger)
 
-    def _start(self, stop_channel: Queue, finished_trigger: Queue):
+    def _start(self, stop_channel: Queue):
         self.repo.refresh_repository(self.logger)
         while stop_channel.qsize() == 0:
             # if self.shop_enabled:
@@ -211,13 +211,12 @@ class UserSettings:
                 if stop_channel.qsize() > 0:
                     break
                 time.sleep(1)
-        finished_trigger.emit()
 
-    def start(self, finished_trigger):
+    def start(self):
         if self.start_thread is None or not self.start_thread.is_alive():
             self.start_thread = threading.Thread(
                 target=self._start,
-                args=(self.stop_channel, finished_trigger),
+                args=(self.stop_channel, ),
             )
             self.start_thread.start()
 

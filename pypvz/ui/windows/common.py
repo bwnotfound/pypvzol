@@ -29,9 +29,10 @@ from ..user import UserSettings
 from ...upgrade import SkillStoneMan
 from ...utils.common import format_number
 from ...repository import Plant
-from ...shop import Shop
 from ..message import Logger
-from ...shop import Good
+from ..user.auto_challenge import Challenge4Level
+
+from ... import Config, Library, User
 
 
 class SetPlantListWindow(QMainWindow):
@@ -98,9 +99,19 @@ class SetPlantListWindow(QMainWindow):
 class AddCaveWindow(QMainWindow):
     cave_add_update: pyqtSignal = pyqtSignal()
 
-    def __init__(self, usersettings: UserSettings, parent=None):
+    def __init__(
+        self,
+        cfg: Config,
+        user: User,
+        logger: Logger,
+        challenge4Level: Challenge4Level,
+        parent=None,
+    ):
         super().__init__(parent=parent)
-        self.usersettings = usersettings
+        self.cfg = cfg
+        self.user = user
+        self.logger = logger
+        self.challenge4Level = challenge4Level
         self.init_ui()
         self.refresh_cave_list()
 
@@ -146,13 +157,11 @@ class AddCaveWindow(QMainWindow):
         self.difficulty_choice.setCurrentIndex(2)
         widget3_1_layout.addWidget(self.difficulty_choice)
         widget3_layout.addLayout(widget3_1_layout)
-        if self.usersettings.cfg.server == "私服":
-            result = self.usersettings.challenge4Level.caveMan.switch_garden_layer(
-                1, self.usersettings.logger
-            )
+        if self.cfg.server == "私服":
+            result = self.challenge4Level.caveMan.switch_garden_layer(1, self.logger)
             widget3_2_layout = QHBoxLayout()
             widget3_2_layout.addWidget(QLabel("选择花园层级:"))
-            self.usersettings.logger.log(result["result"])
+            self.logger.log(result["result"])
             if not result["success"]:
                 self.close()
             self.current_garden_layer_choice = QComboBox()
@@ -214,7 +223,7 @@ class AddCaveWindow(QMainWindow):
         if cave_type <= 3:
             for cave in caves:
                 if cave.cave_id is None:
-                    self.usersettings.logger.log("洞口{}异常".format(cave.format_name()))
+                    self.logger.log("洞口{}异常".format(cave.format_name()))
                     break
                 item = QListWidgetItem(cave.format_name())
                 item.setData(Qt.ItemDataRole.UserRole, cave)
@@ -228,29 +237,27 @@ class AddCaveWindow(QMainWindow):
             raise NotImplementedError
 
     def current_garden_layer_choice_currentIndexChanged(self, index):
-        self.usersettings.challenge4Level.caveMan.switch_garden_layer(
-            index + 1, self.usersettings.logger
-        )
+        self.challenge4Level.caveMan.switch_garden_layer(index + 1, self.logger)
         self.refresh_cave_list()
 
     def get_caves(self, cave_type, cave_layer):
         if not hasattr(self, "_caves"):
             self._caves = {}
         format_name = "{}-{}".format(cave_type, cave_layer)
-        if self.usersettings.cfg.server == "私服" and cave_type <= 3:
+        if self.cfg.server == "私服" and cave_type <= 3:
             format_name += "-{}".format(self.current_garden_layer_choice.currentIndex())
         result = self._caves.get(format_name)
         if result is None:
             if cave_type <= 3:
-                caves = self.usersettings.challenge4Level.caveMan.get_caves(
-                    self.usersettings.user.id,
+                caves = self.challenge4Level.caveMan.get_caves(
+                    self.user.id,
                     cave_type,
                     cave_layer,
-                    logger=self.usersettings.logger,
+                    logger=self.logger,
                 )
             elif cave_type == 4:
-                caves = self.usersettings.challenge4Level.caveMan.get_caves(
-                    cave_layer, cave_type, logger=self.usersettings.logger
+                caves = self.challenge4Level.caveMan.get_caves(
+                    cave_layer, cave_type, logger=self.logger
                 )
             else:
                 raise NotImplementedError
@@ -263,14 +270,14 @@ class AddCaveWindow(QMainWindow):
 
     def cave_list_widget_clicked(self, item: QListWidgetItem):
         cave = item.data(Qt.ItemDataRole.UserRole)
-        if self.usersettings.cfg.server == "私服":
-            self.usersettings.challenge4Level.add_cave(
+        if self.cfg.server == "私服":
+            self.challenge4Level.add_cave(
                 cave,
                 difficulty=self.difficulty_choice.currentIndex() + 1,
                 garden_layer=self.current_garden_layer_choice.currentIndex() + 1,
             )
         else:
-            self.usersettings.challenge4Level.add_cave(
+            self.challenge4Level.add_cave(
                 cave, difficulty=self.difficulty_choice.currentIndex() + 1
             )
         self.cave_add_update.emit()

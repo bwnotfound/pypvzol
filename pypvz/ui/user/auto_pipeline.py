@@ -203,6 +203,19 @@ class AutoChallenge(Pipeline):
                 }
         return {"success": True, "info": "挑战成功", "result": plant_list}
 
+    def setting_window(self):
+        from ..windows import ShopAutoBuySetting
+
+        return ShopAutoBuySetting(
+            self.lib, self.shop, self.logger, self.shop_auto_buy_dict
+        )
+
+    def has_setting_window(self):
+        return True
+
+    def serialize(self):
+        return {"shop_auto_buy_dict": self.shop_auto_buy_dict}
+
 
 class UpgradeQuality(Pipeline):
     def __init__(self, cfg: Config, lib: Library, repo: Repository, logger: Logger):

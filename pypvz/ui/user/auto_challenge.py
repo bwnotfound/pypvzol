@@ -38,7 +38,7 @@ class Challenge4Level:
     ):
         self.cfg = cfg
         self.user = user
-        self.friendman = user.friendMan
+        self.friendMan = user.friendMan
         self.repo = repo
         self.lib = lib
         self.caveMan = CaveMan(cfg, lib)
@@ -88,7 +88,7 @@ class Challenge4Level:
             elif friend_ids is None:
                 grade = cave.open_grade
                 friend_ids = []
-                for i, friend in enumerate(self.friendman.friends):
+                for i, friend in enumerate(self.friendMan.friends):
                     if friend.grade < grade or (cave.type != 2 and i > 0):
                         break
                     friend_ids.append(friend.id)
@@ -426,7 +426,7 @@ class Challenge4Level:
                     if not success:
                         return
                 difficulty = sc.difficulty
-                friend = self.friendman.id2friend[friend_id]
+                friend = self.friendMan.id2friend[friend_id]
 
                 message = "挑战{}({}) {}".format(
                     friend.name,
