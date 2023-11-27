@@ -525,7 +525,14 @@ class FunctionPanelWindow(QMainWindow):
         self.repository_tool_record_window.show()
 
     def compound_btn_clicked(self):
-        self.compound_window = AutoCompoundWindow(self.usersettings, parent=self)
+        self.compound_window = AutoCompoundWindow(
+            self.usersettings.cfg,
+            self.usersettings.lib,
+            self.usersettings.repo,
+            self.usersettings.logger,
+            self.usersettings.auto_compound_man,
+            parent=self,
+        )
         self.compound_window.show()
 
     def plant_relative_btn_clicked(self):

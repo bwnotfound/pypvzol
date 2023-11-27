@@ -1,3 +1,6 @@
+from threading import Event
+from queue import Queue
+
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -8,6 +11,7 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QComboBox,
     QLineEdit,
+    QApplication,
 )
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -15,12 +19,20 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from ...wrapped import QLabel
 from ...user import UserSettings
 from ...user import PipelineScheme, Pipeline
+from .run_thread import RunSchemeThread
+from ...wrapped import WaitEventThread
 
 
 class PipelineSettingWindow(QMainWindow):
+    finish_signal = pyqtSignal()
+    stop_signal = pyqtSignal()
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
         self.usersettings = usersettings
+        self.stop_queue = Queue()
+        self.rest_event = Event()
+        self.finish_signal.connect(self.finish_signal_handler)
+        self.stop_signal.connect(self.stop_handler)
         self.init_ui()
         self.refresh_scheme_list()
 
@@ -61,6 +73,11 @@ class PipelineSettingWindow(QMainWindow):
         self.scheme_rename_btn = QPushButton("重命名方案")
         self.scheme_rename_btn.clicked.connect(self.scheme_rename_btn_clicked)
         self.scheme_choose_layout.addWidget(self.scheme_rename_btn)
+        self.scheme_choose_layout.addWidget(QLabel("\n"))
+
+        self.start_btn = QPushButton("开始")
+        self.start_btn.clicked.connect(self.start_btn_clicked)
+        self.scheme_choose_layout.addWidget(self.start_btn)
 
         self.scheme_choose_widget.setLayout(self.scheme_choose_layout)
         self.main_layout.addWidget(self.scheme_choose_widget)
@@ -80,6 +97,13 @@ class PipelineSettingWindow(QMainWindow):
     def choose_scheme(self, scheme: PipelineScheme):
         self.scheme_widget.switch_scheme(scheme)
 
+    def current_scheme(self):
+        items = self.scheme_list.selectedItems()
+        if len(items) == 0:
+            return None
+        item = items[0]
+        return item.data(Qt.ItemDataRole.UserRole)
+
     def scheme_list_item_clicked(self, item: QListWidgetItem):
         scheme = item.data(Qt.ItemDataRole.UserRole)
         self.scheme_name_inputbox.setText(scheme.name)
@@ -90,19 +114,58 @@ class PipelineSettingWindow(QMainWindow):
         self.refresh_scheme_list()
 
     def scheme_remove_btn_clicked(self):
+        scheme = self.current_scheme()
+        if scheme is None:
+            self.usersettings.logger.log("未选中任何方案")
+            return
         self.usersettings.pipeline_man.remove_scheme(
-            self.scheme_list.currentItem().data(Qt.ItemDataRole.UserRole)
+            scheme
         )
 
     def scheme_rename_btn_clicked(self):
-        if self.scheme_list.currentItem() is None:
+        scheme = self.current_scheme()
+        if scheme is None:
             self.usersettings.logger.log("未选中任何方案")
             return
-        self.scheme_list.currentItem().data(
-            Qt.ItemDataRole.UserRole
-        ).name = self.scheme_name_inputbox.text()
+        scheme.name = self.scheme_name_inputbox.text()
         self.refresh_scheme_list()
 
+    def start_btn_clicked(self):
+        scheme = self.current_scheme()
+        if scheme is None:
+            self.usersettings.logger.log("未选中任何方案")
+            return
+        self.start_btn.setDisabled(True)
+        QApplication.processEvents()
+        if self.start_btn.text() == "开始":
+            try:
+                self.start_btn.setText("停止")
+                self.run_thread = RunSchemeThread(
+                    scheme,
+                    self.stop_queue,
+                    self.finish_signal,
+                    self.rest_event,
+                )
+                self.rest_event.clear()
+                self.run_thread.start()
+            finally:
+                self.start_btn.setEnabled(True)
+        elif self.start_btn.text() == "停止":
+            self.stop_queue.put(True)
+            WaitEventThread(self.rest_event, self.stop_signal).start()
+        else:
+            self.start_btn.setEnabled(True)
+            raise NotImplementedError("开始全自动按钮文本：{} 未知".format(self.start_btn.text()))
+
+    def stop_handler(self):
+        self.start_btn.setText("开始")
+        self.start_btn.setEnabled(True)
+
+    def finish_signal_handler(self):
+        self.start_btn.setText("开始")
+        self.run_thread = None
+        while self.stop_queue.qsize() > 0:
+            self.stop_queue.get()
 
 class SchemeWidget(QWidget):
     change_pipeline1_choice_index_signal = pyqtSignal(int)
@@ -146,7 +209,7 @@ class SchemeWidget(QWidget):
         )
         self.pipeline1_widget.setFixedWidth(int(self.width() * 0.25))
         self.main_layout.addWidget(self.pipeline1_widget)
-        
+
         self.pipeline2_widget = PipelineSettingWidget(
             "第二步\n设置练级",
             self.pipeline_scheme.pipeline2,
@@ -157,43 +220,25 @@ class SchemeWidget(QWidget):
         self.pipeline2_widget.setFixedWidth(int(self.width() * 0.25))
         self.main_layout.addWidget(self.pipeline2_widget)
 
-        pipeline3_layout = QVBoxLayout()
-        pipeline3_layout.addStretch(1)
-        info_label = QLabel("第三步\n选择对植物进行怎样的处理")
-        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pipeline3_layout.addWidget(info_label)
-        self.pipeline3_combobox = QComboBox()
-        for pipeline in self.pipeline_scheme.pipeline3:
-            self.pipeline3_combobox.addItem(pipeline.name)
-        self.pipeline3_combobox.setCurrentIndex(
-            self.pipeline_scheme.pipeline3_choice_index
+        self.pipeline3_widget = PipelineSettingWidget(
+            "第三步\n选择对植物进行怎样的处理",
+            self.pipeline_scheme.pipeline3,
+            self.pipeline_scheme.pipeline3_choice_index,
+            self.change_pipeline3_choice_index_signal,
+            self,
         )
-        pipeline3_layout.addWidget(self.pipeline3_combobox)
+        self.pipeline3_widget.setFixedWidth(int(self.width() * 0.25))
+        self.main_layout.addWidget(self.pipeline3_widget)
 
-        # self.pipeline3_setting_btn = QPushButton("设置")
-        # self.pipeline3_setting_btn.clicked.connect(self.pipeline3_setting_btn_clicked)
-        # pipeline3_layout.addWidget(self.pipeline3_combobox)
-        pipeline3_layout.addStretch(1)
-        self.main_layout.addLayout(pipeline3_layout)
-
-        pipeline4_layout = QVBoxLayout()
-        pipeline4_layout.addStretch(1)
-        info_label = QLabel("第四步\n选择如何最后消耗植物")
-        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pipeline4_layout.addWidget(info_label)
-        self.pipeline4_combobox = QComboBox()
-        for pipeline in self.pipeline_scheme.pipeline4:
-            self.pipeline4_combobox.addItem(pipeline.name)
-        self.pipeline4_combobox.setCurrentIndex(
-            self.pipeline_scheme.pipeline4_choice_index
+        self.pipeline4_widget = PipelineSettingWidget(
+            "第四步\n选择如何最后消耗植物",
+            self.pipeline_scheme.pipeline4,
+            self.pipeline_scheme.pipeline4_choice_index,
+            self.change_pipeline4_choice_index_signal,
+            self,
         )
-        pipeline4_layout.addWidget(self.pipeline4_combobox)
-
-        # self.pipeline4_setting_btn = QPushButton("设置")
-        # self.pipeline4_setting_btn.clicked.connect(self.pipeline4_setting_btn_clicked)
-        # pipeline4_layout.addWidget(self.pipeline4_combobox)
-        pipeline4_layout.addStretch(1)
-        self.main_layout.addLayout(pipeline4_layout)
+        self.pipeline4_widget.setFixedWidth(int(self.width() * 0.25))
+        self.main_layout.addWidget(self.pipeline4_widget)
 
     def change_pipeline1_choice_index(self, index):
         self.pipeline_scheme.pipeline1_choice_index = index

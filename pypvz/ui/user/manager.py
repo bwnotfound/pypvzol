@@ -699,39 +699,48 @@ class AutoCompoundMan:
         self.logger.log("复合完成")
 
     def save(self, save_dir):
-        save_path = os.path.join(save_dir, "user_auto_compound_man")
-        self.check_data(False)
-        with open(save_path, "wb") as f:
-            pickle.dump(
-                {
-                    "liezhi_plant_id": self.liezhi_plant_id,
-                    "receiver_plant_id": self.receiver_plant_id,
-                    "source_plant_id": self.source_plant_id,
-                    "use_all_exchange": self.use_all_exchange,
-                    "auto_synthesis_pool_id": self.auto_synthesis_pool_id,
-                    "n1": self.n1,
-                    "n2": self.n2,
-                    "k": self.k,
-                    "m": self.m,
-                    "chosen_attribute": self.chosen_attribute,
-                    "end_mantissa": self.end_mantissa,
-                    "end_exponent": self.end_exponent,
-                    "force_compound": self.force_compound,
-                    "allow_inherite2target": self.allow_inherite2target,
-                },
-                f,
-            )
+        d = {
+            "liezhi_plant_id": self.liezhi_plant_id,
+            "receiver_plant_id": self.receiver_plant_id,
+            "source_plant_id": self.source_plant_id,
+            "use_all_exchange": self.use_all_exchange,
+            "auto_synthesis_pool_id": self.auto_synthesis_pool_id,
+            "n1": self.n1,
+            "n2": self.n2,
+            "k": self.k,
+            "m": self.m,
+            "chosen_attribute": self.chosen_attribute,
+            "end_mantissa": self.end_mantissa,
+            "end_exponent": self.end_exponent,
+            "force_compound": self.force_compound,
+            "allow_inherite2target": self.allow_inherite2target,
+        }
+        if save_dir is not None:
+            save_path = os.path.join(save_dir, "user_auto_compound_man")
+            self.check_data(False)
+            with open(save_path, "wb") as f:
+                pickle.dump(
+                    d,
+                    f,
+                )
+        return d
 
     def load(self, load_dir):
-        load_path = os.path.join(load_dir, "user_auto_compound_man")
-        if os.path.exists(load_path):
-            with open(load_path, "rb") as f:
-                d = pickle.load(f)
-            for k, v in d.items():
-                if hasattr(self, k):
-                    setattr(self, k, v)
-            self.set_force_compound(self.force_compound)
-            self.set_chosen_attribute(self.chosen_attribute)
+        if isinstance(load_dir, dict):
+            d = load_dir
+        else:
+            load_path = os.path.join(load_dir, "user_auto_compound_man")
+            if os.path.exists(load_path):
+                with open(load_path, "rb") as f:
+                    d = pickle.load(f)
+
+            else:
+                d = {}
+        for k, v in d.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+        self.set_force_compound(self.force_compound)
+        self.set_chosen_attribute(self.chosen_attribute)
         self.check_data(False)
 
 

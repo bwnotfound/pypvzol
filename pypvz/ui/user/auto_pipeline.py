@@ -7,7 +7,6 @@ from ... import (
     Config,
     Repository,
     Library,
-    WebRequest,
     User,
 )
 from ..message import Logger
@@ -36,12 +35,20 @@ class Pipeline:
         return None
 
     def serialize(self):
-        return None
+        return {}
 
     def deserialize(self, d):
         for k, v in d.items():
             if hasattr(self, k):
                 setattr(self, k, v)
+
+
+class SkipPipeline(Pipeline):
+    def __init__(self):
+        super().__init__("跳过")
+
+    def run(self, plant_list, stop_channel: Queue):
+        return {"success": True, "info": "跳过成功", "result": plant_list}
 
 
 class Purchase(Pipeline):
@@ -223,7 +230,7 @@ class AutoChallenge(Pipeline):
             "repeat_time": self.repeat_time,
             "auto_challenge": self.challenge4level.save(None),
         }
-    
+
     def deserialize(self, d):
         for k, v in d.items():
             if hasattr(self, k):
@@ -314,10 +321,12 @@ class AutoComponent(Pipeline):
             self.auto_component_man.auto_synthesis_pool_id.add(plant.id)
         from ..windows.compound import CompoundThread
 
+        self.rest_event.clear()
         self.component_theard = CompoundThread(
             self.auto_component_man,
             None,
             self.interrupt_event,
+            None,
             self.rest_event,
         )
         self.component_theard.start()
@@ -331,17 +340,41 @@ class AutoComponent(Pipeline):
                 "info": "用户终止",
             }
         self.repo.refresh_repository()
+        rest_plant_list = []
         for plant in plant_list:
             if self.repo.get_plant(plant.id) is not None:
-                return {
-                    "success": False,
-                    "info": "复合失败，原因：植物{}本应被吃但仍然存在".format(plant.name(self.lib)),
-                }
+                rest_plant_list.append(plant)
+        if len(rest_plant_list) != 1:
+            return {
+                "success": False,
+                "info": "复合失败，原因：本应被吃的植物仍然存在",
+            }
         return {
             "success": True,
             "info": "复合成功",
-            "result": plant_list,
         }
+
+    def has_setting_window(self):
+        return True
+
+    def setting_window(self):
+        from ..windows import AutoCompoundWindow
+
+        return AutoCompoundWindow(
+            self.cfg, self.lib, self.repo, self.logger, self.auto_component_man
+        )
+
+    def serialize(self):
+        return {
+            "auto_compound": self.auto_component_man.save(None),
+        }
+
+    def deserialize(self, d):
+        for k, v in d.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+        if 'auto_compound' in d:
+            self.auto_component_man.load(d['auto_compound'])
 
 
 class PipelineScheme:
@@ -363,7 +396,10 @@ class PipelineScheme:
         self.pipeline2: list[Pipeline] = [AutoChallenge(cfg, lib, repo, user, logger)]
         self.pipeline2_choice_index = 0
 
-        self.pipeline3: list[Pipeline] = [UpgradeQuality(cfg, lib, repo, logger)]
+        self.pipeline3: list[Pipeline] = [
+            UpgradeQuality(cfg, lib, repo, logger),
+            SkipPipeline(),
+        ]
         self.pipeline3_choice_index = 0
 
         self.pipeline4: list[Pipeline] = [AutoComponent(cfg, lib, repo, logger)]
@@ -373,6 +409,9 @@ class PipelineScheme:
         cnt = 0
         while True:
             cnt += 1
+            if stop_channel.qsize() != 0:
+                self.logger.log("用户终止")
+                return
             result = self.pipeline1[self.pipeline1_choice_index].run(stop_channel)
             if stop_channel.qsize() != 0:
                 self.logger.log("用户终止")
@@ -418,8 +457,8 @@ class PipelineScheme:
             "pipeline4_choice_index": self.pipeline4_choice_index,
             "pipeline1_serialized": {p.name: p.serialize() for p in self.pipeline1},
             "pipeline2_serialized": {p.name: p.serialize() for p in self.pipeline2},
-            # "pipeline3_serialized": {p.name: p.serialize() for p in self.pipeline3},
-            # "pipeline4_serialized": {p.name: p.serialize() for p in self.pipeline4},
+            "pipeline3_serialized": {p.name: p.serialize() for p in self.pipeline3},
+            "pipeline4_serialized": {p.name: p.serialize() for p in self.pipeline4},
         }
 
     def deserialize(self, d):
@@ -434,14 +473,14 @@ class PipelineScheme:
             for p in self.pipeline2:
                 if p.name in d['pipeline2_serialized']:
                     p.deserialize(d['pipeline2_serialized'][p.name])
-        # if 'pipeline3_serialized' in d:
-        #     for p in self.pipeline3:
-        #         if p.name in d['pipeline3_serialized']:
-        #             p.deserialize(d['pipeline3_serialized'][p.name])
-        # if 'pipeline4_serialized' in d:
-        #     for p in self.pipeline4:
-        #         if p.name in d['pipeline4_serialized']:
-        #             p.deserialize(d['pipeline4_serialized'][p.name])
+        if 'pipeline3_serialized' in d:
+            for p in self.pipeline3:
+                if p.name in d['pipeline3_serialized']:
+                    p.deserialize(d['pipeline3_serialized'][p.name])
+        if 'pipeline4_serialized' in d:
+            for p in self.pipeline4:
+                if p.name in d['pipeline4_serialized']:
+                    p.deserialize(d['pipeline4_serialized'][p.name])
 
 
 class PipelineMan:
