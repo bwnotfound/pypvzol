@@ -382,7 +382,7 @@ class WebRequest:
         target,
         url,
         msg,
-        max_retry=15,
+        max_retry=20,
         logger=None,
         exit_response=False,
         allow_empty=False,
@@ -411,11 +411,11 @@ class WebRequest:
                     if "更新" in response.body.description:
                         if logger is not None:
                             logger.log(
-                                "{}的时候服务器频繁，选择等待5秒后重试。最多再等待{}次".format(
+                                "{}的时候服务器频繁，选择等待10秒后重试。最多再等待{}次".format(
                                     msg, max_retry - cnt
                                 )
                             )
-                        sleep_freq(5)
+                        sleep_freq(10)
                         continue
                     # if on_result:
                     #     if logger is not None:
