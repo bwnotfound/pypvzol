@@ -648,44 +648,52 @@ class Challenge4Level:
         self.logger.log("挑战完成")
 
     def save(self, save_dir):
-        save_path = os.path.join(save_dir, "user_challenge4level")
-        with open(save_path, "wb") as f:
-            pickle.dump(
-                {
-                    "caves": self.caves,
-                    "main_plant_list": self.main_plant_list,
-                    "trash_plant_list": self.trash_plant_list,
-                    "free_max": self.free_max,
-                    "friend_id2cave": self.friend_id2cave,
-                    "garden_layer_friend_id2cave": self.garden_layer_friend_id2cave,
-                    "garden_layer_caves": self.garden_layer_caves,
-                    "hp_choice": self.hp_choice,
-                    "pop_after_100": self.pop_after_100,
-                    "auto_use_challenge_book": self.auto_use_challenge_book,
-                    "normal_challenge_book_amount": self.normal_challenge_book_amount,
-                    "advanced_challenge_book_amount": self.advanced_challenge_book_amount,
-                    "enable_sand": self.enable_sand,
-                    "show_lottery": self.show_lottery,
-                    "enable_stone": self.enable_stone,
-                    "enable_large_plant_team": self.enable_large_plant_team,
-                    "disable_cave_info_fetch": self.disable_cave_info_fetch,
-                    "challenge_sand_cave_only_in_disable_mode": self.challenge_sand_cave_only_in_disable_mode,
-                    "need_recover": self.need_recover,
-                    "accelerate_repository_in_challenge_cave": self.accelerate_repository_in_challenge_cave,
-                    "main_plant_recover": self.main_plant_recover,
-                    "main_plant_recover_rate": self.main_plant_recover_rate,
-                },
-                f,
-            )
+        d = {
+            "caves": self.caves,
+            "main_plant_list": self.main_plant_list,
+            "trash_plant_list": self.trash_plant_list,
+            "free_max": self.free_max,
+            "friend_id2cave": self.friend_id2cave,
+            "garden_layer_friend_id2cave": self.garden_layer_friend_id2cave,
+            "garden_layer_caves": self.garden_layer_caves,
+            "hp_choice": self.hp_choice,
+            "pop_after_100": self.pop_after_100,
+            "auto_use_challenge_book": self.auto_use_challenge_book,
+            "normal_challenge_book_amount": self.normal_challenge_book_amount,
+            "advanced_challenge_book_amount": self.advanced_challenge_book_amount,
+            "enable_sand": self.enable_sand,
+            "show_lottery": self.show_lottery,
+            "enable_stone": self.enable_stone,
+            "enable_large_plant_team": self.enable_large_plant_team,
+            "disable_cave_info_fetch": self.disable_cave_info_fetch,
+            "challenge_sand_cave_only_in_disable_mode": self.challenge_sand_cave_only_in_disable_mode,
+            "need_recover": self.need_recover,
+            "accelerate_repository_in_challenge_cave": self.accelerate_repository_in_challenge_cave,
+            "main_plant_recover": self.main_plant_recover,
+            "main_plant_recover_rate": self.main_plant_recover_rate,
+        }
+        if save_dir is not None:
+            save_path = os.path.join(save_dir, "user_challenge4level")
+            with open(save_path, "wb") as f:
+                pickle.dump(
+                    d,
+                    f,
+                )
+        return d
 
     def load(self, load_dir):
-        load_path = os.path.join(load_dir, "user_challenge4level")
-        if os.path.exists(load_path):
-            with open(load_path, "rb") as f:
-                d = pickle.load(f)
-            for k, v in d.items():
-                if hasattr(self, k):
-                    setattr(self, k, v)
+        if isinstance(load_dir, dict):
+            d = load_dir
+        else:
+            load_path = os.path.join(load_dir, "user_challenge4level")
+            if os.path.exists(load_path):
+                with open(load_path, "rb") as f:
+                    d = pickle.load(f)
+            else:
+                d = {}
+        for k, v in d.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
         if self.advanced_challenge_book_amount > 5:
             self.advanced_challenge_book_amount = 5
         main_plant_list = list(

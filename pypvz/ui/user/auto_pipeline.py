@@ -183,6 +183,11 @@ class AutoChallenge(Pipeline):
         self, cfg: Config, lib: Library, repo: Repository, user: User, logger: Logger
     ):
         super().__init__("带级")
+        self.cfg = cfg
+        self.lib = lib
+        self.repo = repo
+        self.user = user
+        self.logger = logger
         self.challenge4level = Challenge4Level(cfg, user, repo, lib, logger=logger)
         self.repeat_time = 1
 
@@ -204,17 +209,27 @@ class AutoChallenge(Pipeline):
         return {"success": True, "info": "挑战成功", "result": plant_list}
 
     def setting_window(self):
-        from ..windows import ShopAutoBuySetting
+        from ..windows import Challenge4levelSettingWindow
 
-        return ShopAutoBuySetting(
-            self.lib, self.shop, self.logger, self.shop_auto_buy_dict
+        return Challenge4levelSettingWindow(
+            self.cfg, self.lib, self.repo, self.user, self.logger, self.challenge4level
         )
 
     def has_setting_window(self):
         return True
 
     def serialize(self):
-        return {"shop_auto_buy_dict": self.shop_auto_buy_dict}
+        return {
+            "repeat_time": self.repeat_time,
+            "auto_challenge": self.challenge4level.save(None),
+        }
+    
+    def deserialize(self, d):
+        for k, v in d.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+        if 'auto_challenge' in d:
+            self.challenge4level.load(d['auto_challenge'])
 
 
 class UpgradeQuality(Pipeline):
@@ -402,7 +417,7 @@ class PipelineScheme:
             "pipeline3_choice_index": self.pipeline3_choice_index,
             "pipeline4_choice_index": self.pipeline4_choice_index,
             "pipeline1_serialized": {p.name: p.serialize() for p in self.pipeline1},
-            # "pipeline2_serialized": {p.name: p.serialize() for p in self.pipeline2},
+            "pipeline2_serialized": {p.name: p.serialize() for p in self.pipeline2},
             # "pipeline3_serialized": {p.name: p.serialize() for p in self.pipeline3},
             # "pipeline4_serialized": {p.name: p.serialize() for p in self.pipeline4},
         }
@@ -415,10 +430,10 @@ class PipelineScheme:
             for p in self.pipeline1:
                 if p.name in d['pipeline1_serialized']:
                     p.deserialize(d['pipeline1_serialized'][p.name])
-        # if 'pipeline2_serialized' in d:
-        #     for p in self.pipeline2:
-        #         if p.name in d['pipeline2_serialized']:
-        #             p.deserialize(d['pipeline2_serialized'][p.name])
+        if 'pipeline2_serialized' in d:
+            for p in self.pipeline2:
+                if p.name in d['pipeline2_serialized']:
+                    p.deserialize(d['pipeline2_serialized'][p.name])
         # if 'pipeline3_serialized' in d:
         #     for p in self.pipeline3:
         #         if p.name in d['pipeline3_serialized']:
@@ -427,8 +442,6 @@ class PipelineScheme:
         #     for p in self.pipeline4:
         #         if p.name in d['pipeline4_serialized']:
         #             p.deserialize(d['pipeline4_serialized'][p.name])
-            
-        
 
 
 class PipelineMan:
