@@ -55,12 +55,6 @@ class Task:
     def refresh_task(self):
         body = []
         response = self.wr.amf_post_retry(body, "api.duty.getAll", "/pvz/amf/", "刷新任务")
-        if response.status == 0:
-            pass
-        elif response.status == 1:
-            raise NotImplementedError
-        else:
-            raise NotImplementedError
         body = response.body
         self.main_task = [TaskItem(r, 1) for r in body['mainTask']]
         self.side_task = [TaskItem(r, 2) for r in body['sideTask']]
@@ -75,7 +69,7 @@ class Task:
 
     def claim_reward(self, task_item: TaskItem, lib: Library):
         body = [float(task_item.id), float(task_item.choice)]
-        response = self.wr.amf_post(body, "api.duty.reward", "/pvz/amf/", "领取任务奖励")
+        response = self.wr.amf_post_retry(body, "api.duty.reward", "/pvz/amf/", "领取任务奖励")
         if response.status != 0:
             msg = "领取任务奖励失败。错误原因:{}".format(response.body.description)
             logging.error(msg)

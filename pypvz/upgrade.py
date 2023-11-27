@@ -96,7 +96,7 @@ class SynthesisMan:
             float(attribute_book_id),
             float(reinforce_number),
         ]
-        return self.wr.amf_post(body, 'api.tool.synthesis', "/pvz/amf/", "合成")
+        return self.wr.amf_post_retry(body, 'api.tool.synthesis', "/pvz/amf/", "合成")
     
 
 
@@ -147,7 +147,7 @@ class HeritageMan:
             float(heritage_item_id),
             float(heritage_reinforce_number),
         ]
-        response = self.wr.amf_post(
+        response = self.wr.amf_post_retry(
             body, 'api.apiorganism.exchangeOne', "/pvz/amf/", "传承单项属性"
         )
         if response.status != 0:
@@ -177,7 +177,7 @@ class HeritageMan:
                 fight:
         '''
         body = [float(id2), float(id1)]
-        response = self.wr.amf_post(
+        response = self.wr.amf_post_retry(
             body, 'api.apiorganism.exchangeAll', "/pvz/amf/", "传承全属性"
         )
         if response.status != 0:
@@ -226,19 +226,16 @@ class SkillStoneMan:
             float(plant_id),
             float(skill_dict["id"]),
         ]
-        response = self.wr.amf_post(body, 'api.apiorganism.skillUp', "/pvz/amf/", "合成")
+        response = self.wr.amf_post_retry(body, 'api.apiorganism.skillUp', "/pvz/amf/", "合成")
         if response.status == 1:
             return {
                 "success": False,
                 "result": response.body.description,
             }
-        elif response.status == 0:
-            now_id = int(response.body["now_id"])
-            upgrade_success = skill_dict["id"] != now_id
-            skill_dict["id"] = now_id
-            return {
-                "success": True,
-                "upgrade_success": upgrade_success,
-            }
-        else:
-            raise NotImplementedError
+        now_id = int(response.body["now_id"])
+        upgrade_success = skill_dict["id"] != now_id
+        skill_dict["id"] = now_id
+        return {
+            "success": True,
+            "upgrade_success": upgrade_success,
+        }

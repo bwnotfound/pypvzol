@@ -1,6 +1,5 @@
 import pickle
 from queue import Queue
-import logging
 import os
 from threading import Event
 from time import sleep
@@ -14,6 +13,7 @@ from ... import (
 from ..message import Logger
 from ... import UpgradeMan
 from .auto_challenge import Challenge4Level
+from ...shop import PurchaseItem
 
 
 class Pipeline:
@@ -21,6 +21,9 @@ class Pipeline:
         self.name = name
 
     def run(self):
+        pass
+
+    def setting_window(self):
         pass
 
 
@@ -46,6 +49,10 @@ class Purchase(Pipeline):
         self.repo = repo
         self.logger = logger
         self.wr = WebRequest(cfg)
+        from ...shop import Shop
+
+        self.shop = Shop(cfg)
+        self.shop_auto_buy_dict: dict[int, PurchaseItem] = dict()
 
         self.purchase_plant_list: list[_PurchaseItem] = []
 
@@ -113,6 +120,13 @@ class Purchase(Pipeline):
             "info": "购买成功",
             "result": [item for item in self.purchase_plant_list if item.type == 0],
         }
+
+    def setting_window(self):
+        from ..windows import ShopAutoBuySetting
+
+        return ShopAutoBuySetting(
+            self.lib, self.shop, self.logger, self.shop_auto_buy_dict
+        )
 
 
 class OpenBox(Pipeline):

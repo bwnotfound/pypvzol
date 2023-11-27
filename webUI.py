@@ -38,7 +38,6 @@ from pypvz.ui.wrapped import QLabel, normal_font
 from pypvz.ui.windows.common import (
     AutoUseItemSettingWindow,
     AddCaveWindow,
-    ShopAutoBuySetting,
     HeritageWindow,
     PlantRelativeWindow,
     SetPlantListWindow,
@@ -54,6 +53,7 @@ from pypvz.ui.windows import (
     GardenChallengeSettingWindow,
     TerritorySettingWindow,
     PipelineSettingWindow,
+    ShopAutoBuySetting,
     # GameWindow,
     # run_game_window,
 )
@@ -996,7 +996,11 @@ class SettingWindow(QMainWindow):
 
     def shop_auto_buy_setting_btn_clicked(self):
         self.shop_auto_buy_setting_window = ShopAutoBuySetting(
-            self.usersettings, parent=self
+            self.usersettings.lib,
+            self.usersettings.shop,
+            self.usersettings.logger,
+            self.usersettings.shop_auto_buy_dict,
+            parent=self,
         )
         self.shop_auto_buy_setting_window.show()
 
@@ -1095,7 +1099,7 @@ class FunctionPanelWindow(QMainWindow):
         compound_btn = QPushButton("自动复合面板")
         compound_btn.clicked.connect(self.compound_btn_clicked)
         menu_layout.addWidget(compound_btn, 4, 0)
-        
+
         auto_pipeline_btn = QPushButton("全自动面板")
         auto_pipeline_btn.clicked.connect(self.auto_pipeline_btn_clicked)
         menu_layout.addWidget(auto_pipeline_btn, 5, 0)
@@ -1115,9 +1119,11 @@ class FunctionPanelWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
     def auto_pipeline_btn_clicked(self):
-        self.auto_pipeline_window = PipelineSettingWindow(self.usersettings, parent=self)
+        self.auto_pipeline_window = PipelineSettingWindow(
+            self.usersettings, parent=self
+        )
         self.auto_pipeline_window.show()
 
     def repository_tool_record_btn_clicked(self):

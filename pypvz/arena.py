@@ -14,34 +14,25 @@ class ArenaMan:
         self.wr = WebRequest(cfg)
 
     def refresh_arena(self):
-        response = self.wr.amf_post(
+        response = self.wr.amf_post_retry(
             [], "api.arena.getArenaList", "/pvz/amf/", "获取竞技场列表"
         )
-        if response.status == 0:
-            pass
-        elif response.status == 1:
-            raise RuntimeError("获取竞技场列表时出现异常。原因：{}".format(response.body.description))
-        else:
-            raise NotImplementedError
         self.opponent_list = [ArenaOpponent(root) for root in response.body['opponent']]
         self.challenge_num = int(response.body['owner']["num"])
 
     def challenge_first(self):
-        response = self.wr.amf_post(
+        response = self.wr.amf_post_retry(
             [float(self.opponent_list[0].user_id)],
             "api.arena.challenge",
             "/pvz/amf/",
             "挑战竞技场",
         )
-        if response.status == 0:
-            pass
-        elif response.status == 1:
+
+        if response.status == 1:
             return {
                 "success": False,
                 "result": "挑战竞技场出现异常。原因：{}".format(response.body.description),
             }
-        else:
-            raise NotImplementedError
         return {
             "success": True,
             "result": "挑战竞技场成功。挑战{}，挑战结果：{}".format(

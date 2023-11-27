@@ -29,6 +29,9 @@ from ..user import UserSettings
 from ...upgrade import SkillStoneMan
 from ...utils.common import format_number
 from ...repository import Plant
+from ...shop import Shop
+from ..message import Logger
+from ...shop import Good
 
 
 class SetPlantListWindow(QMainWindow):
@@ -153,7 +156,7 @@ class AddCaveWindow(QMainWindow):
             if not result["success"]:
                 self.close()
             self.current_garden_layer_choice = QComboBox()
-            self.current_garden_layer_choice.addItems(["1", "2", "3", "4"])
+            self.current_garden_layer_choice.addItems(["1", "2", "3", "4", "5"])
             self.current_garden_layer_choice.setCurrentIndex(0)
             self.current_garden_layer_choice.currentIndexChanged.connect(
                 self.current_garden_layer_choice_currentIndexChanged
@@ -551,244 +554,102 @@ class AutoUseItemSettingWindow(QMainWindow):
             self.refresh_auto_use_item_list()
 
 
-class ChallengeGardenCaveSetting(QMainWindow):
-    def __init__(self, usersettings: UserSettings, parent=None):
-        super().__init__(parent=parent)
-        self.usersettings = usersettings
+# class ChallengeGardenCaveSetting(QMainWindow):
+#     def __init__(self, usersettings: UserSettings, parent=None):
+#         super().__init__(parent=parent)
+#         self.usersettings = usersettings
 
-    def init_ui(self):
-        self.setWindowTitle("挑战花园设置")
+#     def init_ui(self):
+#         self.setWindowTitle("挑战花园设置")
 
-        # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
-        screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.5), int(screen_size.height() * 0.5))
-        self.move(int(screen_size.width() * 0.25), int(screen_size.height() * 0.25))
+#         # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
+#         screen_size = QtGui.QGuiApplication.primaryScreen().size()
+#         self.resize(int(screen_size.width() * 0.5), int(screen_size.height() * 0.5))
+#         self.move(int(screen_size.width() * 0.25), int(screen_size.height() * 0.25))
 
-        main_widget = QWidget()
-        main_layout = QHBoxLayout()
+#         main_widget = QWidget()
+#         main_layout = QHBoxLayout()
 
-        friend_list_widget = QWidget()
-        friend_list_widget.setFixedWidth(int(self.width() * 0.35))
-        friend_list_layout = QVBoxLayout()
-        friend_list_layout.addWidget(QLabel("好友列表"))
-        self.friend_list = QListWidget()
-        self.friend_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self.friend_list.itemClicked.connect(self.friend_list_selection_changed)
-        friend_list_layout.addWidget(self.friend_list)
-        friend_list_widget.setLayout(friend_list_layout)
-        self.text_box = QPlainTextEdit()
-        self.text_box.setReadOnly(True)
-        self.text_box.setFixedWidth(int(self.width() * 0.35))
-        friend_list_layout.addWidget(self.text_box)
-        main_layout.addWidget(friend_list_widget)
-        self.refresh_friend_list()
+#         friend_list_widget = QWidget()
+#         friend_list_widget.setFixedWidth(int(self.width() * 0.35))
+#         friend_list_layout = QVBoxLayout()
+#         friend_list_layout.addWidget(QLabel("好友列表"))
+#         self.friend_list = QListWidget()
+#         self.friend_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+#         self.friend_list.itemClicked.connect(self.friend_list_selection_changed)
+#         friend_list_layout.addWidget(self.friend_list)
+#         friend_list_widget.setLayout(friend_list_layout)
+#         self.text_box = QPlainTextEdit()
+#         self.text_box.setReadOnly(True)
+#         self.text_box.setFixedWidth(int(self.width() * 0.35))
+#         friend_list_layout.addWidget(self.text_box)
+#         main_layout.addWidget(friend_list_widget)
+#         self.refresh_friend_list()
 
-        challenge_setting_btn = QPushButton("自动挑战")
-        challenge_setting_btn.clicked.connect(self.challenge_setting_btn_clicked)
-        main_layout.addWidget(challenge_setting_btn)
+#         challenge_setting_btn = QPushButton("自动挑战")
+#         challenge_setting_btn.clicked.connect(self.challenge_setting_btn_clicked)
+#         main_layout.addWidget(challenge_setting_btn)
 
-        challenge_list_widget = QWidget()
-        challenge_list_widget.setFixedWidth(int(self.width() * 0.35))
-        challenge_list_layout = QVBoxLayout()
-        challenge_list_layout.addWidget(QLabel("挑战列表"))
-        self.challenge_list = QListWidget()
-        self.challenge_list.setSelectionMode(
-            QListWidget.SelectionMode.ExtendedSelection
-        )
-        challenge_list_layout.addWidget(self.challenge_list)
-        challenge_list_widget.setLayout(challenge_list_layout)
-        main_layout.addWidget(challenge_list_widget)
-        self.refresh_challenge_list()
+#         challenge_list_widget = QWidget()
+#         challenge_list_widget.setFixedWidth(int(self.width() * 0.35))
+#         challenge_list_layout = QVBoxLayout()
+#         challenge_list_layout.addWidget(QLabel("挑战列表"))
+#         self.challenge_list = QListWidget()
+#         self.challenge_list.setSelectionMode(
+#             QListWidget.SelectionMode.ExtendedSelection
+#         )
+#         challenge_list_layout.addWidget(self.challenge_list)
+#         challenge_list_widget.setLayout(challenge_list_layout)
+#         main_layout.addWidget(challenge_list_widget)
+#         self.refresh_challenge_list()
 
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
+#         main_widget.setLayout(main_layout)
+#         self.setCentralWidget(main_widget)
 
-    def refresh_friend_list(self):
-        self.friend_list.clear()
-        for friend in self.usersettings.user.friendMan.friends:
-            item = QListWidgetItem(f"{friend.name}({friend.grade})")
-            item.setData(Qt.ItemDataRole.UserRole, friend.id)
-            self.friend_list.addItem(item)
+#     def refresh_friend_list(self):
+#         self.friend_list.clear()
+#         for friend in self.usersettings.user.friendMan.friends:
+#             item = QListWidgetItem(f"{friend.name}({friend.grade})")
+#             item.setData(Qt.ItemDataRole.UserRole, friend.id)
+#             self.friend_list.addItem(item)
 
-    def friend_list_selection_changed(self, item: QListWidgetItem):
-        friend_id = item.data(Qt.ItemDataRole.UserRole)
-        if not hasattr(self.usersettings.user.friendMan, "id2garden_cave"):
-            setattr(self.usersettings.user.friendMan, "id2garden_cave", {})
-        if friend_id not in self.usersettings.user.friendMan.id2garden_cave:
-            self.usersettings.user.friendMan.id2garden_cave[
-                friend_id
-            ] = self.usersettings.challenge4Level.caveMan.get_garden_cave(friend_id)
-        garden_cave = self.usersettings.user.friendMan.id2garden_cave[friend_id]
-        friend = self.usersettings.user.friendMan.id2friend[friend_id]
-        if garden_cave is None:
-            text = "该好友花园里暂时没有花园怪"
-        else:
-            text = "{}({})的花园:\n花园怪:{}\n奖励:{}".format(
-                friend.name,
-                friend.grade,
-                garden_cave.name,
-                ",".join([r.name for r in garden_cave.reward]),
-            )
-        self.text_box.setPlainText(text)
+#     def friend_list_selection_changed(self, item: QListWidgetItem):
+#         friend_id = item.data(Qt.ItemDataRole.UserRole)
+#         if not hasattr(self.usersettings.user.friendMan, "id2garden_cave"):
+#             setattr(self.usersettings.user.friendMan, "id2garden_cave", {})
+#         if friend_id not in self.usersettings.user.friendMan.id2garden_cave:
+#             self.usersettings.user.friendMan.id2garden_cave[
+#                 friend_id
+#             ] = self.usersettings.challenge4Level.caveMan.get_garden_cave(friend_id)
+#         garden_cave = self.usersettings.user.friendMan.id2garden_cave[friend_id]
+#         friend = self.usersettings.user.friendMan.id2friend[friend_id]
+#         if garden_cave is None:
+#             text = "该好友花园里暂时没有花园怪"
+#         else:
+#             text = "{}({})的花园:\n花园怪:{}\n奖励:{}".format(
+#                 friend.name,
+#                 friend.grade,
+#                 garden_cave.name,
+#                 ",".join([r.name for r in garden_cave.reward]),
+#             )
+#         self.text_box.setPlainText(text)
 
-    def challenge_setting_btn_clicked(self):
-        selected_friend = self.friend_list.selectedItems()
-        selected_friend_id = [
-            fid
-            for fid in map(lambda x: x.data(Qt.ItemDataRole.UserRole), selected_friend)
-            if (
-                self.usersettings.user.friendMan.id2garden_cave.get(fid, None)
-                is not None
-            )
-        ]
-        if len(selected_friend_id) == 0:
-            return
-        garden_caves = []
+#     def challenge_setting_btn_clicked(self):
+#         selected_friend = self.friend_list.selectedItems()
+#         selected_friend_id = [
+#             fid
+#             for fid in map(lambda x: x.data(Qt.ItemDataRole.UserRole), selected_friend)
+#             if (
+#                 self.usersettings.user.friendMan.id2garden_cave.get(fid, None)
+#                 is not None
+#             )
+#         ]
+#         if len(selected_friend_id) == 0:
+#             return
+#         garden_caves = []
 
 
-class ShopAutoBuySetting(QMainWindow):
-    def __init__(self, usersettings: UserSettings, parent=None):
-        super().__init__(parent=parent)
-        self.usersettings = usersettings
-        self.usersettings.shop.refresh_shop()
-        self.init_ui()
 
-    def init_ui(self):
-        self.setWindowTitle("商店自动购买设置")
-
-        # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
-        screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.5), int(screen_size.height() * 0.5))
-        self.move(int(screen_size.width() * 0.25), int(screen_size.height() * 0.25))
-
-        main_widget = QWidget()
-        main_layout = QHBoxLayout()
-
-        shop_list_widget = QWidget()
-        shop_list_widget.setFixedWidth(int(self.width() * 0.35))
-        shop_list_layout = QVBoxLayout()
-        shop_list_layout.addWidget(QLabel("商店列表"))
-        self.shop_list_tab = shop_list_tab = QTabWidget()
-        shop_list_layout.addWidget(shop_list_tab)
-        self.normal_shop_list = QListWidget()
-        self.normal_shop_list.setSelectionMode(
-            QListWidget.SelectionMode.ExtendedSelection
-        )
-        self.shop_list_tab.addTab(self.normal_shop_list, "普通商店")
-        shop_list_widget.setLayout(shop_list_layout)
-        main_layout.addWidget(shop_list_widget)
-        self.refresh_shop_list()
-
-        btn_panel_widget = QWidget()
-        btn_panel_layout = QVBoxLayout()
-        buy_item_btn = QPushButton("全部购买")
-        buy_item_btn.clicked.connect(self.buy_item_btn_clicked)
-        btn_panel_layout.addWidget(buy_item_btn)
-        set_auto_buy_btn = QPushButton("设为自动购买")
-        set_auto_buy_btn.clicked.connect(self.set_auto_buy_btn_clicked)
-        btn_panel_layout.addWidget(set_auto_buy_btn)
-
-        btn_panel_widget.setLayout(btn_panel_layout)
-        main_layout.addWidget(btn_panel_widget)
-
-        auto_buy_list_widget = QWidget()
-        auto_buy_list_widget.setFixedWidth(int(self.width() * 0.35))
-        auto_buy_list_layout = QVBoxLayout()
-        auto_buy_list_layout.addWidget(QLabel("自动购买列表"))
-        self.auto_buy_list = QListWidget()
-        self.auto_buy_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        auto_buy_list_layout.addWidget(self.auto_buy_list)
-        auto_buy_list_widget.setLayout(auto_buy_list_layout)
-        main_layout.addWidget(auto_buy_list_widget)
-        self.refresh_auto_buy_list()
-
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
-
-    def refresh_shop_list(self):
-        self.normal_shop_list.clear()
-        for shop_item in self.usersettings.shop.normal_shop_goods.values():
-            if shop_item.type == "tool":
-                tool = self.usersettings.lib.get_tool_by_id(shop_item.p_id)
-                item = QListWidgetItem(f"{tool.name}({shop_item.num})")
-                item.setData(Qt.ItemDataRole.UserRole, shop_item.id)
-                self.normal_shop_list.addItem(item)
-            elif shop_item.type == "organisms":
-                plant = self.usersettings.lib.get_plant_by_id(shop_item.p_id)
-                item = QListWidgetItem(f"{plant.name}({shop_item.num})")
-                item.setData(Qt.ItemDataRole.UserRole, shop_item.id)
-                self.normal_shop_list.addItem(item)
-            else:
-                self.usersettings.logger.log(f"未知的商店商品类型:{shop_item.type}")
-                logging.info(f"未知的商店商品类型:{shop_item.type}")
-                raise NotImplementedError(f"未知的商店商品类型:{shop_item.type}")
-
-    def buy_item_btn_clicked(self):
-        selected_items = self.normal_shop_list.selectedItems()
-        selected_items_id = [
-            item.data(Qt.ItemDataRole.UserRole) for item in selected_items
-        ]
-        if len(selected_items_id) == 0:
-            logging.info("请先选择一个商品")
-            self.usersettings.logger.log("请先选择一个商品")
-            return
-        result = self.usersettings.shop.buy_list(selected_items_id, 1)
-        for good_p_id, amount in result:
-            self.usersettings.logger.log(
-                "购买了{}个{}".format(
-                    amount, self.usersettings.lib.get_tool_by_id(good_p_id).name
-                ),
-                True,
-            )
-        self.usersettings.logger.log("购买完成", True)
-        self.usersettings.shop.refresh_shop()
-        self.refresh_shop_list()
-
-    def set_auto_buy_btn_clicked(self):
-        selected_items = self.normal_shop_list.selectedItems()
-        selected_items_id = [
-            item.data(Qt.ItemDataRole.UserRole) for item in selected_items
-        ]
-        if len(selected_items_id) == 0:
-            self.usersettings.logger.log("请先选择一个商品", True)
-            return
-        for good_id in selected_items_id:
-            self.usersettings.shop_auto_buy_list.add(good_id)
-        self.refresh_auto_buy_list()
-
-    def refresh_auto_buy_list(self):
-        self.auto_buy_list.clear()
-        for good_id in self.usersettings.shop_auto_buy_list:
-            good = self.usersettings.shop.normal_shop_goods.get(good_id, None)
-            if good is None:
-                continue
-            if good.type == "tool":
-                tool = self.usersettings.lib.get_tool_by_id(good.p_id)
-                item = QListWidgetItem(f"{tool.name}")
-                item.setData(Qt.ItemDataRole.UserRole, good.id)
-                self.auto_buy_list.addItem(item)
-            elif good.type == "organisms":
-                plant = self.usersettings.lib.get_plant_by_id(good.p_id)
-                item = QListWidgetItem(f"{plant.name}")
-                item.setData(Qt.ItemDataRole.UserRole, good.id)
-                self.auto_buy_list.addItem(item)
-            else:
-                self.usersettings.logger.log(f"未知的商店商品类型:{good.type}")
-                logging.info(f"未知的商店商品类型:{good.type}")
-                raise NotImplementedError(f"未知的商店商品类型:{good.type}")
-
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
-            selected_items = self.auto_buy_list.selectedItems()
-            selected_items_id = [
-                item.data(Qt.ItemDataRole.UserRole) for item in selected_items
-            ]
-            if len(selected_items_id) == 0:
-                self.usersettings.logger.log("请先选择一个商品", True)
-                return
-            for good_id in selected_items_id:
-                self.usersettings.shop_auto_buy_list.remove(good_id)
-            self.refresh_auto_buy_list()
 
 
 class HeritageWindow(QMainWindow):
@@ -1306,7 +1167,7 @@ class RequirePermissionWindow(QMainWindow):
     def refuse_btn_clicked(self):
         self.finish_queue.put(False)
         self.close()
-    
+
     def closeEvent(self, event):
         self.finish_queue.put(False)
         self.close()
@@ -1328,6 +1189,3 @@ def require_permission(msg):
             return finish_queue.get_nowait()
         except Exception:
             QApplication.processEvents()
-
-
-

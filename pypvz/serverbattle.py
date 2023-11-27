@@ -9,7 +9,7 @@ class ServerbattleMan:
     def challenge(self):
         body = []
         try:
-            response = self.wr.amf_post(
+            response = self.wr.amf_post_retry(
                 body, 'api.serverbattle.challenge', "/pvz/amf/", "跨服挑战"
             )
             if response.status != 0:

@@ -76,14 +76,14 @@ class Repository:
         self.wr = WebRequest(cfg)
         self._lock = Lock()
         self.refresh_repository()
-        
+
     def refresh_repository(self, logger=None):
         try:
             self._lock.acquire()
             self._refresh_repository(logger=logger)
         finally:
             self._lock.release()
-    
+
     def _refresh_repository(self, logger=None):
         url = "/pvz/index.php/Warehouse/index/sig/0"
         cnt, max_retry = 0, 20
@@ -168,7 +168,7 @@ class Repository:
             id = int(id)
         tool = self.id2tool.get(id, None)
         return tool
-    
+
     def remove_plant(self, id):
         if isinstance(id, str):
             id = int(id)
@@ -197,13 +197,11 @@ class Repository:
                 "success": True,
                 "result": "使用了{}个{}".format(amount, lib.get_tool_by_id(tool_id).name),
             }
-        elif response.status == 1:
+        else:
             return {
                 "success": False,
                 "result": response.body.description,
             }
-        else:
-            raise NotImplementedError
 
     def sell_item(self, tool_id, amount, lib: Library):
         body = [float(1), float(tool_id), float(amount)]
@@ -217,23 +215,21 @@ class Repository:
                     format_number(response.body),
                 ),
             }
-        elif response.status == 1:
+        else:
             return {
                 "success": False,
                 "result": response.body.description,
             }
-        else:
-            raise NotImplementedError
 
     def sell_plant(self, plant_id, plant_info):
         body = [float(2), float(plant_id), float(1)]
-        response = self.wr.amf_post(body, "api.shop.sell", "/pvz/amf/", "出售植物")
+        response = self.wr.amf_post_retry(body, "api.shop.sell", "/pvz/amf/", "出售植物")
         if response.status == 0:
             return {
                 "success": True,
                 "result": "出售了{}，获得{}金币".format(plant_info, response.body),
             }
-        elif response.status == 1:
+        else:
             return {
                 "success": False,
                 "result": "出售植物{}时出现异常。原因：{}".format(
@@ -241,8 +237,6 @@ class Repository:
                     response.body.description,
                 ),
             }
-        else:
-            raise NotImplementedError
 
     def open_box(self, tool_id, amount, lib: Library):
         # 单次请求最大为99999
@@ -250,7 +244,9 @@ class Repository:
             amount = int(amount)
         amount = min(amount, 99999)
         body = [float(tool_id), float(amount)]
-        response = self.wr.amf_post(body, "api.reward.openbox", "/pvz/amf/", "打开宝箱")
+        response = self.wr.amf_post_retry(
+            body, "api.reward.openbox", "/pvz/amf/", "打开宝箱"
+        )
         if response.status == 1:
             description = response.body.description
             if "道具异常" in description:
@@ -277,7 +273,7 @@ class Repository:
             "result": result,
             "open_amount": open_amount,
         }
-        
+
     def use_tool(self, tool_id, amount, lib: Library):
         lib_tool = lib.get_tool_by_id(tool_id)
         if lib_tool is None:

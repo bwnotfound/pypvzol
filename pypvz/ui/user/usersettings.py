@@ -29,7 +29,7 @@ from .manager import (
     GardenMan,
 )
 from . import PipelineMan
-
+from ...shop import PurchaseItem
 
 class UserSettings:
     def __init__(
@@ -57,7 +57,7 @@ class UserSettings:
         self.shop_enabled = False
 
         self.shop = Shop(cfg)
-        self.shop_auto_buy_list = set()
+        self.shop_auto_buy_dict: dict[int, PurchaseItem] = dict()
         self.plant_evolution = PlantEvolution(cfg, repo, lib)
         self.task = Task(cfg)
         self.enable_list = [False for _ in range(4)]
@@ -89,18 +89,18 @@ class UserSettings:
     def _start(self, stop_channel: Queue, finished_trigger: Queue):
         self.repo.refresh_repository(self.logger)
         while stop_channel.qsize() == 0:
-            if self.shop_enabled:
-                try:
-                    shop_info = self.shop.buy_list(list(self.shop_auto_buy_list), 1)
-                    for good_p_id, amount in shop_info:
-                        self.logger.log(
-                            f"购买了{amount}个{self.lib.get_tool_by_id(good_p_id).name}"
-                        )
-                    self.logger.log("购买完成")
-                except Exception as e:
-                    self.logger.log(f"购买失败，异常种类:{type(e).__name__}。跳过购买")
-                if stop_channel.qsize() > 0:
-                    break
+            # if self.shop_enabled:
+            #     try:
+            #         shop_info = self.shop.buy_list(list(self.shop_auto_buy_set), 1)
+            #         for good_p_id, amount in shop_info:
+            #             self.logger.log(
+            #                 f"购买了{amount}个{self.lib.get_tool_by_id(good_p_id).name}"
+            #             )
+            #         self.logger.log("购买完成")
+            #     except Exception as e:
+            #         self.logger.log(f"购买失败，异常种类:{type(e).__name__}。跳过购买")
+            #     if stop_channel.qsize() > 0:
+            #         break
             if self.auto_use_item_enabled:
                 try:
                     self.auto_use_item(stop_channel)
@@ -250,7 +250,7 @@ class UserSettings:
                 {
                     "challenge4Level_enabled": self.challenge4Level_enabled,
                     "shop_enabled": self.shop_enabled,
-                    "shop_auto_buy_list": self.shop_auto_buy_list,
+                    "shop_auto_buy_dict": self.shop_auto_buy_dict,
                     "auto_use_item_list": self.auto_use_item_list,
                     "garden_cave_list": self.garden_cave_list,
                     "enable_list": self.enable_list,

@@ -340,45 +340,20 @@ class WebRequest:
         return response
 
     def _amf_post_decode(
-        self, url, data, msg, max_retry=3, exit_on_fail=False, exit_response=False
+        self, url, data, exit_response=False
     ):
-        cnt = 0
-        while cnt < max_retry:
-            try:
-                resp = self.post(
-                    url,
-                    data=data,
-                    exit_response=exit_response,
-                    headers={"Content-Type": "application/x-amf"},
-                )
-                if exit_response:
-                    return
-            except requests.exceptions.ConnectTimeout as e:
-                if exit_on_fail:
-                    raise e
-                logging.warning("请求{}超时，选择等待0.5秒后重试".format(msg))
-                sleep(0.5)
-                cnt += 1
-                continue
-            try:
-                if len(resp) == 0:
-                    raise RuntimeError("amf返回结果为空")
-                resp_ev = remoting.decode(resp)
-                break
-            except DecodeError as e:
-                if exit_on_fail:
-                    raise e
-                cnt += 1
-                logging.info("重新尝试请求{}，选择等待0.5秒后重试".format(msg))
-                sleep(0.5)
-            except OSError as e:
-                if exit_on_fail:
-                    raise e
-                cnt += 1
-                logging.info("重新尝试请求{}，选择等待0.5秒后重试".format(msg))
-                sleep(0.5)
-        else:
-            raise RuntimeError("请求{}失败，超过最大尝试次数{}次".format(msg, max_retry))
+        resp = self.post(
+            url,
+            data=data,
+            exit_response=exit_response,
+            headers={"Content-Type": "application/x-amf"},
+        )
+        if exit_response:
+            return
+        if len(resp) == 0:
+            raise RuntimeError("amf返回结果为空")
+        resp_ev = remoting.decode(resp)
+
         return resp_ev["/1"]
 
     def amf_post(
@@ -386,28 +361,19 @@ class WebRequest:
         body,
         target,
         url,
-        msg,
-        max_retry=3,
-        exit_on_fail=False,
         exit_response=False,
     ):
         req = remoting.Request(target=target, body=body)
         ev = remoting.Envelope(AMF3)
         ev['/1'] = req
         bin_msg = remoting.encode(ev, strict=True)
-        try:
-            result = self._amf_post_decode(
-                url,
-                bin_msg.getvalue(),
-                msg,
-                max_retry,
-                exit_on_fail=exit_on_fail,
-                exit_response=exit_response,
-            )
-            if exit_response:
-                return
-        except Exception as e:
-            raise e
+        result = self._amf_post_decode(
+            url,
+            bin_msg.getvalue(),
+            exit_response=exit_response,
+        )
+        if exit_response:
+            return
         return result
 
     def amf_post_retry(
@@ -418,12 +384,10 @@ class WebRequest:
         msg,
         max_retry=15,
         logger=None,
-        exit_on_fail=False,
         exit_response=False,
-        on_result=False,
+        allow_empty=False,
     ):
         cnt = 0
-        flag = False
         while cnt < max_retry:
             cnt += 1
             try:
@@ -432,8 +396,6 @@ class WebRequest:
                     body,
                     target,
                     url,
-                    msg,
-                    exit_on_fail=exit_on_fail,
                     exit_response=exit_response,
                 )
                 if exit_response:
@@ -455,26 +417,17 @@ class WebRequest:
                             )
                         sleep_freq(5)
                         continue
-                    if on_result:
-                        if logger is not None:
-                            logger.log(
-                                "{}失败，失败原因：{}".format(msg, response.body.description)
-                            )
-                        flag = True
-                        raise RuntimeError(f"{msg}失败")
+                    # if on_result:
+                    #     if logger is not None:
+                    #         logger.log(
+                    #             "{}失败，失败原因：{}".format(msg, response.body.description)
+                    #         )
+                    #     raise RuntimeError(f"{msg}失败")
                 break
             except RuntimeError as e:
+                if "amf返回结果为空" in str(e) and allow_empty:
+                    return None
                 raise e
-            except Exception as e:
-                if (flag and exit_on_fail) or isinstance(e, RuntimeError):
-                    raise e
-                if logger is not None:
-                    logger.log(
-                        "{}时出现异常，异常类型：{}。选择暂停1秒后重新获取信息，最多再尝试{}次".format(
-                            msg, type(e).__name__, max_retry - cnt
-                        )
-                    )
-                sleep(1)
         else:
             msg = "{}失败，超过最大尝试次数{}次".format(msg, max_retry)
             if logger is not None:

@@ -139,19 +139,14 @@ class CaveMan:
             ]
         elif type == 4:
             body = [float(user_id)]
-            response = self.wr.amf_post(
+            response = self.wr.amf_post_retry(
                 body, 'api.stone.getCaveInfo', '/pvz/amf/', '获取宝石副本信息'
             )
-            body = response.body
-            if response.status == 0:
-                caves = [
-                    Cave(cave, type, user_id, i + 1)
-                    for i, cave in enumerate(body['caves'])
-                ]
-            elif response.status == 1:
-                raise NotImplementedError
-            else:
-                raise NotImplementedError
+            caves = [
+                Cave(cave, type, user_id, i + 1)
+                for i, cave in enumerate(response.body['caves'])
+            ]
+
         return caves
 
     def challenge(self, cave_id, plant_list: list[int], difficulty, type):
@@ -181,24 +176,19 @@ class CaveMan:
             [int(i) for i in plant_list],
             float(difficulty),
         ]
-        response = self.wr.amf_post(body, target_amf, '/pvz/amf/', '洞口挑战')
+        response = self.wr.amf_post_retry(body, target_amf, '/pvz/amf/', '洞口挑战')
         if response.status == 0:
-            # onResult
             return {"success": True, "result": response.body}
-        elif response.status == 1:
-            # onStatus
-            return {"success": False, "result": response.body.description}
         else:
-            raise NotImplementedError
+            return {"success": False, "result": response.body.description}
 
     def get_lottery(self, challenge_resp_body):
         lottery_key = challenge_resp_body['awards_key']
         body = [lottery_key]
-        response = self.wr.amf_post(
-            body, "api.reward.lottery", '/pvz/amf/', '获取战利品信息', max_retry=2
+        response = self.wr.amf_post_retry(
+            body, "api.reward.lottery", '/pvz/amf/', '获取战利品信息'
         )
         if response.status == 0:
-            # onResult
             result = [
                 {"id": int(item["id"]), "amount": int(item["amount"])}
                 for item in response.body['tools']
@@ -221,18 +211,16 @@ class CaveMan:
 
     def use_sand(self, cave_id):
         body = [float(cave_id)]
-        response = self.wr.amf_post(body, "api.cave.useTimesands", '/pvz/amf/', '使用时之沙')
+        response = self.wr.amf_post_retry(body, "api.cave.useTimesands", '/pvz/amf/', '使用时之沙')
         if response.status == 0:
             return {
                 "success": True,
             }
-        elif response.status == 1:
+        else:
             return {
                 "success": False,
                 "result": response.body.description,
             }
-        else:
-            raise NotImplementedError
 
     def switch_garden_layer(self, target_layer, logger):
         '''
@@ -240,10 +228,10 @@ class CaveMan:
 
         洞口已切换到第{}层
         '''
-        target_char = "一二三四"[target_layer - 1]
+        target_char = "一二三四五"[target_layer - 1]
         body = [float(1), float(0), float(0), []]
         while True:
-            response = self.wr.amf_post(
+            response = self.wr.amf_post_retry(
                 body, "api.garden.challenge", '/pvz/amf/', '切换花园层'
             )
             resp_text = response.body.description

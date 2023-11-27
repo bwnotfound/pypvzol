@@ -897,7 +897,6 @@ class TerritoryMan:
             "/pvz/amf/",
             "挑战领地",
             logger=self.logger,
-            exit_on_fail=True,
         )
         if response.status != 0:
             return {"success": False, "result": response.body.description}
@@ -929,51 +928,20 @@ class TerritoryMan:
 
     def release_plant(self, user_id):
         body = [float(user_id)]
-        # response = self.wr.amf_post_retry(
-        #     body,
-        #     "api.territory.quit",
-        #     "/pvz/amf/",
-        #     "释放领地",
-        #     logger=self.logger,
-        #     exit_on_fail=True,
-        # )
-
-        cnt, max_retry = 0, 20
-        while cnt < max_retry:
-            cnt += 1
-            response = self.wr.amf_post(
-                body,
-                "api.territory.quit",
-                "/pvz/amf/",
-                "释放领地",
-                exit_on_fail=True,
-            )
-            if response.status != 0:
-                if "频繁" in response.body.description:
-                    self.logger.log(
-                        "{}过于频繁，选择等待3秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
-                    )
-                    sleep(3)
-                    continue
-                if "更新" in response.body.description:
-                    self.logger.log(
-                        "{}的时候服务器频繁，选择等待5秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
-                    )
-                    sleep(5)
-                    continue
-                if response.body.description == "重置所有植物成功!":
-                    return {
-                        "success": True,
-                        "result": "释放领地所有植物成功",
-                    }
-            try:
-                return {"success": False, "result": response.body.description}
-            except:
-                return {"success": False, "result": str(response.body)}
-        else:
-            msg = "{}失败，超过最大尝试次数{}次".format(msg, max_retry)
-            self.logger.log(msg)
-            raise RuntimeError(msg)
+        response = self.wr.amf_post_retry(
+            body,
+            "api.territory.quit",
+            "/pvz/amf/",
+            "释放领地",
+        )
+        if response.status != 0:
+            if response.body.description == "重置所有植物成功!":
+                return {
+                    "success": True,
+                    "result": "释放领地所有植物成功",
+                }
+            return {"success": False, "result": response.body.description}
+        return {"success": False, "result": str(response.body)}
 
     def upload_team(self):
         if len(self.team) > 5:
@@ -986,7 +954,6 @@ class TerritoryMan:
                 "/pvz/amf/",
                 "上领地植物",
                 logger=self.logger,
-                exit_on_fail=True,
             )
             if response.status != 0:
                 return {"success": False, "result": response.body.description}
@@ -1020,36 +987,26 @@ class DailyMan:
         self.logger = logger
 
     def vip_reward_acquire(self):
-        try:
-            response = self.wr.amf_post_retry(
-                [],
-                "api.vip.awards",
-                "/pvz/amf/",
-                "vip每日奖励",
-                logger=self.logger,
-                exit_on_fail=True,
-            )
-        except Exception as e:
-            self.logger.log("领取vip每日奖励异常，异常类型：{}".format(type(e).__name__))
-            return
+        response = self.wr.amf_post_retry(
+            [],
+            "api.vip.awards",
+            "/pvz/amf/",
+            "vip每日奖励",
+            logger=self.logger,
+        )
         if response.status != 0:
             return {"success": False, "result": response.body.description}
         else:
             return {"success": True, "result": response.body}
 
     def daily_sign(self):
-        try:
-            response = self.wr.amf_post_retry(
-                [],
-                "api.active.sign",
-                "/pvz/amf/",
-                "每日签到",
-                logger=self.logger,
-                exit_on_fail=True,
-            )
-        except Exception as e:
-            self.logger.log("每日签到异常，异常类型：{}".format(type(e).__name__))
-            return
+        response = self.wr.amf_post_retry(
+            [],
+            "api.active.sign",
+            "/pvz/amf/",
+            "每日签到",
+            logger=self.logger,
+        )
         if response.status != 0:
             return {"success": False, "result": response.body.description}
         else:
@@ -1085,9 +1042,7 @@ class GardenMan:
                 "/pvz/amf/",
                 "挑战花园boss",
                 logger=self.logger,
-                exit_on_fail=True,
                 exit_response=True,
-                on_result=True,
             )
         except Exception as e:
             self.logger.log("挑战花园boss异常，异常类型：{}".format(type(e).__name__))
