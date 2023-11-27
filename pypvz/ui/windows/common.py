@@ -649,9 +649,6 @@ class AutoUseItemSettingWindow(QMainWindow):
 #         garden_caves = []
 
 
-
-
-
 class HeritageWindow(QMainWindow):
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
@@ -1189,3 +1186,11 @@ def require_permission(msg):
             return finish_queue.get_nowait()
         except Exception:
             QApplication.processEvents()
+
+
+def delete_layout_children(layout):
+    for i in reversed(range(layout.count())):
+        item = layout.itemAt(i)
+        layout.removeItem(item)
+        if item.widget():
+            item.widget().deleteLater()

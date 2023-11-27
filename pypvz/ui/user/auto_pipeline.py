@@ -23,8 +23,25 @@ class Pipeline:
     def run(self):
         pass
 
+    def has_setting_window(self):
+        return False
+
+    def has_setting_widget(self):
+        return False
+
     def setting_window(self):
-        pass
+        return None
+
+    def setting_widget(self):
+        return None
+
+    def serialize(self):
+        return None
+
+    def deserialize(self, d):
+        for k, v in d.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
 
 
 class Purchase(Pipeline):
@@ -34,7 +51,6 @@ class Purchase(Pipeline):
         self.lib = lib
         self.repo = repo
         self.logger = logger
-        self.wr = WebRequest(cfg)
         from ...shop import Shop
 
         self.shop = Shop(cfg)
@@ -96,6 +112,12 @@ class Purchase(Pipeline):
             self.lib, self.shop, self.logger, self.shop_auto_buy_dict
         )
 
+    def has_setting_window(self):
+        return True
+
+    def serialize(self):
+        return {"shop_auto_buy_dict": self.shop_auto_buy_dict}
+
 
 class OpenBox(Pipeline):
     def __init__(self, cfg: Config, lib: Library, repo: Repository, logger: Logger):
@@ -143,6 +165,17 @@ class OpenBox(Pipeline):
             "info": "使用物品成功",
             "result": plant_list,
         }
+
+    def setting_widget(self):
+        from ..windows.auto_pipeline.setting_panel import OpenBoxWidget
+
+        return OpenBoxWidget(self)
+
+    def has_setting_widget(self):
+        return True
+
+    def serialize(self):
+        return {"amount": self.amount, "box_id": self.box_id}
 
 
 class AutoChallenge(Pipeline):
@@ -351,20 +384,38 @@ class PipelineScheme:
     def serialize(self):
         return {
             "name": self.name,
-            # "pipeline1": self.pipeline1,
             "pipeline1_choice_index": self.pipeline1_choice_index,
-            # "pipeline2": self.pipeline2,
             "pipeline2_choice_index": self.pipeline2_choice_index,
-            # "pipeline3": self.pipeline3,
             "pipeline3_choice_index": self.pipeline3_choice_index,
-            # "pipeline4": self.pipeline4,
             "pipeline4_choice_index": self.pipeline4_choice_index,
+            "pipeline1_serialized": {p.name: p.serialize() for p in self.pipeline1},
+            # "pipeline2_serialized": {p.name: p.serialize() for p in self.pipeline2},
+            # "pipeline3_serialized": {p.name: p.serialize() for p in self.pipeline3},
+            # "pipeline4_serialized": {p.name: p.serialize() for p in self.pipeline4},
         }
 
     def deserialize(self, d):
         for k, v in d.items():
             if hasattr(self, k):
                 setattr(self, k, v)
+        if 'pipeline1_serialized' in d:
+            for p in self.pipeline1:
+                if p.name in d['pipeline1_serialized']:
+                    p.deserialize(d['pipeline1_serialized'][p.name])
+        # if 'pipeline2_serialized' in d:
+        #     for p in self.pipeline2:
+        #         if p.name in d['pipeline2_serialized']:
+        #             p.deserialize(d['pipeline2_serialized'][p.name])
+        # if 'pipeline3_serialized' in d:
+        #     for p in self.pipeline3:
+        #         if p.name in d['pipeline3_serialized']:
+        #             p.deserialize(d['pipeline3_serialized'][p.name])
+        # if 'pipeline4_serialized' in d:
+        #     for p in self.pipeline4:
+        #         if p.name in d['pipeline4_serialized']:
+        #             p.deserialize(d['pipeline4_serialized'][p.name])
+            
+        
 
 
 class PipelineMan:

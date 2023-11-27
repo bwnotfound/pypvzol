@@ -10,11 +10,11 @@ from PyQt6.QtWidgets import (
     QLineEdit,
 )
 from PyQt6 import QtGui
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from ...wrapped import QLabel
 from ...user import UserSettings
-from ...user import PipelineScheme
+from ...user import PipelineScheme, Pipeline
 
 
 class PipelineSettingWindow(QMainWindow):
@@ -28,8 +28,8 @@ class PipelineSettingWindow(QMainWindow):
         self.setWindowTitle("全自动流水线设置")
 
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.7), int(screen_size.height() * 0.6))
-        self.move(int(screen_size.width() * 0.15), int(screen_size.height() * 0.2))
+        self.resize(int(screen_size.width() * 0.8), int(screen_size.height() * 0.6))
+        self.move(int(screen_size.width() * 0.1), int(screen_size.height() * 0.2))
 
         self.main_widget = QWidget()
         self.main_layout = QHBoxLayout()
@@ -105,11 +105,28 @@ class PipelineSettingWindow(QMainWindow):
 
 
 class SchemeWidget(QWidget):
+    change_pipeline1_choice_index_signal = pyqtSignal(int)
+    change_pipeline2_choice_index_signal = pyqtSignal(int)
+    change_pipeline3_choice_index_signal = pyqtSignal(int)
+    change_pipeline4_choice_index_signal = pyqtSignal(int)
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.main_layout = QHBoxLayout()
         self.main_layout.setSpacing(10)
         self.setLayout(self.main_layout)
+        self.change_pipeline1_choice_index_signal.connect(
+            self.change_pipeline1_choice_index
+        )
+        self.change_pipeline2_choice_index_signal.connect(
+            self.change_pipeline2_choice_index
+        )
+        self.change_pipeline3_choice_index_signal.connect(
+            self.change_pipeline3_choice_index
+        )
+        self.change_pipeline4_choice_index_signal.connect(
+            self.change_pipeline4_choice_index
+        )
 
     def switch_scheme(self, pipeline_scheme: PipelineScheme):
         self.pipeline_scheme = pipeline_scheme
@@ -120,24 +137,33 @@ class SchemeWidget(QWidget):
             self.init_ui()
 
     def init_ui(self):
-        pipeline1_layout = QVBoxLayout()
-        pipeline1_layout.addStretch(1)
-        info_label = QLabel("第一步\n目的是获得接下来使用的植物")
-        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pipeline1_layout.addWidget(info_label)
-        self.pipeline1_combobox = QComboBox()
-        for pipeline in self.pipeline_scheme.pipeline1:
-            self.pipeline1_combobox.addItem(pipeline.name)
-        self.pipeline1_combobox.setCurrentIndex(
-            self.pipeline_scheme.pipeline1_choice_index
-        )
-        pipeline1_layout.addWidget(self.pipeline1_combobox)
-
-        # self.pipeline1_setting_btn = QPushButton("设置")
-        # self.pipeline1_setting_btn.clicked.connect(self.pipeline1_setting_btn_clicked)
+        # pipeline1_layout = QVBoxLayout()
+        # pipeline1_layout.addStretch(1)
+        # info_label = QLabel("第一步\n目的是获得接下来使用的植物")
+        # info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # pipeline1_layout.addWidget(info_label)
+        # self.pipeline1_combobox = QComboBox()
+        # for pipeline in self.pipeline_scheme.pipeline1:
+        #     self.pipeline1_combobox.addItem(pipeline.name)
+        # self.pipeline1_combobox.setCurrentIndex(
+        #     self.pipeline_scheme.pipeline1_choice_index
+        # )
         # pipeline1_layout.addWidget(self.pipeline1_combobox)
-        pipeline1_layout.addStretch(1)
-        self.main_layout.addLayout(pipeline1_layout)
+
+        # # self.pipeline1_setting_btn = QPushButton("设置")
+        # # self.pipeline1_setting_btn.clicked.connect(self.pipeline1_setting_btn_clicked)
+        # # pipeline1_layout.addWidget(self.pipeline1_combobox)
+        # pipeline1_layout.addStretch(1)
+        # self.main_layout.addLayout(pipeline1_layout)
+        self.pipeline1_widget = PipelineSettingWidget(
+            "第一步\n目的是获得接下来使用的植物",
+            self.pipeline_scheme.pipeline1,
+            self.pipeline_scheme.pipeline1_choice_index,
+            self.change_pipeline1_choice_index_signal,
+            self,
+        )
+        self.pipeline1_widget.setFixedWidth(int(self.width() * 0.25))
+        self.main_layout.addWidget(self.pipeline1_widget)
 
         pipeline2_layout = QVBoxLayout()
         pipeline2_layout.addStretch(1)
@@ -195,3 +221,90 @@ class SchemeWidget(QWidget):
         # pipeline4_layout.addWidget(self.pipeline4_combobox)
         pipeline4_layout.addStretch(1)
         self.main_layout.addLayout(pipeline4_layout)
+
+    def change_pipeline1_choice_index(self, index):
+        self.pipeline_scheme.pipeline1_choice_index = index
+
+    def change_pipeline2_choice_index(self, index):
+        self.pipeline_scheme.pipeline2_choice_index = index
+
+    def change_pipeline3_choice_index(self, index):
+        self.pipeline_scheme.pipeline3_choice_index = index
+
+    def change_pipeline4_choice_index(self, index):
+        self.pipeline_scheme.pipeline4_choice_index = index
+
+
+class PipelineSettingWidget(QWidget):
+    def __init__(
+        self,
+        msg,
+        pipeline_list: list[Pipeline],
+        pipeline_choice_index: int,
+        change_choice_index_signal,
+        parent=None,
+    ):
+        super().__init__(parent=parent)
+        self.msg = msg
+        self.pipeline_list = pipeline_list
+        self.pipeline_choice_index = pipeline_choice_index
+        self.change_choice_index_signal = change_choice_index_signal
+        self.init_ui()
+        self.refresh()
+
+    def init_ui(self):
+        pipeline_layout = QVBoxLayout()
+        pipeline_layout.addStretch(1)
+
+        info_label = QLabel(self.msg)
+        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pipeline_layout.addWidget(info_label)
+
+        layout1 = QHBoxLayout()
+
+        self.pipeline_combobox = QComboBox()
+        for pipeline in self.pipeline_list:
+            self.pipeline_combobox.addItem(pipeline.name)
+        self.pipeline_combobox.setCurrentIndex(self.pipeline_choice_index)
+        self.pipeline_combobox.currentIndexChanged.connect(
+            self.pipeline_combobox_currentIndexChanged
+        )
+        layout1.addWidget(self.pipeline_combobox)
+
+        self.pipeline1_setting_btn = QPushButton("设置")
+        self.pipeline1_setting_btn.clicked.connect(self.pipeline_setting_btn_clicked)
+        layout1.addWidget(self.pipeline1_setting_btn)
+
+        pipeline_layout.addLayout(layout1)
+
+        self.pipeline_setting_widget_layout = QHBoxLayout()
+        pipeline_layout.addLayout(self.pipeline_setting_widget_layout)
+
+        pipeline_layout.addStretch(1)
+        self.setLayout(pipeline_layout)
+
+    def refresh(self):
+        from ..common import delete_layout_children
+
+        delete_layout_children(self.pipeline_setting_widget_layout)
+        if self.pipeline_list[self.pipeline_choice_index].has_setting_widget():
+            setting_widget = self.pipeline_list[
+                self.pipeline_choice_index
+            ].setting_widget()
+            self.pipeline_setting_widget_layout.addWidget(setting_widget)
+        if self.pipeline_list[self.pipeline_choice_index].has_setting_window():
+            self.pipeline1_setting_btn.setEnabled(True)
+        else:
+            self.pipeline1_setting_btn.setDisabled(True)
+
+    def pipeline_setting_btn_clicked(self):
+        if self.pipeline_list[self.pipeline_choice_index].has_setting_window():
+            self.setting_window = self.pipeline_list[
+                self.pipeline_choice_index
+            ].setting_window()
+            self.setting_window.show()
+
+    def pipeline_combobox_currentIndexChanged(self):
+        self.pipeline_choice_index = self.pipeline_combobox.currentIndex()
+        self.change_choice_index_signal.emit(self.pipeline_combobox.currentIndex())
+        self.refresh()
