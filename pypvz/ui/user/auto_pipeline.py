@@ -379,7 +379,12 @@ class AutoComponent(Pipeline):
 
 class PipelineScheme:
     def __init__(
-        self, cfg: Config, lib: Library, repo: Repository, user: User, logger: Logger
+        self,
+        cfg: Config,
+        lib: Library,
+        repo: Repository,
+        user: User,
+        logger: Logger,
     ):
         self.cfg = cfg
         self.logger = logger
@@ -405,10 +410,17 @@ class PipelineScheme:
         self.pipeline4: list[Pipeline] = [AutoComponent(cfg, lib, repo, logger)]
         self.pipeline4_choice_index = 0
 
-    def run(self, stop_channel: Queue):
+    def run(self, stop_channel: Queue, stop_after_finish=True):
         cnt = 0
+        if stop_after_finish:
+            pre_stop_channel = stop_channel
+            stop_channel = Queue()
         while True:
             cnt += 1
+            if stop_after_finish:
+                if pre_stop_channel.qsize() != 0:
+                    self.logger.log("用户终止")
+                    return
             if stop_channel.qsize() != 0:
                 self.logger.log("用户终止")
                 return
@@ -494,6 +506,7 @@ class PipelineMan:
         self.logger = logger
         self.scheme_list: list[PipelineScheme] = []
         self.current_scheme_index = 0
+        self.stop_after_finish = True
 
     @property
     def current_scheme(self):
@@ -517,6 +530,7 @@ class PipelineMan:
                         scheme.serialize() for scheme in self.scheme_list
                     ],
                     "current_scheme_index": self.current_scheme_index,
+                    "stop_after_finish": self.stop_after_finish,
                 },
                 f,
             )

@@ -80,36 +80,6 @@ class AutoSynthesisMan:
                 max_plant_id = deputy_plant_id
         return max_plant_id
 
-    def _synthesis(self, id1, id2, attribute_name):
-        response = self.synthesisMan.synthesis(
-            id1,
-            id2,
-            self.attribute_book_dict[attribute_name],
-            self.reinforce_number,
-        )
-        if response.status != 0:
-            result = {
-                "success": False,
-                "result": "合成出错。以下为详细报错原因：",
-            }
-            try:
-                result['result'] += response.body.description
-            except:
-                result["result"] += str(response.body)
-            return result
-        if "fight" not in response.body:
-            result = {
-                "success": False,
-                "result": "合成出错。以下为详细报错原因：",
-            }
-            result['result'] += str(response.body)
-            return result
-        return {
-            "success": True,
-            "result": "合成成功",
-            "body": response.body,
-        }
-
     def synthesis(self, need_check=True):
         if need_check:
             self.check_data(need_check)
@@ -135,8 +105,11 @@ class AutoSynthesisMan:
         deputy_plant_id = list(self.auto_synthesis_pool_id)[0]
 
         try:
-            result = self._synthesis(
-                deputy_plant_id, self.main_plant_id, self.chosen_attribute
+            result = self.synthesisMan.synthesis(
+                deputy_plant_id,
+                self.main_plant_id,
+                self.attribute_book_dict[self.chosen_attribute],
+                self.reinforce_number,
             )
         except Exception as e:
             if "amf返回结果为空" in str(e):
@@ -252,9 +225,6 @@ class AutoSynthesisMan:
                 if hasattr(self, k):
                     setattr(self, k, v)
         self.check_data(False)
-
-
-
 
 
 class SingleFubenCave:

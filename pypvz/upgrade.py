@@ -96,8 +96,29 @@ class SynthesisMan:
             float(attribute_book_id),
             float(reinforce_number),
         ]
-        return self.wr.amf_post_retry(body, 'api.tool.synthesis', "/pvz/amf/", "合成")
-    
+        response = self.wr.amf_post_retry(body, 'api.tool.synthesis', "/pvz/amf/", "合成")
+        if response.status != 0:
+            result = {
+                "success": False,
+                "result": "合成出错。以下为详细报错原因：",
+            }
+            try:
+                result['result'] += response.body.description
+            except:
+                result["result"] += str(response.body)
+            return result
+        if "fight" not in response.body:
+            result = {
+                "success": False,
+                "result": "合成出错。以下为详细报错原因：",
+            }
+            result['result'] += str(response.body)
+            return result
+        return {
+            "success": True,
+            "result": "合成成功",
+            "body": response.body,
+        }
 
 
 class HeritageMan:
@@ -190,7 +211,7 @@ class HeritageMan:
                 "success": True,
                 "result": "全属性传承成功",
             }
-            
+
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "user_heritageman")
         with open(save_path, "wb") as f:
@@ -215,7 +236,6 @@ class HeritageMan:
 
 
 class SkillStoneMan:
-    
     def __init__(self, cfg: Config, lib: Library):
         self.lib = lib
         self.cfg = cfg
@@ -226,7 +246,9 @@ class SkillStoneMan:
             float(plant_id),
             float(skill_dict["id"]),
         ]
-        response = self.wr.amf_post_retry(body, 'api.apiorganism.skillUp', "/pvz/amf/", "合成")
+        response = self.wr.amf_post_retry(
+            body, 'api.apiorganism.skillUp', "/pvz/amf/", "合成"
+        )
         if response.status == 1:
             return {
                 "success": False,

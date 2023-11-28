@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QLineEdit,
     QApplication,
+    QCheckBox,
 )
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -26,6 +27,7 @@ from ...wrapped import WaitEventThread
 class PipelineSettingWindow(QMainWindow):
     finish_signal = pyqtSignal()
     stop_signal = pyqtSignal()
+
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
         self.usersettings = usersettings
@@ -78,6 +80,14 @@ class PipelineSettingWindow(QMainWindow):
         self.start_btn = QPushButton("开始")
         self.start_btn.clicked.connect(self.start_btn_clicked)
         self.scheme_choose_layout.addWidget(self.start_btn)
+        self.stop_after_finish_checkbox = QCheckBox("一周期完成后才停止")
+        self.stop_after_finish_checkbox.setChecked(
+            self.usersettings.pipeline_man.stop_after_finish
+        )
+        self.stop_after_finish_checkbox.stateChanged.connect(
+            self.stop_after_finish_checkbox_stateChanged
+        )
+        self.scheme_choose_layout.addWidget(self.stop_after_finish_checkbox)
 
         self.scheme_choose_widget.setLayout(self.scheme_choose_layout)
         self.main_layout.addWidget(self.scheme_choose_widget)
@@ -86,6 +96,11 @@ class PipelineSettingWindow(QMainWindow):
         self.main_layout.addWidget(self.scheme_widget)
         self.main_widget.setLayout(self.main_layout)
         self.setCentralWidget(self.main_widget)
+
+    def stop_after_finish_checkbox_stateChanged(self):
+        self.usersettings.pipeline_man.stop_after_finish = (
+            self.stop_after_finish_checkbox.isChecked()
+        )
 
     def refresh_scheme_list(self):
         self.scheme_list.clear()
@@ -118,9 +133,7 @@ class PipelineSettingWindow(QMainWindow):
         if scheme is None:
             self.usersettings.logger.log("未选中任何方案")
             return
-        self.usersettings.pipeline_man.remove_scheme(
-            scheme
-        )
+        self.usersettings.pipeline_man.remove_scheme(scheme)
         self.choose_scheme(None)
         self.refresh_scheme_list()
 
@@ -147,6 +160,7 @@ class PipelineSettingWindow(QMainWindow):
                     self.stop_queue,
                     self.finish_signal,
                     self.rest_event,
+                    self.usersettings.pipeline_man.stop_after_finish,
                 )
                 self.rest_event.clear()
                 self.run_thread.start()
@@ -168,6 +182,7 @@ class PipelineSettingWindow(QMainWindow):
         self.run_thread = None
         while self.stop_queue.qsize() > 0:
             self.stop_queue.get()
+
 
 class SchemeWidget(QWidget):
     change_pipeline1_choice_index_signal = pyqtSignal(int)
@@ -196,6 +211,7 @@ class SchemeWidget(QWidget):
     def switch_scheme(self, pipeline_scheme: PipelineScheme):
         self.pipeline_scheme = pipeline_scheme
         from ..common import delete_layout_children
+
         delete_layout_children(self.main_layout)
         if self.pipeline_scheme is not None:
             self.init_ui()

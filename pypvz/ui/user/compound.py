@@ -240,36 +240,23 @@ class AutoCompoundMan:
         return plant_id
 
     def _exchange(self, id1, func):
-        cnt, max_retry = 0, 5
         plant1 = self.repo.get_plant(id1)
-        while cnt < max_retry:
-            cnt += 1
-            try:
-                result = func()
-                break
-            except Exception as e:
-                self.logger.log("在复制植物时出现传承异常，异常类型：{}".format(type(e).__name__))
-                self.repo.refresh_repository()
-                after_plant1 = self.repo.get_plant(id1)
-                attr_name = self.attribute2plant_attribute[self.chosen_attribute]
-                if not getattr(after_plant1, attr_name) == getattr(plant1, attr_name):
-                    self.logger.log(
-                        "检测传出植物前后属性一致，判断为传承失败，尝试暂停1秒后重新传承，最多再尝试{}次".format(
-                            max_retry - cnt
-                        )
-                    )
-                    sleep(1)
-                else:
-                    self.logger.log("检测传出植物前后属性不一致，判断为传承成功，继续复合")
-                    result = {
-                        "success": True,
-                    }
-                    break
-        else:
-            self.logger.log(f"尝试{max_retry}次传承失败，中止复合")
-            result = {
-                "success": False,
-            }
+        try:
+            result = func()
+        except Exception as e:
+            if "amf返回结果为空" in str(e):
+                msg = "可能由以下原因引起：参与复合的植物不见了、传承增强卷轴不够、传承书不够"
+                self.logger.log("复合异常，已跳出复合。{}".format(msg))
+                return False
+            self.repo.refresh_repository()
+            after_plant1 = self.repo.get_plant(id1)
+            attr_name = self.attribute2plant_attribute[self.chosen_attribute]
+            if not getattr(after_plant1, attr_name) == getattr(plant1, attr_name):
+                self.logger.log("复合异常。检测传出植物前后属性一致，判断为传承失败。尝试重新传承")
+                return self._exchange(id1, func)
+            else:
+                self.logger.log("复合异常。检测传出植物前后属性不一致，判断为传承成功。")
+                return True
         return result["success"]
 
     def exchange_one(self, id1, id2, book_id, num):
@@ -285,52 +272,29 @@ class AutoCompoundMan:
         return self._exchange(id1, run)
 
     def _synthesis(self, id1, id2, book_id, reinforce_num):
-        cnt, max_retry = 0, 10
-        while cnt < max_retry:
-            cnt += 1
-            try:
-                response = self.auto_synthesis_man.synthesisMan.synthesis(
-                    id1,
-                    id2,
-                    book_id,
-                    reinforce_num,
-                )
-                if response.status != 0:
-                    result = {
-                        "success": False,
-                        "result": response.body.description,
-                    }
-                    if "频繁" in result['result']:
-                        raise RuntimeError(result['result'])
-                else:
-                    result = {
-                        "success": True,
-                        "result": "合成成功",
-                    }
-                break
-            except Exception as e:
-                self.logger.log("合成植物时出现异常，异常类型：{}".format(type(e).__name__))
-                self.repo.refresh_repository()
-                if self.repo.get_plant(id2) is not None:
-                    self.logger.log(
-                        "检测被吃植物仍然存在，判断为合成失败，尝试暂停1秒后重新合成，最多再尝试{}次".format(
-                            max_retry - cnt
-                        )
-                    )
-                    sleep(1)
-                else:
-                    self.logger.log("检测被吃植物消失，判断为合成成功，继续复合")
-                    result = {
-                        "success": True,
-                        "result": "合成成功",
-                    }
-                    break
-        else:
-            self.logger.log(f"尝试{max_retry}次合成失败，中止复合")
-            result = {
-                "success": False,
-                "result": "合成失败",
-            }
+        try:
+            result = self.auto_synthesis_man.synthesisMan.synthesis(
+                id1,
+                id2,
+                book_id,
+                reinforce_num,
+            )
+        except Exception as e:
+            if "amf返回结果为空" in str(e):
+                msg = "可能由以下原因引起：参与合成的植物不见了、增强卷轴不够、合成书不够"
+                return {
+                    "success": False,
+                    "result": "合成异常，已跳出合成。{}".format(msg),
+                }
+            self.repo.refresh_repository()
+            if self.repo.get_plant(id2) is None:
+                return {
+                    "success": True,
+                    "result": "合成异常，但是底座植物不存在，所以判定为合成成功",
+                }
+            else:
+                self.logger.log("合成异常，检测到底座还在，尝试重新合成")
+                return self._synthesis(id1, id2, book_id, reinforce_num)
         return result
 
     def copy_source_plant(self, refresh_signal):
