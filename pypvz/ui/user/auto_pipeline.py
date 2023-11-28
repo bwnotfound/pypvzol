@@ -310,7 +310,7 @@ class AutoComponent(Pipeline):
         self.lib = lib
         self.repo = repo
         self.logger = logger
-        from .manager import AutoCompoundMan
+        from .compound import AutoCompoundMan
 
         self.auto_component_man = AutoCompoundMan(cfg, lib, repo, logger)
         self.interrupt_event = Event()
@@ -318,7 +318,7 @@ class AutoComponent(Pipeline):
 
     def run(self, plant_list, stop_channel: Queue):
         for plant in plant_list:
-            self.auto_component_man.auto_synthesis_pool_id.add(plant.id)
+            self.auto_component_man.auto_compound_pool_id.add(plant.id)
         from ..windows.compound import CompoundThread
 
         self.rest_event.clear()

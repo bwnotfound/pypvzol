@@ -22,7 +22,7 @@ from ...repository import Plant
 from .common import ImageWindow, require_permission
 from ... import Config, Repository, Library
 from ..message import Logger
-from ..user.manager import AutoCompoundMan
+from ..user.compound import AutoCompoundMan
 
 
 class AutoCompoundWindow(QMainWindow):
@@ -285,18 +285,6 @@ class AutoCompoundWindow(QMainWindow):
         auto_compound_single_btn.clicked.connect(self.auto_compound_single_btn_clicked)
         widget6_layout.addWidget(auto_compound_single_btn)
 
-        widget6_2_layout = QHBoxLayout()
-        widget6_2_layout.addWidget(QLabel("异常后继续复合："))
-        self.force_compound_checkbox = QCheckBox()
-        self.force_compound_checkbox.setChecked(
-            self.auto_compound_man.force_compound
-        )
-        self.force_compound_checkbox.stateChanged.connect(
-            self.force_compound_checkbox_value_changed
-        )
-        widget6_2_layout.addWidget(self.force_compound_checkbox)
-        widget6_layout.addLayout(widget6_2_layout)
-
         widget6_layout.addWidget(QLabel("使用前请一定点击下方按钮\n查看原理"))
         illustration_btn = QPushButton("查看原理")
         illustration_btn.clicked.connect(self.illustration_btn_clicked)
@@ -323,11 +311,6 @@ class AutoCompoundWindow(QMainWindow):
 
     def illustration_btn_clicked(self):
         ImageWindow("data/复合通用方案.png", self).show()
-
-    def force_compound_checkbox_value_changed(self):
-        self.auto_compound_man.set_force_compound(
-            self.force_compound_checkbox.isChecked()
-        )
 
     def use_all_exchange_checkbox_value_changed(self):
         self.auto_compound_man.use_all_exchange = (
@@ -442,7 +425,7 @@ class AutoCompoundWindow(QMainWindow):
                 self.logger.log("合成数据检查出异常，停止合成")
                 return False
         for deputy_plant_id in list(
-            self.auto_compound_man.auto_synthesis_pool_id
+            self.auto_compound_man.auto_compound_pool_id
         ):
             deputy_plant = self.repo.get_plant(deputy_plant_id)
             if deputy_plant is not None:
@@ -454,14 +437,14 @@ class AutoCompoundWindow(QMainWindow):
     def remove_abnormal_plant_btn_clicked(self):
         cnt = 0
         for deputy_plant_id in list(
-            self.auto_compound_man.auto_synthesis_pool_id
+            self.auto_compound_man.auto_compound_pool_id
         ):
             deputy_plant = self.repo.get_plant(deputy_plant_id)
             if deputy_plant is None or not self._check_plant(
                 deputy_plant, full_check=True, alert=False
             ):
                 if not self._check_plant(deputy_plant, full_check=True, alert=False):
-                    self.auto_compound_man.auto_synthesis_pool_id.remove(
+                    self.auto_compound_man.auto_compound_pool_id.remove(
                         deputy_plant_id
                     )
                     cnt += 1
@@ -513,7 +496,7 @@ class AutoCompoundWindow(QMainWindow):
         self.plant_list.clear()
         for plant in self.repo.plants:
             if (
-                plant.id in self.auto_compound_man.auto_synthesis_pool_id
+                plant.id in self.auto_compound_man.auto_compound_pool_id
                 or plant.id == self.auto_compound_man.source_plant_id
                 or plant.id == self.auto_compound_man.liezhi_plant_id
                 or plant.id == self.auto_compound_man.receiver_plant_id
@@ -525,7 +508,7 @@ class AutoCompoundWindow(QMainWindow):
 
     def refresh_plant_pool_list(self):
         self.plant_pool_list.clear()
-        for plant_id in self.auto_compound_man.auto_synthesis_pool_id:
+        for plant_id in self.auto_compound_man.auto_compound_pool_id:
             plant = self.repo.get_plant(plant_id)
             if plant is None:
                 continue
@@ -537,7 +520,7 @@ class AutoCompoundWindow(QMainWindow):
         message = []
         message.append(
             "复合池植物数量：{}个".format(
-                len(self.auto_compound_man.auto_synthesis_pool_id)
+                len(self.auto_compound_man.auto_compound_pool_id)
             )
         )
         message.append(
@@ -629,7 +612,7 @@ class AutoCompoundWindow(QMainWindow):
             self.logger.log("请先选择一个植物再导入合成池")
             return
         for plant_id in selected_plant_id:
-            self.auto_compound_man.auto_synthesis_pool_id.add(plant_id)
+            self.auto_compound_man.auto_compound_pool_id.add(plant_id)
         self.auto_compound_man.check_data()
         self.refresh_plant_list()
         self.refresh_plant_pool_list()
@@ -764,7 +747,7 @@ class AutoCompoundWindow(QMainWindow):
                 return
             for plant_id in selected_items_id:
                 try:
-                    self.auto_compound_man.auto_synthesis_pool_id.remove(
+                    self.auto_compound_man.auto_compound_pool_id.remove(
                         plant_id
                     )
                 except KeyError:

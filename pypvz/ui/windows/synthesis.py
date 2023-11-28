@@ -190,18 +190,6 @@ class AutoSynthesisWindow(QMainWindow):
         )
         widget6_layout.addWidget(auto_synthesis_single_btn)
 
-        widget6_2_layout = QHBoxLayout()
-        widget6_2_layout.addWidget(QLabel("异常后继续合成："))
-        self.force_synthesisi_checkbox = QCheckBox()
-        self.force_synthesisi_checkbox.setChecked(
-            self.usersettings.auto_synthesis_man.force_synthesis
-        )
-        self.force_synthesisi_checkbox.stateChanged.connect(
-            self.force_synthesisi_checkbox_value_changed
-        )
-        widget6_2_layout.addWidget(self.force_synthesisi_checkbox)
-        widget6_layout.addLayout(widget6_2_layout)
-
         widget6_layout.addWidget(QLabel("以下是部分合成信息"))
         self.information_text_box = QPlainTextEdit()
         self.information_text_box.setReadOnly(True)
@@ -215,11 +203,6 @@ class AutoSynthesisWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-
-    def force_synthesisi_checkbox_value_changed(self):
-        self.usersettings.auto_synthesis_man.force_synthesis = (
-            self.force_synthesisi_checkbox.isChecked()
-        )
 
     def mantissa_line_edit_value_changed(self):
         try:
@@ -554,7 +537,6 @@ class AutoSynthesisWindow(QMainWindow):
                     self.refresh_all_signal,
                     self.need_synthesis,
                     self.rest_event,
-                    force_synthesis=self.usersettings.auto_synthesis_man.force_synthesis,
                 )
                 self.rest_event.clear()
                 self.run_thread.start()
@@ -618,7 +600,6 @@ class SynthesisThread(threading.Thread):
         need_synthesis,
         rest_event: Event,
         synthesis_number=None,
-        force_synthesis=False,
     ):
         super().__init__()
         self.usersettings = usersettings
@@ -628,7 +609,6 @@ class SynthesisThread(threading.Thread):
         self.refresh_all_signal = refresh_all_signal
         self.need_synthesis = need_synthesis
         self.rest_event = rest_event
-        self.force_synthesis = force_synthesis
 
     def run(self):
         try:

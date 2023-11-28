@@ -22,12 +22,12 @@ from ...utils.common import second2str
 from .auto_challenge import Challenge4Level
 from .manager import (
     AutoSynthesisMan,
-    AutoCompoundMan,
     FubenMan,
     TerritoryMan,
     DailyMan,
     GardenMan,
 )
+from .compound import AutoCompoundMan
 from . import PipelineMan
 from ...shop import PurchaseItem
 
