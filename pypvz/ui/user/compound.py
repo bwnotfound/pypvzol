@@ -220,7 +220,7 @@ class AutoCompoundMan:
         auto_compound_pool_id = list(self.auto_compound_pool_id)
         for plant_id in auto_compound_pool_id[:num]:
             self.auto_compound_pool_id.remove(plant_id)
-            self.auto_synthesis_man.auto_compound_pool_id.add(plant_id)
+            self.auto_synthesis_man.auto_synthesis_pool_id.add(plant_id)
 
     def get_deputy_plant(self):
         auto_compound_pool_id = list(self.auto_compound_pool_id)
