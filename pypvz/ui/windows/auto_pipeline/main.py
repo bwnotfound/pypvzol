@@ -121,6 +121,8 @@ class PipelineSettingWindow(QMainWindow):
         self.usersettings.pipeline_man.remove_scheme(
             scheme
         )
+        self.choose_scheme(None)
+        self.refresh_scheme_list()
 
     def scheme_rename_btn_clicked(self):
         scheme = self.current_scheme()
@@ -176,7 +178,7 @@ class SchemeWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.main_layout = QHBoxLayout()
-        self.main_layout.setSpacing(10)
+        self.main_layout.setSpacing(0)
         self.setLayout(self.main_layout)
         self.change_pipeline1_choice_index_signal.connect(
             self.change_pipeline1_choice_index
@@ -193,10 +195,9 @@ class SchemeWidget(QWidget):
 
     def switch_scheme(self, pipeline_scheme: PipelineScheme):
         self.pipeline_scheme = pipeline_scheme
-        if self.pipeline_scheme is None:
-            for i in reversed(range(self.main_layout.count())):
-                self.main_layout.itemAt(i).widget().deleteLater()
-        else:
+        from ..common import delete_layout_children
+        delete_layout_children(self.main_layout)
+        if self.pipeline_scheme is not None:
             self.init_ui()
 
     def init_ui(self):
@@ -207,7 +208,7 @@ class SchemeWidget(QWidget):
             self.change_pipeline1_choice_index_signal,
             self,
         )
-        self.pipeline1_widget.setFixedWidth(int(self.width() * 0.25))
+        self.pipeline1_widget.setMaximumWidth(int(self.width() * 0.25))
         self.main_layout.addWidget(self.pipeline1_widget)
 
         self.pipeline2_widget = PipelineSettingWidget(
@@ -217,7 +218,7 @@ class SchemeWidget(QWidget):
             self.change_pipeline2_choice_index_signal,
             self,
         )
-        self.pipeline2_widget.setFixedWidth(int(self.width() * 0.25))
+        self.pipeline2_widget.setMaximumWidth(int(self.width() * 0.25))
         self.main_layout.addWidget(self.pipeline2_widget)
 
         self.pipeline3_widget = PipelineSettingWidget(
@@ -227,7 +228,7 @@ class SchemeWidget(QWidget):
             self.change_pipeline3_choice_index_signal,
             self,
         )
-        self.pipeline3_widget.setFixedWidth(int(self.width() * 0.25))
+        self.pipeline3_widget.setMaximumWidth(int(self.width() * 0.25))
         self.main_layout.addWidget(self.pipeline3_widget)
 
         self.pipeline4_widget = PipelineSettingWidget(
@@ -237,7 +238,7 @@ class SchemeWidget(QWidget):
             self.change_pipeline4_choice_index_signal,
             self,
         )
-        self.pipeline4_widget.setFixedWidth(int(self.width() * 0.25))
+        self.pipeline4_widget.setMaximumWidth(int(self.width() * 0.25))
         self.main_layout.addWidget(self.pipeline4_widget)
 
     def change_pipeline1_choice_index(self, index):
