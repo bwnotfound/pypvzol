@@ -3,6 +3,7 @@ import os
 import time
 from queue import Queue
 import threading
+from time import perf_counter
 
 from ...shop import Shop
 
@@ -14,7 +15,6 @@ from ... import (
     Task,
     ArenaMan,
     HeritageMan,
-    ServerbattleMan,
 )
 from ..message import IOLogger
 from ...utils.evolution import PlantEvolution
@@ -26,10 +26,12 @@ from .manager import (
     TerritoryMan,
     DailyMan,
     GardenMan,
+    ServerBattleMan,
 )
 from .compound import AutoCompoundMan
 from . import PipelineMan
 from ...shop import PurchaseItem
+
 
 class UserSettings:
     def __init__(
@@ -70,7 +72,7 @@ class UserSettings:
         self.arena_man = ArenaMan(cfg)
         self.auto_synthesis_man = AutoSynthesisMan(cfg, lib, repo)
         self.heritage_man = HeritageMan(self.cfg, self.lib)
-        self.serverbattle_man = ServerbattleMan(self.cfg)
+        self.serverbattle_man = ServerBattleMan(self.cfg, logger=self.logger)
         self.serverbattle_enabled = False
         self.auto_compound_man = AutoCompoundMan(cfg, lib, repo, self.logger)
         self.fuben_man = FubenMan(cfg, repo, self.logger)
@@ -83,12 +85,13 @@ class UserSettings:
         self.daily_man = DailyMan(cfg, self.logger)
         self.garden_man = GardenMan(cfg, repo, lib, self.logger)
         self.garden_enabled = False
-        
+
         self.pipeline_man = PipelineMan(cfg, lib, repo, user, self.logger)
 
     def _start(self, stop_channel: Queue):
         self.repo.refresh_repository(self.logger)
         while stop_channel.qsize() == 0:
+            enter_time = perf_counter()
             # if self.shop_enabled:
             #     try:
             #         shop_info = self.shop.buy_list(list(self.shop_auto_buy_set), 1)
@@ -141,33 +144,33 @@ class UserSettings:
                 if stop_channel.qsize() > 0:
                     break
             if self.territory_enabled:
-                self.territory_man.check_data(False)
                 try:
-                    result = self.territory_man.upload_team()
-                    self.logger.log(result['result'])
+                    if self.territory_man.can_challenge():
+                        self.territory_man.check_data(False)
+                        try:
+                            result = self.territory_man.upload_team()
+                            self.logger.log(result['result'])
+                        except Exception as e:
+                            self.logger.log(f"上领地植物失败，异常种类:{type(e).__name__}。跳过领地挑战")
+                        else:
+                            try:
+                                self.territory_man.auto_challenge(stop_channel)
+                            except Exception as e:
+                                self.logger.log(
+                                    f"自动领地挑战失败，异常种类:{type(e).__name__}。跳过自动领地挑战"
+                                )
+                        try:
+                            result = self.territory_man.release_plant(self.user.id)
+                            self.logger.log(result['result'])
+                        except Exception as e:
+                            self.logger.log(f"领地释放植物失败，异常种类:{type(e).__name__}。")
                 except Exception as e:
-                    self.logger.log(f"上领地植物失败，异常种类:{type(e).__name__}。跳过领地挑战")
-                else:
-                    try:
-                        self.territory_man.auto_challenge(stop_channel)
-                    except Exception as e:
-                        self.logger.log(f"自动领地挑战失败，异常种类:{type(e).__name__}。跳过自动领地挑战")
-                try:
-                    result = self.territory_man.release_plant(self.user.id)
-                    self.logger.log(result['result'])
-                except Exception as e:
-                    self.logger.log(f"领地释放植物失败，异常种类:{type(e).__name__}。")
+                    self.logger.log(f"领地挑战失败，异常种类:{type(e).__name__}。跳过领地挑战")
                 if stop_channel.qsize() > 0:
                     break
             if self.serverbattle_enabled:
                 try:
-                    while True:
-                        result = self.serverbattle_man.challenge()
-                        self.logger.log(result["result"])
-                        if not result["success"]:
-                            break
-                        if stop_channel.qsize() > 0:
-                            break
+                    self.serverbattle_man.auto_challenge(stop_channel)
                 except Exception as e:
                     self.logger.log(f"跨服挑战失败，异常种类:{type(e).__name__}。跳过跨服挑战")
                     break
@@ -206,17 +209,19 @@ class UserSettings:
                     self.logger.log(f"自动挑战失败，异常种类:{type(e).__name__}。跳过自动挑战")
             self.logger.log("工作完成，等待{}".format(second2str(self.rest_time)))
             if self.rest_time == 0:
-                time.sleep(0.1)
+                sleep_time = max(perf_counter() - enter_time, 0.3)
+                time.sleep(sleep_time)
             for _ in range(self.rest_time):
                 if stop_channel.qsize() > 0:
                     break
                 time.sleep(1)
+        self.logger.log("停止工作")
 
     def start(self):
         if self.start_thread is None or not self.start_thread.is_alive():
             self.start_thread = threading.Thread(
                 target=self._start,
-                args=(self.stop_channel, ),
+                args=(self.stop_channel,),
             )
             self.start_thread.start()
 
@@ -276,6 +281,7 @@ class UserSettings:
         self.territory_man.save(self.save_dir)
         self.garden_man.save(self.save_dir)
         self.pipeline_man.save(self.save_dir)
+        self.serverbattle_man.save(self.save_dir)
 
     def load(self):
         self.challenge4Level.load(self.save_dir)
@@ -298,3 +304,4 @@ class UserSettings:
         self.territory_man.load(self.save_dir)
         self.garden_man.load(self.save_dir)
         self.pipeline_man.load(self.save_dir)
+        self.serverbattle_man.load(self.save_dir)

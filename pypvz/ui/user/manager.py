@@ -11,7 +11,7 @@ from ... import (
     WebRequest,
 )
 from ..message import Logger
-from ... import FubenRequest
+from ... import FubenRequest, Serverbattle
 from ...fuben import FubenCave
 from ...utils.recover import RecoverMan
 from ..wrapped import signal_block_emit
@@ -381,6 +381,24 @@ class TerritoryMan:
             if self.repo.get_plant(plant_id) is not None
         ]
 
+    def can_challenge(self):
+        body = []
+        response = self.wr.amf_post_retry(
+            body,
+            "api.territory.init",
+            "/pvz/amf/",
+            "查询领地剩余次数",
+            logger=self.logger,
+        )
+        if response.status != 0:
+            self.logger.log("查询领地剩余次数失败，原因：{}".format(response.body.description))
+            return False
+        rest_num = int(response.body["challengecount"])
+        if rest_num < self.difficulty_choice:
+            self.logger.log("剩余次数不足，剩余次数：{}".format(rest_num))
+            return False
+        return True
+
     def challenge(self):
         body = [float(2000 + self.difficulty_choice), [], float(1), float(0)]
         response = self.wr.amf_post_retry(
@@ -595,6 +613,62 @@ class GardenMan:
 
     def load(self, load_dir):
         load_path = os.path.join(load_dir, "auto_garden")
+        if os.path.exists(load_path):
+            with open(load_path, "rb") as f:
+                d = pickle.load(f)
+            for k, v in d.items():
+                if hasattr(self, k):
+                    setattr(self, k, v)
+
+
+class ServerBattleMan:
+    def __init__(self, cfg: Config, logger: Logger):
+        self.cfg = cfg
+        self.logger = logger
+        self.serverbattle = Serverbattle(cfg)
+        self.rest_challenge_num_limit = 60
+
+    def auto_challenge(self, stop_channel: Queue):
+        current_challenge_num = self.rest_challenge_num()
+        if current_challenge_num is None:
+            self.logger.log("获取跨服信息失败")
+            return
+
+        while True:
+            if current_challenge_num <= self.rest_challenge_num_limit:
+                self.logger.log(
+                    "跨服挑战次数剩余量已达限定值：{}/{}".format(
+                        current_challenge_num, self.rest_challenge_num_limit
+                    )
+                )
+                return
+            result = self.serverbattle.challenge()
+            self.logger.log(result["result"])
+            if not result["success"]:
+                break
+            if stop_channel.qsize() > 0:
+                break
+            current_challenge_num -= 1
+
+    def rest_challenge_num(self):
+        result = self.serverbattle.get_info()
+        if not result["success"]:
+            self.logger.log(result["result"])
+            return None
+        return int(result["result"]["remaining_challenges"])
+
+    def save(self, save_dir):
+        save_path = os.path.join(save_dir, "serverbattle_man")
+        with open(save_path, "wb") as f:
+            pickle.dump(
+                {
+                    "rest_challenge_num_limit": self.rest_challenge_num_limit,
+                },
+                f,
+            )
+
+    def load(self, load_dir):
+        load_path = os.path.join(load_dir, "serverbattle_man")
         if os.path.exists(load_path):
             with open(load_path, "rb") as f:
                 d = pickle.load(f)

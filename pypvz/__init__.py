@@ -8,5 +8,5 @@ from .cave import CaveMan
 from .task import Task
 from .upgrade import UpgradeMan, SynthesisMan, HeritageMan
 from .arena import ArenaMan
-from .serverbattle import ServerbattleMan
+from .serverbattle import Serverbattle
 from .fuben import FubenRequest

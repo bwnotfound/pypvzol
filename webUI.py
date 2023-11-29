@@ -232,14 +232,28 @@ class SettingWindow(QMainWindow):
         menu_layout.addWidget(arena_widget, 4, 0)
 
         serverbattle_widget = QWidget()
-        serverbattle_layout = QHBoxLayout()
+        serverbattle_layout = QVBoxLayout()
+        layout1 = QHBoxLayout()
         self.serverbattle_checkbox = serverbattle_checkbox = QCheckBox("跨服战")
         serverbattle_checkbox.setFont(normal_font)
         serverbattle_checkbox.setChecked(self.usersettings.serverbattle_enabled)
         serverbattle_checkbox.stateChanged.connect(
             self.serverbattle_checkbox_stateChanged
         )
-        serverbattle_layout.addWidget(serverbattle_checkbox)
+        layout1.addWidget(serverbattle_checkbox)
+        serverbattle_layout.addLayout(layout1)
+        layout2 = QHBoxLayout()
+        layout2.addWidget(QLabel("跨服次数保存数量:"))
+        self.serverbattle_rest_num_inputbox = QLineEdit()
+        self.serverbattle_rest_num_inputbox.setText(
+            str(self.usersettings.serverbattle_man.rest_challenge_num_limit)
+        )
+        self.serverbattle_rest_num_inputbox.setValidator(QtGui.QIntValidator(0, 9999))
+        self.serverbattle_rest_num_inputbox.textChanged.connect(
+            self.serverbattle_rest_num_inputbox_textChanged
+        )
+        layout2.addWidget(self.serverbattle_rest_num_inputbox)
+        serverbattle_layout.addLayout(layout2)
         serverbattle_widget.setLayout(serverbattle_layout)
         menu_layout.addWidget(serverbattle_widget, 4, 1)
 
@@ -333,6 +347,11 @@ class SettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+        
+    def serverbattle_rest_num_inputbox_textChanged(self):
+        self.usersettings.serverbattle_man.rest_challenge_num_limit = (
+            int(self.serverbattle_rest_num_inputbox.text())
+        )
 
     def territory_setting_btn_clicked(self):
         self.territory_setting_window = TerritorySettingWindow(
