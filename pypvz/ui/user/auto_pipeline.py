@@ -141,6 +141,22 @@ class OpenBox(Pipeline):
         return
 
     def run(self, stop_channel: Queue):
+        tool = self.repo.get_tool(self.box_id)
+        if tool is None:
+            return {
+                "success": False,
+                "info": "使用物品失败，原因：魔神箱不存在",
+            }
+        if tool['amount'] < self.amount:
+            return {
+                "success": False,
+                "info": "使用物品失败，原因：魔神箱需要{}个，实际有{}个".format(self.amount, tool['amount']),
+            }
+        if len(self.repo.plants) + self.amount > self.repo.organism_grid_amount:
+            return {
+                "success": False,
+                "info": "使用物品失败，原因：植物数量超过上限",
+            }
         pre_id2plant = self.repo.id2plant
         result = self.repo.use_tool(self.box_id, self.amount, self.lib)
         if result is None:
@@ -252,10 +268,18 @@ class UpgradeQuality(Pipeline):
         self.need_show_all_info = False
         self.force_upgrade = True
         self.pool_size = 3
+        self.upgrade_plant_amount = 1
         self.interrupt_event = Event()
         self.rest_event = Event()
 
     def run(self, plant_list, stop_channel: Queue):
+        if len(plant_list) < self.upgrade_plant_amount:
+            return {
+                "success": False,
+                "info": "升品植物数量不足。需要{}个，实际{}个".format(
+                    self.upgrade_plant_amount, len(plant_list)
+                ),
+            }
         from ..windows.quality import UpgradeQualityThread
 
         self.quality_thread = UpgradeQualityThread(
@@ -302,6 +326,28 @@ class UpgradeQuality(Pipeline):
             "result": plant_list,
         }
 
+    def setting_widget(self):
+        from ..windows.auto_pipeline.setting_panel import UpgradeQualityWidget
+
+        return UpgradeQualityWidget(self)
+
+    def has_setting_widget(self):
+        return True
+
+    def serialize(self):
+        return {
+            "target_quality_index": self.target_quality_index,
+            "need_show_all_info": self.need_show_all_info,
+            "force_upgrade": self.force_upgrade,
+            "pool_size": self.pool_size,
+            "upgrade_plant_amount": self.upgrade_plant_amount,
+        }
+
+    def deserialize(self, d):
+        for k, v in d.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+
 
 class AutoComponent(Pipeline):
     def __init__(self, cfg: Config, lib: Library, repo: Repository, logger: Logger):
@@ -344,7 +390,11 @@ class AutoComponent(Pipeline):
         for plant in plant_list:
             if self.repo.get_plant(plant.id) is not None:
                 rest_plant_list.append(plant)
-        if len(rest_plant_list) != 1:
+        cnt = 0
+        for scheme in self.auto_component_man.scheme_list:
+            if scheme.enabled:
+                cnt += 1
+        if len(rest_plant_list) != cnt:
             return {
                 "success": False,
                 "info": "复合失败，原因：本应被吃的植物仍然存在",
@@ -424,6 +474,7 @@ class PipelineScheme:
             if stop_channel.qsize() != 0:
                 self.logger.log("用户终止")
                 return
+            self.repo.refresh_repository()
             result = self.pipeline1[self.pipeline1_choice_index].run(stop_channel)
             if stop_channel.qsize() != 0:
                 self.logger.log("用户终止")

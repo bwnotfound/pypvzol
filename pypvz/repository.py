@@ -136,6 +136,7 @@ class Repository:
         self.plants.sort(key=lambda x: (-x.grade, x.pid, -x.quality_index, -x.fight))
         self.id2plant = {plant.id: plant for plant in self.plants}
         self.id2tool = {tool['id']: tool for tool in self.tools}
+        self.organism_grid_amount = int(warehouse.get("organism_grid_amount"))
 
     def hp_below(self, high, id_only=False):
         result = []
