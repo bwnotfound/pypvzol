@@ -18,7 +18,7 @@ class FubenRequest:
 
     def get_caves(self, layer, logger):
         body = [float(layer)]
-        response = self.wr.amf_post_retry(body, "api.fuben.display", '/pvz/amf/', '副本洞口信息', logger=logger)
+        response = self.wr.amf_post_retry(body, "api.fuben.display", '/pvz/amf/', '副本洞口信息', logger=logger, except_retry=True)
         caves = [FubenCave(root) for root in response.body['_caves']]
         return caves
 

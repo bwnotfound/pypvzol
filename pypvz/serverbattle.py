@@ -20,11 +20,15 @@ class Serverbattle:
             "success": True,
             "result": f"跨服挑战成功。挑战结果：{response.body['is_winning']}",
         }
-    
+
     def get_info(self):
         body = []
         response = self.wr.amf_post_retry(
-            body, 'api.serverbattle.qualifying', "/pvz/amf/", "获取跨服信息"
+            body,
+            'api.serverbattle.qualifying',
+            "/pvz/amf/",
+            "获取跨服信息",
+            except_retry=True,
         )
         if response.status != 0:
             return {

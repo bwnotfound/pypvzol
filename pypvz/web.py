@@ -308,10 +308,13 @@ class WebRequest:
     def get_retry(
         self,
         url,
+        msg,
         use_cache=False,
         init_header=True,
         url_format=True,
         max_retry=15,
+        logger=None,
+        except_retry=False,
         **kwargs,
     ):
         cnt = 0
@@ -325,23 +328,47 @@ class WebRequest:
                     url_format=url_format,
                     **kwargs,
                 )
+                if len(response) == 0:
+                    return None
+                try:
+                    text = response.decode("utf-8")
+                    if "请求过于频繁" in text:
+                        if logger is not None:
+                            logger.log(
+                                "请求{}过于频繁，选择等待3秒后重试。最多再等待{}次".format(
+                                    msg, max_retry - cnt
+                                )
+                            )
+                        sleep_freq(3)
+                        continue
+                    if "服务器更新" in text:
+                        if logger is not None:
+                            logger.log(
+                                "请求{}的时候服务器频繁，选择等待10秒后重试。最多再等待{}次".format(
+                                    msg, max_retry - cnt
+                                )
+                            )
+                        sleep_freq(10)
+                        continue
+                except:
+                    pass
                 break
             except Exception as e:
-                logging.info(
-                    "重新尝试请求{}，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
-                        url, max_retry - cnt, type(e).__name__
+                if except_retry:
+                    logging.info(
+                        "重新尝试请求{}，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
+                            msg, max_retry - cnt, type(e).__name__
+                        )
                     )
-                )
-                sleep(1)
+                    sleep(1)
+                    continue
         else:
-            msg = "尝试请求{}失败，超过最大尝试次数{}次".format(url, max_retry)
+            msg = "尝试请求{}失败，超过最大尝试次数{}次".format(msg, max_retry)
             logging.info(msg)
-            raise RuntimeError(msg)
+            raise Exception(msg)
         return response
 
-    def _amf_post_decode(
-        self, url, data, exit_response=False
-    ):
+    def _amf_post_decode(self, url, data, exit_response=False):
         resp = self.post(
             url,
             data=data,
@@ -386,6 +413,7 @@ class WebRequest:
         logger=None,
         exit_response=False,
         allow_empty=False,
+        except_retry=False,
     ):
         cnt = 0
         while cnt < max_retry:
@@ -427,6 +455,15 @@ class WebRequest:
             except RuntimeError as e:
                 if "amf返回结果为空" in str(e) and allow_empty:
                     return None
+                if except_retry:
+                    if logger is not None:
+                        logger.log(
+                            "{}失败，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
+                                msg, max_retry - cnt, type(e).__name__
+                            )
+                        )
+                    sleep(1)
+                    continue
                 raise e
         else:
             msg = "{}失败，超过最大尝试次数{}次".format(msg, max_retry)

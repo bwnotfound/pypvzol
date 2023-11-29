@@ -365,6 +365,7 @@ class AutoComponent(Pipeline):
         self.rest_event = Event()
 
     def run(self, plant_list, stop_channel: Queue):
+        self.auto_component_man.auto_compound_pool_id.clear()
         for plant in plant_list:
             self.auto_component_man.auto_compound_pool_id.add(plant.id)
         from ..windows.compound import CompoundThread
@@ -396,15 +397,24 @@ class AutoComponent(Pipeline):
         for scheme in self.auto_component_man.scheme_list:
             if scheme.enabled:
                 cnt += 1
+
         if len(rest_plant_list) != cnt:
-            return {
+            result = {
                 "success": False,
                 "info": "复合失败，原因：本应被吃的植物仍然存在",
             }
-        return {
-            "success": True,
-            "info": "复合成功",
-        }
+        elif len(self.auto_component_man.auto_compound_pool_id) != 0:
+            result = {
+                "success": False,
+                "info": "复合失败，原因：复合池中仍然有植物",
+            }
+        else:
+            result = {
+                "success": True,
+                "info": "复合成功",
+            }
+        self.auto_component_man.auto_compound_pool_id.clear()
+        return result
 
     def has_setting_window(self):
         return True

@@ -72,7 +72,7 @@ class User:
         cnt, max_retry = 0, 10
         while cnt < max_retry:
             try:
-                resp = self.wr.get_retry("/pvz/index.php/default/user/sig/0")
+                resp = self.wr.get_retry("/pvz/index.php/default/user/sig/0", "刷新用户信息")
                 root = fromstring(resp.decode("utf-8"))
                 break
             except Exception as e:

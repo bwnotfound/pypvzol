@@ -90,22 +90,14 @@ class Repository:
         while cnt < max_retry:
             cnt += 1
             try:
-                resp = self.wr.get(url)
+                resp = self.wr.get_retry(url, "刷新仓库", logger=logger, except_retry=True)
                 resp_text = resp.decode("utf-8")
-                if "服务器更新" in resp_text:
-                    logging.info("服务器更新，选择等待5秒后重试。最多再等待{}次".format(max_retry - cnt))
-                    time.sleep(5)
-                    continue
-                elif "请求过于频繁" in resp_text:
-                    logging.info("请求过于频繁，选择等待3秒后重试。最多再等待{}次".format(max_retry - cnt))
-                    time.sleep(3)
-                    continue
                 try:
                     root = fromstring(resp_text)
                     break
                 except:
                     if resp_text.startswith("<html"):
-                        logging.info(f"{resp_text}\n刷新仓库出现问题。大概率是Cookie或者区服选择有误。上面是响应")
+                        logging.error(f"{resp_text}\n刷新仓库出现问题。大概率是Cookie或者区服选择有误。上面是响应")
                         raise RuntimeError("刷新仓库出现问题")
                     msg = "刷新仓库失败，选择等待3秒后重试。最多再等待{}次".format(max_retry - cnt)
                     if logger is not None:

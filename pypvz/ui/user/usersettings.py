@@ -209,7 +209,7 @@ class UserSettings:
                     self.logger.log(f"自动挑战失败，异常种类:{type(e).__name__}。跳过自动挑战")
             self.logger.log("工作完成，等待{}".format(second2str(self.rest_time)))
             if self.rest_time == 0:
-                sleep_time = max(perf_counter() - enter_time, 0.3)
+                sleep_time = max(0.3 - (perf_counter() - enter_time), 0)
                 time.sleep(sleep_time)
             for _ in range(self.rest_time):
                 if stop_channel.qsize() > 0:

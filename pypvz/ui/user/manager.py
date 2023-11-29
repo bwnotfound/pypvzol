@@ -389,6 +389,7 @@ class TerritoryMan:
             "/pvz/amf/",
             "查询领地剩余次数",
             logger=self.logger,
+            except_retry=True,
         )
         if response.status != 0:
             self.logger.log("查询领地剩余次数失败，原因：{}".format(response.body.description))

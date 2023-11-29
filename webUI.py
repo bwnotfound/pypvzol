@@ -615,8 +615,9 @@ class CustomMainWindow(QMainWindow):
 
         img = Image.open(
             BytesIO(
-                self.wr_cache.get(
+                self.wr_cache.get_retry(
                     self.usersettings.user.face_url,
+                    "获取照片",
                     init_header="pvzol" in self.usersettings.cfg.host,
                     url_format=False,
                     use_cache=True,

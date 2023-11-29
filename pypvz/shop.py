@@ -11,15 +11,17 @@ class Good:
         self.num = int(root['num'])
         self.price = int(root['price'])
         self.shop_type = shop_type
-    
+
     @property
     def is_plant(self):
         return self.type == 'organisms'
+
 
 class PurchaseItem:
     def __init__(self, good: Good, amount: int):
         self.good = good
         self.amount = amount
+
 
 class Shop:
     def __init__(self, cfg: Config):
@@ -31,7 +33,7 @@ class Shop:
     def _refresh_shop(self, shop_type: int):
         body = [float(shop_type)]
         resp = self.wr.amf_post_retry(
-            body, "api.shop.getMerchandises", "/pvz/amf/", "获取商店信息"
+            body, "api.shop.getMerchandises", "/pvz/amf/", "获取商店信息", except_retry=True
         )
         return resp
 

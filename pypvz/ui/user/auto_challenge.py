@@ -439,52 +439,58 @@ class Challenge4Level:
                 cnt, max_retry = 0, 20
                 need_skip = False
                 while cnt < max_retry:
-                    result = self.caveMan.challenge(
-                        cave_id, team, difficulty, sc.cave.type
-                    )
-                    success, result = result["success"], result["result"]
-                    if not success:
-                        if (
-                            "狩猎场挑战次数已达上限" in result or "挑战次数不足" in result
-                        ) and self.auto_use_challenge_book:
-                            use_result = self.repo.use_item(
-                                self.lib.name2tool["高级挑战书"].id,
-                                self.advanced_challenge_book_amount,
-                                self.lib,
-                            )
-                            if use_result["success"]:
-                                self.logger.log(use_result["result"])
-                                continue
-                            use_result = self.repo.use_item(
-                                self.lib.name2tool["挑战书"].id,
-                                self.normal_challenge_book_amount,
-                                self.lib,
-                            )
-                            if use_result["success"]:
-                                self.logger.log(use_result["result"])
-                                continue
-                        if "频繁" in result:
-                            time.sleep(1)
-                            cnt += 1
-                            self.logger.log(
-                                "挑战过于频繁，选择等待1秒后重试。最多再等待{}次".format(max_retry - cnt)
-                            )
-                            if stop_channel.qsize() > 0:
-                                return
-                            continue
-                        if "冷却中" in result:
-                            message = message + "失败，已跳过该洞口。原因: 洞口冷却中."
+                    try:
+                        result = self.caveMan.challenge(
+                            cave_id, team, difficulty, sc.cave.type
+                        )
+                        success, result = result["success"], result["result"]
+                        if not success:
+                            if (
+                                "狩猎场挑战次数已达上限" in result or "挑战次数不足" in result
+                            ) and self.auto_use_challenge_book:
+                                use_result = self.repo.use_item(
+                                    self.lib.name2tool["高级挑战书"].id,
+                                    self.advanced_challenge_book_amount,
+                                    self.lib,
+                                )
+                                if use_result["success"]:
+                                    self.logger.log(use_result["result"])
+                                    continue
+                                use_result = self.repo.use_item(
+                                    self.lib.name2tool["挑战书"].id,
+                                    self.normal_challenge_book_amount,
+                                    self.lib,
+                                )
+                                if use_result["success"]:
+                                    self.logger.log(use_result["result"])
+                                    continue
+                            if "冷却中" in result:
+                                message = message + "失败，已跳过该洞口。原因: 洞口冷却中."
+                                self.logger.log(message)
+                                need_skip = True
+                                break
+                            message = message + "失败. 原因: {}.".format(result)
                             self.logger.log(message)
-                            need_skip = True
+                            return
+                        else:
+                            message = message + "成功. "
                             break
-                        message = message + "失败. 原因: {}.".format(result)
-                        self.logger.log(message)
-                        return
-                    else:
-                        message = message + "成功. "
-                        break
+                    except Exception as e:
+                        if isinstance(e, RuntimeError):
+                            self.logger.log(
+                                "刷洞出现异常，继续挑战，最多再挑战{}次。异常原因：{}".format(
+                                    max_retry - cnt, str(e)
+                                )
+                            )
+                        else:
+                            self.logger.log(
+                                "刷洞出现异常，继续挑战，最多再挑战{}次。异常类型：{}".format(
+                                    max_retry - cnt, type(e).__name__
+                                )
+                            )
+                        continue
                 else:
-                    message = message + "失败. 原因: 挑战过于频繁.".format(result)
+                    message = message + "失败. 原因: 重试次数超过{}次.".format(max_retry)
                     self.logger.log(message)
                     return
 
@@ -543,28 +549,35 @@ class Challenge4Level:
                 )
                 cnt, max_retry = 0, 20
                 while cnt < max_retry:
-                    result = self.caveMan.challenge(cave.id, team, difficulty, 4)
-                    success, result = result["success"], result["result"]
-                    if not success:
-                        if "频繁" in result:
-                            time.sleep(1)
-                            cnt += 1
+                    try:
+                        result = self.caveMan.challenge(cave.id, team, difficulty, 4)
+                        success, result = result["success"], result["result"]
+                        if not success:
+                            message = message + "失败. 原因: {}.".format(result)
+                            self.logger.log(message)
+                            return
+                        else:
+                            message = message + "成功. "
+                            break
+                    except Exception as e:
+                        if isinstance(e, RuntimeError):
                             self.logger.log(
-                                "挑战过于频繁，选择等待1秒后重试。最多再等待{}次".format(max_retry - cnt)
+                                "刷洞出现异常，继续挑战，最多再挑战{}次。异常原因：{}".format(
+                                    max_retry - cnt, str(e)
+                                )
                             )
-                            if stop_channel.qsize() > 0:
-                                return
-                            continue
-                        message = message + "失败. 原因: {}.".format(result)
-                        self.logger.log(message)
-                        return
-                    else:
-                        message = message + "成功. "
-                        break
+                        else:
+                            self.logger.log(
+                                "刷洞出现异常，继续挑战，最多再挑战{}次。异常类型：{}".format(
+                                    max_retry - cnt, type(e).__name__
+                                )
+                            )
+                        continue
                 else:
-                    message = message + "失败. 原因: 挑战过于频繁.".format(result)
+                    message = message + "失败. 原因: 重试次数超过{}次.".format(max_retry)
                     self.logger.log(message)
                     return
+
                 has_challenged = True
                 message = message + "挑战结果：{}".format(
                     "胜利" if result['is_winning'] else "失败"

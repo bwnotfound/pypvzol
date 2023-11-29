@@ -111,28 +111,16 @@ class CaveMan:
             else:
                 raise ValueError("type must be 1, 2 or 3")
             url = f"/pvz/index.php/cave/index/id/{user_id}/type/{type_name}/sig/0"
-            cnt, max_retry = 0, 20
-            while cnt < max_retry:
-                resp = self.wr.get(url)
+            try:
+                resp = self.wr.get_retry(
+                    url, "获取矿洞信息", logger=logger, except_retry=True
+                )
                 resp_text = resp.decode("utf-8")
-                try:
-                    root = fromstring(resp_text)
-                    break
-                except:
-                    if "频繁" not in resp_text:
-                        if logger is not None:
-                            logger.log("获取矿洞信息失败1")
-                        raise RuntimeError("获取矿洞信息失败1")
-                cnt += 1
-                msg = "获取矿洞信息过于频繁，选择等待1秒后重试。最多再等待{}次".format(max_retry - cnt)
+            except Exception as e:
                 if logger is not None:
-                    logger.log(msg)
-                else:
-                    logging.info(msg)
-                time.sleep(1)
-            else:
-                raise RuntimeError("获取矿洞信息失败2")
-
+                    logger.log("获取矿洞信息失败")
+                raise RuntimeError("获取矿洞信息失败")
+            root = fromstring(resp_text)
             caves = [
                 Cave(cave, type, layer, i + 1)
                 for i, cave in enumerate(root.find("hunting").findall("h"))
@@ -140,7 +128,11 @@ class CaveMan:
         elif type == 4:
             body = [float(user_id)]
             response = self.wr.amf_post_retry(
-                body, 'api.stone.getCaveInfo', '/pvz/amf/', '获取宝石副本信息'
+                body,
+                'api.stone.getCaveInfo',
+                '/pvz/amf/',
+                '获取宝石副本信息',
+                except_retry=True,
             )
             caves = [
                 Cave(cave, type, user_id, i + 1)
@@ -202,7 +194,7 @@ class CaveMan:
 
     def get_garden_cave(self, id):
         url = f"/pvz/index.php/garden/index/id/{id}/sig/0"
-        resp = self.wr.get(url)
+        resp = self.wr.get_retry(url, "获取花园信息")
         root = fromstring(resp.decode("utf-8"))
         garden_cave_item = root.find("garden").find("monster").find("mon")
         if garden_cave_item is None:
@@ -211,7 +203,9 @@ class CaveMan:
 
     def use_sand(self, cave_id):
         body = [float(cave_id)]
-        response = self.wr.amf_post_retry(body, "api.cave.useTimesands", '/pvz/amf/', '使用时之沙')
+        response = self.wr.amf_post_retry(
+            body, "api.cave.useTimesands", '/pvz/amf/', '使用时之沙'
+        )
         if response.status == 0:
             return {
                 "success": True,
