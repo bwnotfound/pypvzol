@@ -22,7 +22,8 @@ from ...repository import Plant
 from .common import ImageWindow, require_permission
 from ... import Config, Repository, Library
 from ..message import Logger
-from ..user.compound import AutoCompoundMan
+from ..user.compound import AutoCompoundMan, CompoundScheme
+from ...upgrade import quality_name_list
 
 
 class AutoCompoundWindow(QMainWindow):
@@ -52,23 +53,34 @@ class AutoCompoundWindow(QMainWindow):
         self.refresh_all_signal.connect(self.refresh_all)
         self.compound_finish_signal.connect(self.compound_finish)
         self.compound_stoped_signal.connect(self.compound_stoped)
+        self.chosen_attribute = "HP特"
+        self.scheme_widget = CompoundSchemeWidget(
+            self.repo,
+            self.format_plant_info,
+            self.set_chosen_attribute,
+            self.refresh_all_signal,
+            self.logger,
+            self,
+        )
         self.init_ui()
+        self.scheme_widget.plant_list_widget = self.plant_list
         self.refresh_all()
+        self.refresh_scheme_list()
 
     def init_ui(self):
-        self.setWindowTitle("自动合成")
+        self.setWindowTitle("自动复合")
 
-        # 将窗口居中显示，宽度为显示器宽度的70%，高度为显示器高度的50%
+        # 将窗口居中显示，宽度为显示器宽度的80%，高度为显示器高度的80%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.75), int(screen_size.height() * 0.7))
-        self.move(int(screen_size.width() * 0.125), int(screen_size.height() * 0.15))
+        self.resize(int(screen_size.width() * 0.95), int(screen_size.height() * 0.8))
+        self.move(int(screen_size.width() * 0.025), int(screen_size.height() * 0.1))
 
         main_widget = QWidget()
         main_layout = QHBoxLayout()
         main_layout.setSpacing(0)
 
         widget1 = QWidget()
-        widget1.setFixedWidth(int(self.width() * 0.12))
+        widget1.setFixedWidth(int(self.width() * 0.11))
         widget1_layout = QVBoxLayout()
         widget1_layout.addWidget(QLabel("物品列表"))
         self.tool_list = QListWidget()
@@ -78,7 +90,7 @@ class AutoCompoundWindow(QMainWindow):
         main_layout.addWidget(widget1)
 
         widget2 = QWidget()
-        widget2.setMinimumWidth(int(self.width() * 0.25))
+        widget2.setMinimumWidth(int(self.width() * 0.21))
         widget2_layout = QVBoxLayout()
         widget2_layout.addWidget(QLabel("植物列表"))
         self.plant_list = QListWidget()
@@ -88,68 +100,11 @@ class AutoCompoundWindow(QMainWindow):
         main_layout.addWidget(widget2)
 
         widget3 = QWidget()
-        widget3.setFixedWidth(int(self.width() * 0.13))
+        widget3.setFixedWidth(int(self.width() * 0.11))
         widget3_layout = QVBoxLayout()
         widget3_layout.addStretch(1)
-        widget3_1 = QWidget()
-        widget3_1_layout = QVBoxLayout()
-        widget3_1_layout.addWidget(QLabel("选择复合属性"))
-        self.auto_compound_attribute_choice = QComboBox()
-        for name in self.auto_compound_man.attribute_list:
-            self.auto_compound_attribute_choice.addItem(name)
-        self.auto_compound_attribute_choice.setCurrentIndex(
-            self.auto_compound_man.attribute_list.index(
-                self.auto_compound_man.chosen_attribute
-            )
-        )
-        self.auto_compound_attribute_choice.currentIndexChanged.connect(
-            self.auto_compound_attribute_choice_changed
-        )
-        widget3_1_layout.addWidget(self.auto_compound_attribute_choice)
-        widget3_1.setLayout(widget3_1_layout)
-        widget3_layout.addWidget(widget3_1)
 
-        widget3_2_layout = QHBoxLayout()
-        widget3_2_layout.addWidget(QLabel("k值:"))
-        self.k_choice = QComboBox()
-        for i in range(11):
-            self.k_choice.addItem(str(i))
-        self.k_choice.setCurrentIndex(self.auto_compound_man.k)
-        self.k_choice.currentIndexChanged.connect(self.k_choice_changed)
-        widget3_2_layout.addWidget(self.k_choice)
-        widget3_layout.addLayout(widget3_2_layout)
-
-        widget3_3_layout = QHBoxLayout()
-        widget3_3_layout.addWidget(QLabel("n1值:"))
-        self.n1_choice = QComboBox()
-        for i in range(11):
-            self.n1_choice.addItem(str(i))
-        self.n1_choice.setCurrentIndex(self.auto_compound_man.n1)
-        self.n1_choice.currentIndexChanged.connect(self.n1_choice_changed)
-        widget3_3_layout.addWidget(self.n1_choice)
-        widget3_layout.addLayout(widget3_3_layout)
-
-        widget3_4_layout = QHBoxLayout()
-        widget3_4_layout.addWidget(QLabel("n2值:"))
-        self.n2_choice = QComboBox()
-        for i in range(31):
-            self.n2_choice.addItem(str(i))
-        self.n2_choice.setCurrentIndex(self.auto_compound_man.n2)
-        self.n2_choice.currentIndexChanged.connect(self.n2_choice_changed)
-        widget3_4_layout.addWidget(self.n2_choice)
-        widget3_layout.addLayout(widget3_4_layout)
-
-        widget3_3_layout = QHBoxLayout()
-        widget3_3_layout.addWidget(QLabel("m值:"))
-        self.m_choice = QComboBox()
-        for i in range(16):
-            self.m_choice.addItem(str(i))
-        self.m_choice.setCurrentIndex(self.auto_compound_man.m)
-        self.m_choice.currentIndexChanged.connect(self.m_choice_changed)
-        widget3_3_layout.addWidget(self.m_choice)
-        widget3_layout.addLayout(widget3_3_layout)
-
-        plant_import_btn = QPushButton("导入合成池")
+        plant_import_btn = QPushButton("导入复合池")
         plant_import_btn.clicked.connect(self.plant_import_btn_clicked)
         widget3_layout.addWidget(plant_import_btn)
 
@@ -161,14 +116,6 @@ class AutoCompoundWindow(QMainWindow):
         remove_liezhi_plant_btn.clicked.connect(self.remove_liezhi_plant_btn_clicked)
         widget3_layout.addWidget(remove_liezhi_plant_btn)
 
-        set_source_plant_btn = QPushButton("设置底座")
-        set_source_plant_btn.clicked.connect(self.set_source_plant_btn_clicked)
-        widget3_layout.addWidget(set_source_plant_btn)
-
-        remove_source_plant_btn = QPushButton("移除底座")
-        remove_source_plant_btn.clicked.connect(self.remove_source_plant_btn_clicked)
-        widget3_layout.addWidget(remove_source_plant_btn)
-
         set_receiver_plant_btn = QPushButton("设置主力")
         set_receiver_plant_btn.clicked.connect(self.set_receiver_plant_btn_clicked)
         widget3_layout.addWidget(set_receiver_plant_btn)
@@ -178,18 +125,6 @@ class AutoCompoundWindow(QMainWindow):
             self.remove_receiver_plant_btn_clicked
         )
         widget3_layout.addWidget(remove_receiver_plant_btn)
-
-        use_all_exchange_layout = QHBoxLayout()
-        use_all_exchange_layout.addWidget(QLabel("劣质使用全传"))
-        self.use_all_exchange_checkbox = QCheckBox()
-        self.use_all_exchange_checkbox.setChecked(
-            self.auto_compound_man.use_all_exchange
-        )
-        self.use_all_exchange_checkbox.stateChanged.connect(
-            self.use_all_exchange_checkbox_value_changed
-        )
-        use_all_exchange_layout.addWidget(self.use_all_exchange_checkbox)
-        widget3_layout.addLayout(use_all_exchange_layout)
 
         allow_inherite2target_layout = QHBoxLayout()
         allow_inherite2target_layout.addWidget(QLabel("劣质传承到主力上"))
@@ -214,9 +149,9 @@ class AutoCompoundWindow(QMainWindow):
         main_layout.addWidget(widget3)
 
         widget4 = QWidget()
-        widget4.setMinimumWidth(int(self.width() * 0.25))
+        widget4.setMinimumWidth(int(self.width() * 0.2))
         widget4_layout = QVBoxLayout()
-        widget4_layout.addWidget(QLabel("合成池"))
+        widget4_layout.addWidget(QLabel("复合池"))
         self.plant_pool_list = QListWidget()
         self.plant_pool_list.setSelectionMode(
             QListWidget.SelectionMode.ExtendedSelection
@@ -226,13 +161,8 @@ class AutoCompoundWindow(QMainWindow):
         main_layout.addWidget(widget4)
 
         widget5 = QWidget()
-        widget5.setFixedWidth(int(self.width() * 0.15))
+        widget5.setFixedWidth(int(self.width() * 0.11))
         widget5_layout = QVBoxLayout()
-
-        widget5_layout.addWidget(QLabel("当前底座"))
-        self.source_plant_textbox = QPlainTextEdit()
-        self.source_plant_textbox.setReadOnly(True)
-        widget5_layout.addWidget(self.source_plant_textbox)
 
         widget5_layout.addWidget(QLabel("当前主力"))
         self.receiver_plant_textbox = QPlainTextEdit()
@@ -248,44 +178,40 @@ class AutoCompoundWindow(QMainWindow):
         main_layout.addWidget(widget5)
 
         widget6 = QWidget()
-        widget6.setFixedWidth(int(self.width() * 0.15))
+        widget6.setFixedWidth(int(self.width() * 0.11))
         widget6_layout = QVBoxLayout()
-        widget6_layout.addStretch(1)
 
-        widget6_1_layout = QVBoxLayout()
-        widget6_1_layout.addWidget(QLabel("复合数值终点"))
-        widget6_1_1_layout = QHBoxLayout()
-        self.mantissa_line_edit = QLineEdit()
-        self.mantissa_line_edit.setValidator(QtGui.QDoubleValidator())
-        self.mantissa_line_edit.setText(
-            str(self.auto_compound_man.end_mantissa)
-        )
-        self.mantissa_line_edit.textChanged.connect(
-            self.mantissa_line_edit_value_changed
-        )
-        widget6_1_1_layout.addWidget(self.mantissa_line_edit)
-        widget6_1_1_layout.addWidget(QLabel("x10的"))
-        self.exponent_line_edit = QLineEdit()
-        self.exponent_line_edit.setValidator(QtGui.QIntValidator())
-        self.exponent_line_edit.setText(
-            str(self.auto_compound_man.end_exponent)
-        )
-        self.exponent_line_edit.textChanged.connect(
-            self.exponent_line_edit_value_changed
-        )
-        widget6_1_1_layout.addWidget(self.exponent_line_edit)
-        widget6_1_1_layout.addWidget(QLabel("次方亿"))
-        widget6_1_layout.addLayout(widget6_1_1_layout)
-        widget6_layout.addLayout(widget6_1_layout)
-
+        widget6_layout.addWidget(QLabel("复合方案"))
+        self.scheme_list = QListWidget()
+        self.scheme_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.scheme_list.itemClicked.connect(self.scheme_list_item_clicked)
+        widget6_layout.addWidget(self.scheme_list)
+        self.scheme_name_inputbox = QLineEdit()
+        widget6_layout.addWidget(self.scheme_name_inputbox)
+        add_scheme_btn = QPushButton("新建方案")
+        add_scheme_btn.clicked.connect(self.add_scheme_btn_clicked)
+        widget6_layout.addWidget(add_scheme_btn)
+        remove_scheme_btn = QPushButton("删除方案")
+        remove_scheme_btn.clicked.connect(self.remove_scheme_btn_clicked)
+        widget6_layout.addWidget(remove_scheme_btn)
+        rename_scheme_btn = QPushButton("重命名方案")
+        rename_scheme_btn.clicked.connect(self.rename_scheme_btn_clicked)
+        widget6_layout.addWidget(rename_scheme_btn)
+        enable_scheme_btn = QPushButton("启用方案")
+        enable_scheme_btn.clicked.connect(self.enable_scheme_btn_clicked)
+        widget6_layout.addWidget(enable_scheme_btn)
+        disable_scheme_btn = QPushButton("禁用方案")
+        disable_scheme_btn.clicked.connect(self.disable_scheme_btn_clicked)
+        widget6_layout.addWidget(disable_scheme_btn)
+        widget6_layout.addWidget(QLabel("\n"))
         self.auto_compound_btn = auto_compound_btn = QPushButton("全部复合")
         auto_compound_btn.clicked.connect(self.auto_compound_btn_clicked)
         widget6_layout.addWidget(auto_compound_btn)
-        self.auto_compound_single_btn = auto_compound_single_btn = QPushButton("复合一批")
-        auto_compound_single_btn.clicked.connect(self.auto_compound_single_btn_clicked)
-        widget6_layout.addWidget(auto_compound_single_btn)
+        # self.auto_compound_single_btn = auto_compound_single_btn = QPushButton("复合一批")
+        # auto_compound_single_btn.clicked.connect(self.auto_compound_single_btn_clicked)
+        # widget6_layout.addWidget(auto_compound_single_btn)
 
-        widget6_layout.addWidget(QLabel("使用前请一定点击下方按钮\n查看原理"))
+        widget6_layout.addWidget(QLabel("\n"))
         illustration_btn = QPushButton("查看原理")
         illustration_btn.clicked.connect(self.illustration_btn_clicked)
         widget6_layout.addWidget(illustration_btn)
@@ -297,12 +223,87 @@ class AutoCompoundWindow(QMainWindow):
         widget6_layout.addWidget(self.information_text_box)
 
         widget6_layout.addStretch(1)
-
         widget6.setLayout(widget6_layout)
         main_layout.addWidget(widget6)
 
+        self.scheme_widget.setFixedWidth(int(self.width() * 0.14))
+        main_layout.addWidget(self.scheme_widget)
+
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def set_chosen_attribute(self, chosen_attribute):
+        self.chosen_attribute = chosen_attribute
+
+    def scheme_list_item_clicked(self, item: QListWidgetItem):
+        scheme = item.data(Qt.ItemDataRole.UserRole)
+        self.scheme_name_inputbox.setText(scheme.name)
+        self.scheme_widget.switch_scheme(scheme)
+
+    def add_scheme_btn_clicked(self):
+        self.auto_compound_man.new_scheme()
+        self.refresh_scheme_list()
+
+    def remove_scheme_btn_clicked(self):
+        selected_items = self.scheme_list.selectedItems()
+        if len(selected_items) == 0:
+            self.logger.log("请先选择一个方案再删除")
+            return
+        selected_scheme = [
+            item.data(Qt.ItemDataRole.UserRole) for item in selected_items
+        ]
+        for scheme in selected_scheme:
+            self.auto_compound_man.remove_scheme(scheme)
+        self.scheme_widget.switch_scheme(None)
+        self.refresh_scheme_list()
+
+    def rename_scheme_btn_clicked(self):
+        selected_items = self.scheme_list.selectedItems()
+        if len(selected_items) == 0:
+            self.logger.log("请先选择一个方案再重命名")
+            return
+        selected_scheme = [
+            item.data(Qt.ItemDataRole.UserRole) for item in selected_items
+        ]
+        if len(selected_scheme) > 1:
+            self.logger.log("一次只能选择一个方案")
+            return
+        scheme = selected_scheme[0]
+        scheme.name = self.scheme_name_inputbox.text()
+        self.refresh_scheme_list()
+
+    def enable_scheme_btn_clicked(self):
+        selected_items = self.scheme_list.selectedItems()
+        if len(selected_items) == 0:
+            self.logger.log("请先选择一个方案再启用")
+            return
+        selected_scheme = [
+            item.data(Qt.ItemDataRole.UserRole) for item in selected_items
+        ]
+        for scheme in selected_scheme:
+            scheme.enabled = True
+        self.refresh_scheme_list()
+
+    def disable_scheme_btn_clicked(self):
+        selected_items = self.scheme_list.selectedItems()
+        if len(selected_items) == 0:
+            self.logger.log("请先选择一个方案再禁用")
+            return
+        selected_scheme = [
+            item.data(Qt.ItemDataRole.UserRole) for item in selected_items
+        ]
+        for scheme in selected_scheme:
+            scheme.enabled = False
+        self.refresh_scheme_list()
+
+    def refresh_scheme_list(self):
+        self.scheme_list.clear()
+        for scheme in self.auto_compound_man.scheme_list:
+            item = QListWidgetItem(
+                "({}){}".format("启用" if scheme.enabled else "禁用", scheme.name)
+            )
+            item.setData(Qt.ItemDataRole.UserRole, scheme)
+            self.scheme_list.addItem(item)
 
     def allow_inherite2target_checkbox_value_changed(self):
         self.auto_compound_man.allow_inherite2target = (
@@ -312,44 +313,23 @@ class AutoCompoundWindow(QMainWindow):
     def illustration_btn_clicked(self):
         ImageWindow("data/复合通用方案.png", self).show()
 
-    def use_all_exchange_checkbox_value_changed(self):
-        self.auto_compound_man.use_all_exchange = (
-            self.use_all_exchange_checkbox.isChecked()
-        )
-
-    def mantissa_line_edit_value_changed(self):
-        try:
-            float(self.mantissa_line_edit.text())
-        except ValueError:
-            self.mantissa_line_edit.setText("1.0")
-        mantissa = float(self.mantissa_line_edit.text())
-        self.auto_compound_man.end_mantissa = mantissa
-
-    def exponent_line_edit_value_changed(self):
-        try:
-            int(self.exponent_line_edit.text())
-        except ValueError:
-            self.exponent_line_edit.setText("0")
-        exponent = int(self.exponent_line_edit.text())
-        self.auto_compound_man.end_exponent = exponent
-
-    def format_plant_info(self, plant, full_msg=False):
+    def format_plant_info(self, plant, chosen_attribute=None):
         if isinstance(plant, str):
             plant = int(plant)
         if isinstance(plant, int):
             plant = self.repo.get_plant(plant)
         assert isinstance(plant, Plant), type(plant).__name__
-        if not full_msg:
+        if chosen_attribute is not None:
             return "{}({})[{}]-{}:{}".format(
                 plant.name(self.lib),
                 plant.grade,
                 plant.quality_str,
-                self.auto_compound_man.chosen_attribute.replace("特", ""),
+                chosen_attribute.replace("特", ""),
                 format_number(
                     getattr(
                         plant,
                         self.auto_compound_man.attribute2plant_attribute[
-                            self.auto_compound_man.chosen_attribute
+                            chosen_attribute
                         ],
                     )
                 ),
@@ -373,28 +353,24 @@ class AutoCompoundWindow(QMainWindow):
                     format_number(
                         getattr(
                             plant,
-                            self.auto_compound_man.attribute2plant_attribute[
-                                attr_name
-                            ],
+                            self.auto_compound_man.attribute2plant_attribute[attr_name],
                         )
                     ),
                 )
             return message
 
-    def _check_plant(self, plant, full_check=False, alert=True):
+    def _check_plant(self, plant, chosen_attr_name=None, alert=True):
         result = None
-        chosen_attr_name = (
-            self.auto_compound_man.attribute2plant_attribute[
-                self.auto_compound_man.chosen_attribute
+        if (
+            chosen_attr_name is not None
+            and chosen_attr_name in self.auto_compound_man.attribute2plant_attribute
+        ):
+            chosen_attr_name = self.auto_compound_man.attribute2plant_attribute[
+                chosen_attr_name
             ]
-        )
-        for (
-            attr_dict_name
-        ) in self.auto_compound_man.attribute2plant_attribute.keys():
-            attr_name = self.auto_compound_man.attribute2plant_attribute[
-                attr_dict_name
-            ]
-            if attr_name == chosen_attr_name and not full_check:
+        for attr_dict_name in self.auto_compound_man.attribute2plant_attribute.keys():
+            attr_name = self.auto_compound_man.attribute2plant_attribute[attr_dict_name]
+            if chosen_attr_name is not None and attr_name == chosen_attr_name:
                 continue
             attr = getattr(plant, attr_name)
             if attr > 500000000:
@@ -406,9 +382,7 @@ class AutoCompoundWindow(QMainWindow):
             need_continue = None
             if not result:
                 need_continue = require_permission(
-                    "植物{}部分数据超过设定，请确认是否继续：".format(
-                        self.format_plant_info(plant, full_msg=True)
-                    )
+                    "植物{}部分数据超过设定，请确认是否继续：".format(self.format_plant_info(plant))
                 )
             else:
                 need_continue = True
@@ -417,36 +391,29 @@ class AutoCompoundWindow(QMainWindow):
             return result
 
     def check_data(self):
-        source_plant = self.repo.get_plant(
-            self.auto_compound_man.source_plant_id
-        )
-        if source_plant is not None:
-            if not self._check_plant(source_plant):
-                self.logger.log("合成数据检查出异常，停止合成")
-                return False
-        for deputy_plant_id in list(
-            self.auto_compound_man.auto_compound_pool_id
-        ):
+        for scheme in self.auto_compound_man.scheme_list:
+            if not scheme.enabled:
+                continue
+            source_plant = self.repo.get_plant(scheme.source_plant_id)
+            if source_plant is not None:
+                if not self._check_plant(source_plant, scheme.chosen_attribute):
+                    self.logger.log("合成数据检查出异常，停止合成")
+                    return False
+        for deputy_plant_id in list(self.auto_compound_man.auto_compound_pool_id):
             deputy_plant = self.repo.get_plant(deputy_plant_id)
             if deputy_plant is not None:
-                if not self._check_plant(deputy_plant, full_check=True):
+                if not self._check_plant(deputy_plant):
                     self.logger.log("合成数据检查出异常，停止合成")
                     return False
         return True
 
     def remove_abnormal_plant_btn_clicked(self):
         cnt = 0
-        for deputy_plant_id in list(
-            self.auto_compound_man.auto_compound_pool_id
-        ):
+        for deputy_plant_id in list(self.auto_compound_man.auto_compound_pool_id):
             deputy_plant = self.repo.get_plant(deputy_plant_id)
-            if deputy_plant is None or not self._check_plant(
-                deputy_plant, full_check=True, alert=False
-            ):
-                if not self._check_plant(deputy_plant, full_check=True, alert=False):
-                    self.auto_compound_man.auto_compound_pool_id.remove(
-                        deputy_plant_id
-                    )
+            if deputy_plant is None or not self._check_plant(deputy_plant, alert=False):
+                if not self._check_plant(deputy_plant, alert=False):
+                    self.auto_compound_man.auto_compound_pool_id.remove(deputy_plant_id)
                     cnt += 1
         self.logger.log("移除了{}个异常植物".format(cnt))
         if cnt > 0:
@@ -473,9 +440,7 @@ class AutoCompoundWindow(QMainWindow):
             "护甲传承书",
             "护甲合成书",
         ]:
-            tool = self.repo.get_tool(
-                self.lib.name2tool[tool_name].id
-            )
+            tool = self.repo.get_tool(self.lib.name2tool[tool_name].id)
             if tool is None:
                 item = QListWidgetItem(
                     "{}({})".format(
@@ -494,15 +459,25 @@ class AutoCompoundWindow(QMainWindow):
 
     def refresh_plant_list(self):
         self.plant_list.clear()
-        for plant in self.repo.plants:
-            if (
-                plant.id in self.auto_compound_man.auto_compound_pool_id
-                or plant.id == self.auto_compound_man.source_plant_id
-                or plant.id == self.auto_compound_man.liezhi_plant_id
-                or plant.id == self.auto_compound_man.receiver_plant_id
-            ):
+        used_plant_id_set = set()
+        used_plant_id_set.add(self.auto_compound_man.liezhi_plant_id)
+        used_plant_id_set.add(self.auto_compound_man.receiver_plant_id)
+        for plant_id in self.auto_compound_man.auto_compound_pool_id:
+            used_plant_id_set.add(plant_id)
+        for scheme in self.auto_compound_man.scheme_list:
+            if not scheme.enabled:
                 continue
-            item = QListWidgetItem(self.format_plant_info(plant))
+            used_plant_id_set.add(scheme.source_plant_id)
+            for plant_id in scheme.auto_compound_pool_id:
+                used_plant_id_set.add(plant_id)
+            for plant_id in scheme.auto_synthesis_man.auto_synthesis_pool_id:
+                used_plant_id_set.add(plant_id)
+        for plant in self.repo.plants:
+            if plant.id in used_plant_id_set:
+                continue
+            item = QListWidgetItem(
+                self.format_plant_info(plant, chosen_attribute=self.chosen_attribute)
+            )
             item.setData(Qt.ItemDataRole.UserRole, plant.id)
             self.plant_list.addItem(item)
 
@@ -512,85 +487,31 @@ class AutoCompoundWindow(QMainWindow):
             plant = self.repo.get_plant(plant_id)
             if plant is None:
                 continue
-            item = QListWidgetItem(self.format_plant_info(plant))
+            item = QListWidgetItem(
+                self.format_plant_info(plant, chosen_attribute=self.chosen_attribute)
+            )
             item.setData(Qt.ItemDataRole.UserRole, plant_id)
             self.plant_pool_list.addItem(item)
-
-    def refresh_information_text_box(self):
-        message = []
-        message.append(
-            "复合池植物数量：{}个".format(
-                len(self.auto_compound_man.auto_compound_pool_id)
-            )
-        )
-        message.append(
-            "内置合成池植物数量：{}个".format(
-                len(
-                    self.auto_compound_man.auto_synthesis_man.auto_synthesis_pool_id
-                )
-            )
-        )
-        self.information_text_box.setPlainText("\n".join(message))
-
-    def auto_compound_attribute_choice_changed(self):
-        self.auto_compound_man.set_chosen_attribute(
-            self.auto_compound_attribute_choice.currentText()
-        )
-        self.refresh_all()
-
-    def k_choice_changed(self):
-        self.auto_compound_man.k = int(self.k_choice.currentText())
-
-    def n1_choice_changed(self):
-        self.auto_compound_man.n1 = int(self.n1_choice.currentText())
-
-    def n2_choice_changed(self):
-        self.auto_compound_man.n2 = int(self.n2_choice.currentText())
-
-    def m_choice_changed(self):
-        self.auto_compound_man.m = int(self.m_choice.currentText())
 
     def refresh_liezhi_plant_textbox(self):
         if self.auto_compound_man.liezhi_plant_id is None:
             self.liezhi_plant_textbox.setPlainText("")
             return
-        plant = self.repo.get_plant(
-            self.auto_compound_man.liezhi_plant_id
-        )
+        plant = self.repo.get_plant(self.auto_compound_man.liezhi_plant_id)
         if plant is None:
             self.liezhi_plant_textbox.setPlainText("")
             return
-        self.liezhi_plant_textbox.setPlainText(
-            self.format_plant_info(plant, full_msg=True)
-        )
+        self.liezhi_plant_textbox.setPlainText(self.format_plant_info(plant))
 
     def refresh_receiver_plant_textbox(self):
         if self.auto_compound_man.receiver_plant_id is None:
             self.receiver_plant_textbox.setPlainText("")
             return
-        plant = self.repo.get_plant(
-            self.auto_compound_man.receiver_plant_id
-        )
+        plant = self.repo.get_plant(self.auto_compound_man.receiver_plant_id)
         if plant is None:
             self.receiver_plant_textbox.setPlainText("")
             return
-        self.receiver_plant_textbox.setPlainText(
-            self.format_plant_info(plant, full_msg=True)
-        )
-
-    def refresh_source_plant_textbox(self):
-        if self.auto_compound_man.source_plant_id is None:
-            self.source_plant_textbox.setPlainText("")
-            return
-        plant = self.repo.get_plant(
-            self.auto_compound_man.source_plant_id
-        )
-        if plant is None:
-            self.source_plant_textbox.setPlainText("")
-            return
-        self.source_plant_textbox.setPlainText(
-            self.format_plant_info(plant, full_msg=True)
-        )
+        self.receiver_plant_textbox.setPlainText(self.format_plant_info(plant))
 
     def refresh_all(self, event: Event = None):
         self.refresh_tool_list()
@@ -598,8 +519,7 @@ class AutoCompoundWindow(QMainWindow):
         self.refresh_plant_pool_list()
         self.refresh_liezhi_plant_textbox()
         self.refresh_receiver_plant_textbox()
-        self.refresh_source_plant_textbox()
-        self.refresh_information_text_box()
+        self.scheme_widget.refresh_all()
         if event is not None:
             event.set()
 
@@ -616,7 +536,6 @@ class AutoCompoundWindow(QMainWindow):
         self.auto_compound_man.check_data()
         self.refresh_plant_list()
         self.refresh_plant_pool_list()
-        self.refresh_information_text_box()
 
     def set_liezhi_plant_btn_clicked(self):
         selected_plant_id = [
@@ -660,42 +579,19 @@ class AutoCompoundWindow(QMainWindow):
         self.refresh_receiver_plant_textbox()
         self.refresh_plant_list()
 
-    def set_source_plant_btn_clicked(self):
-        selected_plant_id = [
-            item.data(Qt.ItemDataRole.UserRole)
-            for item in self.plant_list.selectedItems()
-        ]
-        if len(selected_plant_id) == 0:
-            self.logger.log("请先选择一个植物再设置主植物(底座)")
-            return
-        if len(selected_plant_id) > 1:
-            self.logger.log("一次只能设置一个主植物(底座)")
-            return
-        plant_id = selected_plant_id[0]
-        self.auto_compound_man.source_plant_id = plant_id
-        self.refresh_source_plant_textbox()
-        self.refresh_plant_list()
-
-    def remove_source_plant_btn_clicked(self):
-        self.auto_compound_man.source_plant_id = None
-        self.refresh_source_plant_textbox()
-        self.refresh_plant_list()
-
-    def auto_compound_single_btn_clicked(self):
-        try:
-            self.auto_compound_single_btn.setDisabled(True)
-            QApplication.processEvents()
-            if not self.check_data():
-                return
-            self.auto_compound_man.compound_one_cycle(
-                self.refresh_all_signal
-            )
-            self.auto_compound_man.check_data()
-            self.refresh_all()
-        except Exception as e:
-            self.logger.log("合成异常。异常种类：{}".format(type(e).__name__))
-        finally:
-            self.auto_compound_single_btn.setEnabled(True)
+    # def auto_compound_single_btn_clicked(self):
+    #     try:
+    #         self.auto_compound_single_btn.setDisabled(True)
+    #         QApplication.processEvents()
+    #         if not self.check_data():
+    #             return
+    #         self.auto_compound_man.compound_one_cycle(self.refresh_all_signal)
+    #         self.auto_compound_man.check_data()
+    #         self.refresh_all()
+    #     except Exception as e:
+    #         self.logger.log("合成异常。异常种类：{}".format(type(e).__name__))
+    #     finally:
+    #         self.auto_compound_single_btn.setEnabled(True)
 
     def compound_stoped(self):
         self.auto_compound_btn.setText("全部复合")
@@ -747,21 +643,20 @@ class AutoCompoundWindow(QMainWindow):
                 return
             for plant_id in selected_items_id:
                 try:
-                    self.auto_compound_man.auto_compound_pool_id.remove(
-                        plant_id
-                    )
+                    self.auto_compound_man.auto_compound_pool_id.remove(plant_id)
                 except KeyError:
                     plant = self.repo.get_plant(plant_id)
                     if plant is None:
-                        self.logger.log(
-                            "仓库里没有id为{}的植物，可能已被删除".format(plant_id)
-                        )
+                        self.logger.log("仓库里没有id为{}的植物，可能已被删除".format(plant_id))
                     self.logger.log(
-                        "合成池里没有植物{}".format(self.format_plant_info(plant))
+                        "合成池里没有植物{}".format(
+                            self.format_plant_info(
+                                plant, chosen_attribute=self.chosen_attribute
+                            )
+                        )
                     )
             self.refresh_plant_list()
             self.refresh_plant_pool_list()
-            self.refresh_information_text_box()
 
     def closeEvent(self, event):
         if self.run_thread is not None:
@@ -795,3 +690,233 @@ class CompoundThread(Thread):
             if self.compound_finish_signal is not None:
                 self.compound_finish_signal.emit()
             self.rest_event.set()
+
+
+class CompoundSchemeWidget(QWidget):
+    def __init__(
+        self,
+        repo: Repository,
+        format_plant_info,
+        set_chosen_attribute,
+        refresh_all_signal,
+        logger: Logger,
+        parent=None,
+    ):
+        super().__init__(parent=parent)
+        self.repo = repo
+        self.set_chosen_attribute = set_chosen_attribute
+        self.format_plant_info = format_plant_info
+        self.scheme = None
+        self.plant_list_widget = None
+        self.logger = logger
+        self.refresh_all_signal = refresh_all_signal
+        self.main_layout = QHBoxLayout()
+        self.setLayout(self.main_layout)
+
+    def switch_scheme(self, scheme: CompoundScheme):
+        self.scheme = scheme
+        from .common import delete_layout_children
+
+        delete_layout_children(self.main_layout)
+        if self.scheme is not None:
+            self.init_ui()
+            self.set_chosen_attribute(self.scheme.chosen_attribute)
+            self.refresh_all_signal.emit(Event())
+            self.refresh_all()
+
+    def init_ui(self):
+        setting_panel = QWidget()
+        setting_panel_layout = QVBoxLayout()
+
+        setting_panel_layout.addWidget(QLabel("当前底座"))
+        self.source_plant_textbox = QPlainTextEdit()
+        self.source_plant_textbox.setReadOnly(True)
+        setting_panel_layout.addWidget(self.source_plant_textbox)
+
+        setting_panel_layout.addWidget(QLabel("选择复合属性"))
+        self.auto_compound_attribute_choice = QComboBox()
+        for name in self.scheme.attribute_list:
+            self.auto_compound_attribute_choice.addItem(name)
+        self.auto_compound_attribute_choice.setCurrentIndex(
+            self.scheme.attribute_list.index(self.scheme.chosen_attribute)
+        )
+        self.auto_compound_attribute_choice.currentIndexChanged.connect(
+            self.auto_compound_attribute_choice_changed
+        )
+        setting_panel_layout.addWidget(self.auto_compound_attribute_choice)
+
+        layout1 = QHBoxLayout()
+        layout1.addWidget(QLabel("k值:"))
+        self.k_choice = QComboBox()
+        for i in range(11):
+            self.k_choice.addItem(str(i))
+        self.k_choice.setCurrentIndex(self.scheme.k)
+        self.k_choice.currentIndexChanged.connect(self.k_choice_changed)
+        layout1.addWidget(self.k_choice)
+        setting_panel_layout.addLayout(layout1)
+
+        layout2 = QHBoxLayout()
+        layout2.addWidget(QLabel("n1值:"))
+        self.n1_choice = QComboBox()
+        for i in range(11):
+            self.n1_choice.addItem(str(i))
+        self.n1_choice.setCurrentIndex(self.scheme.n1)
+        self.n1_choice.currentIndexChanged.connect(self.n1_choice_changed)
+        layout2.addWidget(self.n1_choice)
+        setting_panel_layout.addLayout(layout2)
+
+        layout3 = QHBoxLayout()
+        layout3.addWidget(QLabel("n2值:"))
+        self.n2_choice = QComboBox()
+        for i in range(31):
+            self.n2_choice.addItem(str(i))
+        self.n2_choice.setCurrentIndex(self.scheme.n2)
+        self.n2_choice.currentIndexChanged.connect(self.n2_choice_changed)
+        layout3.addWidget(self.n2_choice)
+        setting_panel_layout.addLayout(layout3)
+
+        layout4 = QHBoxLayout()
+        layout4.addWidget(QLabel("m值:"))
+        self.m_choice = QComboBox()
+        for i in range(16):
+            self.m_choice.addItem(str(i))
+        self.m_choice.setCurrentIndex(self.scheme.m)
+        self.m_choice.currentIndexChanged.connect(self.m_choice_changed)
+        layout4.addWidget(self.m_choice)
+        setting_panel_layout.addLayout(layout4)
+
+        set_source_plant_btn = QPushButton("设置底座")
+        set_source_plant_btn.clicked.connect(self.set_source_plant_btn_clicked)
+        setting_panel_layout.addWidget(set_source_plant_btn)
+
+        remove_source_plant_btn = QPushButton("移除底座")
+        remove_source_plant_btn.clicked.connect(self.remove_source_plant_btn_clicked)
+        setting_panel_layout.addWidget(remove_source_plant_btn)
+
+        setting_panel_layout.addWidget(QLabel("复合数值终点"))
+        widget6_1_1_layout = QHBoxLayout()
+        self.mantissa_line_edit = QLineEdit()
+        self.mantissa_line_edit.setValidator(QtGui.QDoubleValidator())
+        self.mantissa_line_edit.setText(str(self.scheme.end_mantissa))
+        self.mantissa_line_edit.textChanged.connect(
+            self.mantissa_line_edit_value_changed
+        )
+        widget6_1_1_layout.addWidget(self.mantissa_line_edit)
+        widget6_1_1_layout.addWidget(QLabel("x10的"))
+        self.exponent_line_edit = QLineEdit()
+        self.exponent_line_edit.setValidator(QtGui.QIntValidator())
+        self.exponent_line_edit.setText(str(self.scheme.end_exponent))
+        self.exponent_line_edit.textChanged.connect(
+            self.exponent_line_edit_value_changed
+        )
+        widget6_1_1_layout.addWidget(self.exponent_line_edit)
+        widget6_1_1_layout.addWidget(QLabel("次方亿"))
+        setting_panel_layout.addLayout(widget6_1_1_layout)
+
+        setting_panel_layout.addWidget(QLabel("所需要的植物品质"))
+        self.quality_choice = QComboBox()
+        for quality_name in quality_name_list:
+            self.quality_choice.addItem(quality_name)
+        self.quality_choice.setCurrentIndex(self.scheme.need_quality_index)
+        self.quality_choice.currentIndexChanged.connect(self.quality_choice_changed)
+        setting_panel_layout.addWidget(self.quality_choice)
+
+        setting_panel_layout.addWidget(QLabel("以下是部分合成信息"))
+        self.information_text_box = QPlainTextEdit()
+        self.information_text_box.setReadOnly(True)
+        self.information_text_box.setMinimumHeight(int(self.height() * 0.1))
+        setting_panel_layout.addWidget(self.information_text_box)
+
+        setting_panel_layout.addStretch(1)
+        setting_panel.setLayout(setting_panel_layout)
+        self.main_layout.addWidget(setting_panel)
+
+    def quality_choice_changed(self):
+        self.scheme.need_quality_index = self.quality_choice.currentIndex()
+
+    def mantissa_line_edit_value_changed(self):
+        try:
+            float(self.mantissa_line_edit.text())
+        except ValueError:
+            self.mantissa_line_edit.setText("1.0")
+        mantissa = float(self.mantissa_line_edit.text())
+        self.scheme.end_mantissa = mantissa
+
+    def exponent_line_edit_value_changed(self):
+        try:
+            int(self.exponent_line_edit.text())
+        except ValueError:
+            self.exponent_line_edit.setText("0")
+        exponent = int(self.exponent_line_edit.text())
+        self.scheme.end_exponent = exponent
+
+    def auto_compound_attribute_choice_changed(self):
+        self.scheme.set_chosen_attribute(
+            self.auto_compound_attribute_choice.currentText()
+        )
+        self.set_chosen_attribute(self.scheme.chosen_attribute)
+        self.refresh_all_signal.emit(Event())
+
+    def k_choice_changed(self):
+        self.scheme.k = int(self.k_choice.currentText())
+
+    def n1_choice_changed(self):
+        self.scheme.n1 = int(self.n1_choice.currentText())
+
+    def n2_choice_changed(self):
+        self.scheme.n2 = int(self.n2_choice.currentText())
+
+    def m_choice_changed(self):
+        self.scheme.m = int(self.m_choice.currentText())
+
+    def set_source_plant_btn_clicked(self):
+        selected_plant_id = [
+            item.data(Qt.ItemDataRole.UserRole)
+            for item in self.plant_list_widget.selectedItems()
+        ]
+        if len(selected_plant_id) == 0:
+            self.logger.log("请先选择一个植物再设置主植物(底座)")
+            return
+        if len(selected_plant_id) > 1:
+            self.logger.log("一次只能设置一个主植物(底座)")
+            return
+        plant_id = selected_plant_id[0]
+        self.scheme.source_plant_id = plant_id
+        self.refresh_all_signal.emit(Event())
+
+    def remove_source_plant_btn_clicked(self):
+        self.scheme.source_plant_id = None
+        self.refresh_all_signal.emit(Event())
+
+    def refresh_information_text_box(self):
+        if self.scheme is None:
+            return
+        message = []
+        message.append(
+            "方案{}中复合池植物数量：{}个".format(
+                self.scheme.name, len(self.scheme.auto_compound_pool_id)
+            )
+        )
+        message.append(
+            "方案{}中内置合成池植物数量：{}个".format(
+                self.scheme.name,
+                len(self.scheme.auto_synthesis_man.auto_synthesis_pool_id),
+            )
+        )
+        self.information_text_box.setPlainText("\n".join(message))
+
+    def refresh_source_plant_textbox(self):
+        if self.scheme is None:
+            return
+        if self.scheme.source_plant_id is None:
+            self.source_plant_textbox.setPlainText("")
+            return
+        plant = self.repo.get_plant(self.scheme.source_plant_id)
+        if plant is None:
+            self.source_plant_textbox.setPlainText("")
+            return
+        self.source_plant_textbox.setPlainText(self.format_plant_info(plant))
+
+    def refresh_all(self):
+        self.refresh_source_plant_textbox()
+        self.refresh_information_text_box()
