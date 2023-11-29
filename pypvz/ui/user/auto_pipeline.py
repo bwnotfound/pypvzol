@@ -281,6 +281,7 @@ class UpgradeQuality(Pipeline):
                 ),
             }
         upgrade_plant_list = plant_list[: self.upgrade_plant_amount]
+        self.rest_event.clear()
         from ..windows.quality import UpgradeQualityThread
 
         self.quality_thread = UpgradeQualityThread(
