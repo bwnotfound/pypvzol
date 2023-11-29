@@ -551,7 +551,7 @@ class AutoCompoundMan:
                 )
                 return False
             scheme.import_deputy_plant(plant_list)
-        
+
         # for scheme in enabled_scheme_list:
         #     scheme.compound_one_cycle(refresh_signal)
 
@@ -561,10 +561,9 @@ class AutoCompoundMan:
                 futures.append(
                     executor.submit(scheme.compound_one_cycle, refresh_signal)
                 )
+        concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
         success_list = []
-        for future, scheme in zip(
-            concurrent.futures.as_completed(futures), enabled_scheme_list
-        ):
+        for future, scheme in zip(futures, enabled_scheme_list):
             try:
                 success_list.append(future.result())
             except Exception as e:

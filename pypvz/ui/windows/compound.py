@@ -513,12 +513,20 @@ class AutoCompoundWindow(QMainWindow):
             return
         self.receiver_plant_textbox.setPlainText(self.format_plant_info(plant))
 
+    def refresh_information_text_box(self):
+        message = []
+        message.append(
+            "复合池植物数量：{}个".format(len(self.auto_compound_man.auto_compound_pool_id))
+        )
+        self.information_text_box.setPlainText("\n".join(message))
+
     def refresh_all(self, event: Event = None):
         self.refresh_tool_list()
         self.refresh_plant_list()
         self.refresh_plant_pool_list()
         self.refresh_liezhi_plant_textbox()
         self.refresh_receiver_plant_textbox()
+        self.refresh_information_text_box()
         self.scheme_widget.refresh_all()
         if event is not None:
             event.set()
@@ -536,6 +544,7 @@ class AutoCompoundWindow(QMainWindow):
         self.auto_compound_man.check_data()
         self.refresh_plant_list()
         self.refresh_plant_pool_list()
+        self.refresh_information_text_box()
 
     def set_liezhi_plant_btn_clicked(self):
         selected_plant_id = [
@@ -657,6 +666,7 @@ class AutoCompoundWindow(QMainWindow):
                     )
             self.refresh_plant_list()
             self.refresh_plant_pool_list()
+            self.refresh_information_text_box()
 
     def closeEvent(self, event):
         if self.run_thread is not None:
