@@ -62,9 +62,10 @@ class Challenge4Level:
         self.show_lottery = False
         self.enable_stone = True
         self.enable_large_plant_team = False
+        self.skip_no_trash_plant = False
 
         self.disable_cave_info_fetch = False
-        self.challenge_sand_cave_only_in_disable_mode = True
+        self.challenge_sand_cave_only_in_disable_mode = False
         self.need_recover = True
         self.accelerate_repository_in_challenge_cave = False
 
@@ -365,6 +366,8 @@ class Challenge4Level:
 
         for friend_id, caves in self.friend_id2cave.items():
             for id, name in caves:
+                if self.skip_no_trash_plant and len(self.trash_plant_list) == 0:
+                    return
                 for sc in self.caves:
                     if sc.cave.id == id and sc.cave.name == name:
                         break
@@ -516,6 +519,8 @@ class Challenge4Level:
         while self.enable_stone:
             has_challenged = False
             for sc in self.caves:
+                if self.skip_no_trash_plant and len(self.trash_plant_list) == 0:
+                    return
                 if sc.cave.type != 4 or not sc.enabled:
                     continue
                 cave = get_stone_cave(sc.cave.layer, sc.cave.number)
@@ -671,6 +676,7 @@ class Challenge4Level:
             "accelerate_repository_in_challenge_cave": self.accelerate_repository_in_challenge_cave,
             "main_plant_recover": self.main_plant_recover,
             "main_plant_recover_rate": self.main_plant_recover_rate,
+            "skip_no_trash_plant": self.skip_no_trash_plant,
         }
         if save_dir is not None:
             save_path = os.path.join(save_dir, "user_challenge4level")

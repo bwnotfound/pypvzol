@@ -289,7 +289,7 @@ class UpgradeQuality(Pipeline):
             self.lib,
             self.logger,
             UpgradeMan(self.cfg),
-            upgrade_plant_list,
+            [plant.id for plant in upgrade_plant_list],
             self.target_quality_index,
             self.need_show_all_info,
             None,

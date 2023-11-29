@@ -254,6 +254,18 @@ class Challenge4levelSettingWindow(QMainWindow):
         widget1.setLayout(widget1_layout)
         right_panel_layout.addWidget(widget1)
 
+        skip_no_trash_plant_layout = QHBoxLayout()
+        skip_no_trash_plant_layout.addWidget(QLabel("没炮灰停止挑战:"))
+        self.skip_no_trash_plant_checkbox = QCheckBox()
+        self.skip_no_trash_plant_checkbox.setChecked(
+            self.challenge4Level.skip_no_trash_plant
+        )
+        self.skip_no_trash_plant_checkbox.stateChanged.connect(
+            self.skip_no_trash_plant_checkbox_stateChanged
+        )
+        skip_no_trash_plant_layout.addWidget(self.skip_no_trash_plant_checkbox)
+        right_panel_layout.addLayout(skip_no_trash_plant_layout)
+
         widget2 = QWidget()
         widget2_layout = QHBoxLayout()
         widget2_layout.addWidget(QLabel("自动使用挑战书(优先高挑):"))
@@ -395,6 +407,11 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def skip_no_trash_plant_checkbox_stateChanged(self):
+        self.challenge4Level.skip_no_trash_plant = (
+            self.skip_no_trash_plant_checkbox.isChecked()
+        )
 
     def main_plant_recover_checkbox_stateChanged(self):
         self.challenge4Level.main_plant_recover = (
