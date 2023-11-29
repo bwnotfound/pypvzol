@@ -280,6 +280,7 @@ class UpgradeQuality(Pipeline):
                     self.upgrade_plant_amount, len(plant_list)
                 ),
             }
+        upgrade_plant_list = plant_list[: self.upgrade_plant_amount]
         from ..windows.quality import UpgradeQualityThread
 
         self.quality_thread = UpgradeQualityThread(
@@ -287,7 +288,7 @@ class UpgradeQuality(Pipeline):
             self.lib,
             self.logger,
             UpgradeMan(self.cfg),
-            plant_list,
+            upgrade_plant_list,
             self.target_quality_index,
             self.need_show_all_info,
             None,
@@ -308,7 +309,7 @@ class UpgradeQuality(Pipeline):
                 "info": "用户终止",
             }
         self.repo.refresh_repository()
-        for plant in plant_list:
+        for plant in upgrade_plant_list:
             repo_plant = self.repo.get_plant(plant.id)
             if repo_plant is None:
                 return {
