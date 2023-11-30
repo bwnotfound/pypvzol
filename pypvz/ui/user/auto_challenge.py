@@ -16,10 +16,10 @@ from ..message import Logger
 
 
 class SingleCave:
-    def __init__(self, cave: Cave, difficulty=3, garden_layer=None):
+    def __init__(self, cave: Cave, difficulty=3, garden_layer=None, use_sand=False):
         self.difficulty = difficulty  # 1: easy, 2: normal, 3: hard
         self.garden_layer = garden_layer
-        self.use_sand = False
+        self.use_sand = use_sand
         self.enabled = True
         self.friend_id_list: list[int] = []
         self.cave = cave
@@ -33,7 +33,6 @@ class Challenge4Level:
         user: User,
         repo: Repository,
         lib: Library,
-        free_max=10,
         logger: Logger = None,
     ):
         self.cfg = cfg
@@ -48,7 +47,6 @@ class Challenge4Level:
         self.caves: list[SingleCave] = []
         self.main_plant_list: list[int] = []
         self.trash_plant_list: list[int] = []
-        self.free_max = free_max
         self.friend_id2cave = {}
         self.garden_layer_friend_id2cave = {} if cfg.server == "私服" else None
         self.garden_layer_caves = {} if cfg.server == "私服" else None
@@ -62,7 +60,7 @@ class Challenge4Level:
         self.show_lottery = False
         self.enable_stone = True
         self.enable_large_plant_team = False
-        self.skip_no_trash_plant = False
+        self.exit_no_trash_plant = False
 
         self.disable_cave_info_fetch = False
         self.challenge_sand_cave_only_in_disable_mode = False
@@ -75,7 +73,13 @@ class Challenge4Level:
         self.main_plant_recover_rate = 0.1
 
     def add_cave(
-        self, cave: Cave, friend_ids=None, difficulty=3, enabled=True, garden_layer=None
+        self,
+        cave: Cave,
+        friend_ids=None,
+        difficulty=3,
+        enabled=True,
+        garden_layer=None,
+        use_sand=False,
     ):
         for c in self.caves:
             if (
@@ -98,7 +102,12 @@ class Challenge4Level:
             if len(friend_ids) == 0:
                 self.logger.log("你的等级不够，不能添加洞口{}".format(cave.name))
                 return
-            sc = SingleCave(cave, difficulty=difficulty, garden_layer=garden_layer)
+            sc = SingleCave(
+                cave,
+                difficulty=difficulty,
+                garden_layer=garden_layer,
+                use_sand=use_sand,
+            )
             sc.difficulty = difficulty
             if self.cfg.server == "私服":
                 self.friend_id2cave = self.garden_layer_friend_id2cave.setdefault(
@@ -113,7 +122,7 @@ class Challenge4Level:
                 self.garden_layer_caves.setdefault(garden_layer, []).append(sc)
             self.caves.append(sc)
         elif cave.type == 4:
-            sc = SingleCave(cave)
+            sc = SingleCave(cave, use_sand=use_sand)
             sc.difficulty = difficulty
             sc.enabled = enabled
             self.caves.append(sc)
@@ -208,8 +217,6 @@ class Challenge4Level:
                 continue
             team.append(plant.id)
             team_grid_amount += width
-        if team_grid_amount < team_limit - self.free_max:
-            return None
         return team
 
     def _recover(self):
@@ -366,7 +373,7 @@ class Challenge4Level:
 
         for friend_id, caves in self.friend_id2cave.items():
             for id, name in caves:
-                if self.skip_no_trash_plant and len(self.trash_plant_list) == 0:
+                if self.exit_no_trash_plant and len(self.trash_plant_list) == 0:
                     return
                 for sc in self.caves:
                     if sc.cave.id == id and sc.cave.name == name:
@@ -392,7 +399,9 @@ class Challenge4Level:
                         sand_result = self.caveMan.use_sand(cave_id)
                         if sand_result["success"]:
                             self.logger.log(
-                                "成功对{}使用时之沙".format(sc.cave.format_name(sc.difficulty))
+                                "成功对{}使用时之沙".format(
+                                    sc.cave.format_name(sc.difficulty)
+                                )
                             )
                         else:
                             self.logger.log(sand_result["result"])
@@ -525,7 +534,7 @@ class Challenge4Level:
         while self.enable_stone:
             has_challenged = False
             for sc in self.caves:
-                if self.skip_no_trash_plant and len(self.trash_plant_list) == 0:
+                if self.exit_no_trash_plant and len(self.trash_plant_list) == 0:
                     return
                 if sc.cave.type != 4 or not sc.enabled:
                     continue
@@ -645,24 +654,32 @@ class Challenge4Level:
         elif self.cfg.server != "私服":
             raise NotImplementedError
         else:
-            for garden_layer in self.garden_layer_caves.keys():
+            while True:
+                enter_time = time.perf_counter()
+                for garden_layer in self.garden_layer_caves.keys():
+                    if stop_channel.qsize() > 0:
+                        break
+                    if self.cfg.server == "私服":
+                        self.friend_id2cave = self.garden_layer_friend_id2cave.get(
+                            garden_layer, None
+                        )
+                        if self.friend_id2cave is None:
+                            raise RuntimeError("garden layer is not added 2")
+                        if not self.disable_cave_info_fetch:
+                            if not self.switch_garden_layer(garden_layer):
+                                continue
+                    try:
+                        self.challenge_cave(stop_channel)
+                    except Exception as e:
+                        self.logger.log(
+                            "挑战第{}层洞口异常，异常种类:{}。跳过该层".format(garden_layer, type(e).__name__)
+                        )
+                time.sleep(max(0, 0.2 - (time.perf_counter() - enter_time)))
                 if stop_channel.qsize() > 0:
                     break
-                if self.cfg.server == "私服":
-                    self.friend_id2cave = self.garden_layer_friend_id2cave.get(
-                        garden_layer, None
-                    )
-                    if self.friend_id2cave is None:
-                        raise RuntimeError("garden layer is not added 2")
-                    if not self.disable_cave_info_fetch:
-                        if not self.switch_garden_layer(garden_layer):
-                            continue
-                try:
-                    self.challenge_cave(stop_channel)
-                except Exception as e:
-                    self.logger.log(
-                        "挑战第{}层洞口异常，异常种类:{}。跳过该层".format(garden_layer, type(e).__name__)
-                    )
+                if self.exit_no_trash_plant and len(self.trash_plant_list) != 0:
+                    continue
+                break
         self.logger.log("挑战完成")
 
     def save(self, save_dir):
@@ -670,7 +687,6 @@ class Challenge4Level:
             "caves": self.caves,
             "main_plant_list": self.main_plant_list,
             "trash_plant_list": self.trash_plant_list,
-            "free_max": self.free_max,
             "friend_id2cave": self.friend_id2cave,
             "garden_layer_friend_id2cave": self.garden_layer_friend_id2cave,
             "garden_layer_caves": self.garden_layer_caves,
@@ -689,7 +705,7 @@ class Challenge4Level:
             "accelerate_repository_in_challenge_cave": self.accelerate_repository_in_challenge_cave,
             "main_plant_recover": self.main_plant_recover,
             "main_plant_recover_rate": self.main_plant_recover_rate,
-            "skip_no_trash_plant": self.skip_no_trash_plant,
+            "exit_no_trash_plant": self.exit_no_trash_plant,
         }
         if save_dir is not None:
             save_path = os.path.join(save_dir, "user_challenge4level")

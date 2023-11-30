@@ -72,13 +72,6 @@ class UpgradeQualityWidget(QWidget):
         )
         self.main_layout.addWidget(self.pool_size_combobox)
 
-        self.force_upgrade_checkbox = QCheckBox("异常后继续")
-        self.force_upgrade_checkbox.setChecked(self.pipeline.force_upgrade)
-        self.force_upgrade_checkbox.stateChanged.connect(
-            self.force_upgrade_checkbox_state_changed
-        )
-        self.main_layout.addWidget(self.force_upgrade_checkbox)
-
         self.need_show_all_info_checkbox = QCheckBox("显示所有信息")
         self.need_show_all_info_checkbox.setChecked(self.pipeline.need_show_all_info)
         self.need_show_all_info_checkbox.stateChanged.connect(
@@ -98,9 +91,6 @@ class UpgradeQualityWidget(QWidget):
 
     def pool_size_combobox_current_index_changed(self, index):
         self.pipeline.pool_size = index + 1
-
-    def force_upgrade_checkbox_state_changed(self):
-        self.pipeline.force_upgrade = self.force_upgrade_checkbox.isChecked()
 
     def need_show_all_info_checkbox_state_changed(self):
         self.pipeline.need_show_all_info = self.need_show_all_info_checkbox.isChecked()

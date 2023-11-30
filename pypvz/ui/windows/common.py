@@ -275,6 +275,7 @@ class AddCaveWindow(QMainWindow):
                 cave,
                 difficulty=self.difficulty_choice.currentIndex() + 1,
                 garden_layer=self.current_garden_layer_choice.currentIndex() + 1,
+                use_sand=self.need_use_sand.isChecked(),
             )
         else:
             self.challenge4Level.add_cave(

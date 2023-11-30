@@ -188,22 +188,6 @@ class Challenge4levelSettingWindow(QMainWindow):
         cave_enabled_switch_layout.addWidget(disable_all_cave_btn)
         right_panel_layout.addLayout(cave_enabled_switch_layout)
 
-        free_max_input_widget = QWidget()
-        free_max_input_layout = QHBoxLayout()
-        free_max_input_box = QSpinBox()
-        free_max_input_box.setMinimum(0)
-        free_max_input_box.setMaximum(16)
-        free_max_input_box.setValue(self.challenge4Level.free_max)
-
-        def free_max_input_box_value_changed(value):
-            self.challenge4Level.free_max = value
-
-        free_max_input_box.valueChanged.connect(free_max_input_box_value_changed)
-        free_max_input_layout.addWidget(QLabel("出战植物最大空位数:"))
-        free_max_input_layout.addWidget(free_max_input_box)
-        free_max_input_widget.setLayout(free_max_input_layout)
-        right_panel_layout.addWidget(free_max_input_widget)
-
         hp_choice_widget = QWidget()
         hp_choice_layout = QHBoxLayout()
         hp_choice_layout.addWidget(QLabel("血瓶选择:"))
@@ -254,17 +238,17 @@ class Challenge4levelSettingWindow(QMainWindow):
         widget1.setLayout(widget1_layout)
         right_panel_layout.addWidget(widget1)
 
-        skip_no_trash_plant_layout = QHBoxLayout()
-        skip_no_trash_plant_layout.addWidget(QLabel("没炮灰停止挑战:"))
-        self.skip_no_trash_plant_checkbox = QCheckBox()
-        self.skip_no_trash_plant_checkbox.setChecked(
-            self.challenge4Level.skip_no_trash_plant
+        exit_no_trash_plant_layout = QHBoxLayout()
+        exit_no_trash_plant_layout.addWidget(QLabel("没炮灰才停止挑战:"))
+        self.exit_no_trash_plant_checkbox = QCheckBox()
+        self.exit_no_trash_plant_checkbox.setChecked(
+            self.challenge4Level.exit_no_trash_plant
         )
-        self.skip_no_trash_plant_checkbox.stateChanged.connect(
-            self.skip_no_trash_plant_checkbox_stateChanged
+        self.exit_no_trash_plant_checkbox.stateChanged.connect(
+            self.exit_no_trash_plant_checkbox_stateChanged
         )
-        skip_no_trash_plant_layout.addWidget(self.skip_no_trash_plant_checkbox)
-        right_panel_layout.addLayout(skip_no_trash_plant_layout)
+        exit_no_trash_plant_layout.addWidget(self.exit_no_trash_plant_checkbox)
+        right_panel_layout.addLayout(exit_no_trash_plant_layout)
 
         widget2 = QWidget()
         widget2_layout = QHBoxLayout()
@@ -408,9 +392,9 @@ class Challenge4levelSettingWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
-    def skip_no_trash_plant_checkbox_stateChanged(self):
-        self.challenge4Level.skip_no_trash_plant = (
-            self.skip_no_trash_plant_checkbox.isChecked()
+    def exit_no_trash_plant_checkbox_stateChanged(self):
+        self.challenge4Level.exit_no_trash_plant = (
+            self.exit_no_trash_plant_checkbox.isChecked()
         )
 
     def main_plant_recover_checkbox_stateChanged(self):

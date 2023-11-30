@@ -903,12 +903,12 @@ class CompoundSchemeWidget(QWidget):
             return
         message = []
         message.append(
-            "方案{}中复合池植物数量：{}个".format(
+            '方案"{}"中复合池植物数量：{}个'.format(
                 self.scheme.name, len(self.scheme.auto_compound_pool_id)
             )
         )
         message.append(
-            "方案{}中内置合成池植物数量：{}个".format(
+            '方案"{}"中内置合成池植物数量：{}个'.format(
                 self.scheme.name,
                 len(self.scheme.auto_synthesis_man.auto_synthesis_pool_id),
             )

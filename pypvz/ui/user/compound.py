@@ -119,7 +119,7 @@ class CompoundScheme:
         )
         target_attr = self.end_mantissa * (10 ** (self.end_exponent + 8))
         if now_attr >= target_attr:
-            self.logger.log(f"对于方案{self.name}而言，主力数值已达到设定值")
+            self.logger.log(f'对于方案"{self.name}"而言，主力数值已达到设定值')
             return False
         else:
             return True
@@ -196,7 +196,7 @@ class CompoundScheme:
         )
         signal_block_emit(refresh_signal)
         if not success:
-            self.logger.log(f"方案{self.name}在复制植物时出现传承错误，中断复合")
+            self.logger.log(f'方案"{self.name}"在复制植物时出现传承错误，中断复合')
             return None
         self.source_plant_id = self.synthesis_plant(
             self.source_plant_id, self.n1, refresh_signal
@@ -234,13 +234,13 @@ class CompoundScheme:
         for i in range(self.m):
             copy_plant_id = self.copy_source_plant(refresh_signal)
             if copy_plant_id is None:
-                self.logger.log(f"方案{self.name}复制第{i+1}个植物失败，中止复合")
+                self.logger.log(f'方案"{self.name}"复制第{i+1}个植物失败，中止复合')
             result = self._synthesis(
                 self.liezhi_plant_id, copy_plant_id, self.synthesis_book['id'], 10
             )
             if not result["success"]:
                 self.logger.log(result['result'])
-                self.logger.log("合成异常，中止复合")
+                self.logger.log("自动复合中把复制出来的植物给劣质双格吃时发生合成异常，中止复合")
                 return False
             self.logger.log("复制第{}个植物成功".format(i + 1))
         return True
@@ -322,14 +322,6 @@ class AutoCompoundMan:
     def remove_scheme(self, scheme: CompoundScheme):
         self.scheme_list.remove(scheme)
 
-    @property
-    def inherit_reinforce(self):
-        return self.repo.get_tool(self.lib.name2tool["传承增强卷轴"].id)
-
-    @property
-    def synthesis_reinforce(self):
-        return self.repo.get_tool(self.lib.name2tool["增强卷轴"].id)
-
     def need_compound(self):
         if self.receiver_plant_id is None:
             self.logger.log("未设置主力")
@@ -375,7 +367,7 @@ class AutoCompoundMan:
             if not scheme.enabled:
                 continue
             if scheme.source_plant_id is None:
-                result.append(f"方案{scheme.name}未设置底座植物")
+                result.append(f'方案"{scheme.name}"未设置底座植物')
         inherit_book_dict = {}
         synthesis_book_dict = {}
         quality_dict = {}
@@ -451,7 +443,7 @@ class AutoCompoundMan:
                 )
             )
 
-        inherit_reinforce = self.inherit_reinforce
+        inherit_reinforce = self.repo.get_tool(self.lib.name2tool["传承增强卷轴"].id)
         if inherit_reinforce is None:
             result.append("没有传承增强卷轴了")
         elif inherit_reinforce['amount'] < inherit_reinforce_num_required:
@@ -461,7 +453,7 @@ class AutoCompoundMan:
                     inherit_reinforce_num_required,
                 )
             )
-        synthesis_reinforce = self.synthesis_reinforce
+        synthesis_reinforce = self.repo.get_tool(self.lib.name2tool["增强卷轴"].id)
         if synthesis_reinforce is None:
             result.append("没有增强卷轴了")
         elif synthesis_reinforce['amount'] < synthesis_reinforce_num_required:
@@ -515,16 +507,16 @@ class AutoCompoundMan:
             result = self.heritage_man.exchange_all(id1, id2)
         except Exception as e:
             if "amf返回结果为空" in str(e):
-                msg = "可能由以下原因引起：参与复合的植物不见了、全传不够"
+                msg = "可能由以下原因引起：参与全传的植物不见了、全传不够"
                 self.logger.log("复合异常，已跳出复合。{}".format(msg))
                 return False
             self.repo.refresh_repository()
             after_plant1 = self.repo.get_plant(id1)
             for attr_name in self.attribute2plant_attribute.values()[:6]:
                 if getattr(after_plant1, attr_name) != getattr(plant1, attr_name):
-                    self.logger.log("复合异常。检测传出植物前后属性不一致，判断为传承成功。")
+                    self.logger.log("全传异常。检测传出植物前后属性不一致，判断为传承成功。")
                     return True
-            self.logger.log("复合异常。检测传出植物前后属性一致，判断为传承失败。尝试重新传承")
+            self.logger.log("全传异常。检测传出植物前后属性一致，判断为传承失败。尝试重新传承")
             return self.exchange_all(id1, id2)
         return result["success"]
 
@@ -547,7 +539,7 @@ class AutoCompoundMan:
             )
             if plant_list is None:
                 self.logger.log(
-                    f"方案{scheme.name}复合所需的{quality_name_list[scheme.need_quality_index]}植物数量不足，中止复合"
+                    f'方案"{scheme.name}"复合所需的{quality_name_list[scheme.need_quality_index]}植物数量不足，中止复合'
                 )
                 return False
             scheme.import_deputy_plant(plant_list)
@@ -568,15 +560,15 @@ class AutoCompoundMan:
                 success_list.append(future.result())
             except Exception as e:
                 if isinstance(e, RuntimeError):
-                    self.logger.log(f"方案{scheme.name}自动复合异常。异常原因：{str(e)}")
+                    self.logger.log(f'方案"{scheme.name}"自动复合异常。异常原因：{str(e)}')
                 else:
-                    self.logger.log(f"方案{scheme.name}自动复合异常。异常类型：{type(e).__name__}")
+                    self.logger.log(f'方案"{scheme.name}"自动复合异常。异常类型：{type(e).__name__}')
                 return False
         flag = False
         for s, scheme in zip(success_list, enabled_scheme_list):
             if not s:
                 flag = True
-                self.logger.log(f"方案{scheme.name}自动复合失败")
+                self.logger.log(f'方案"{scheme.name}"自动复合失败')
         if flag:
             return False
 
@@ -586,7 +578,7 @@ class AutoCompoundMan:
                 self.receiver_plant_id,
             )
             if not success:
-                self.logger.log("在将劣质双格满传给主力时出现传承错误，中断复合")
+                self.logger.log("在将劣质双格全传给主力时出现传承错误，中断复合")
                 return False
         return True
 

@@ -266,7 +266,6 @@ class UpgradeQuality(Pipeline):
 
         self.target_quality_index = quality_name_list.index("魔神")
         self.need_show_all_info = False
-        self.force_upgrade = True
         self.pool_size = 3
         self.upgrade_plant_amount = 1
         self.interrupt_event = Event()
@@ -296,7 +295,6 @@ class UpgradeQuality(Pipeline):
             self.interrupt_event,
             None,
             self.rest_event,
-            self.force_upgrade,
             self.pool_size,
         )
         self.quality_thread.start()
@@ -340,7 +338,6 @@ class UpgradeQuality(Pipeline):
         return {
             "target_quality_index": self.target_quality_index,
             "need_show_all_info": self.need_show_all_info,
-            "force_upgrade": self.force_upgrade,
             "pool_size": self.pool_size,
             "upgrade_plant_amount": self.upgrade_plant_amount,
         }

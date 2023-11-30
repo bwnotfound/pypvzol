@@ -1,6 +1,8 @@
 from time import sleep
+import logging
 from threading import Event, Thread
 import concurrent.futures
+
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -20,6 +22,7 @@ from ..wrapped import QLabel, signal_block_emit, WaitEventThread
 from ..user import UserSettings
 from ... import Repository, UpgradeMan, Library
 
+
 class UpgradeQualityWindow(QMainWindow):
     upgrade_finish_signal = pyqtSignal()
     refresh_signal = pyqtSignal(Event)
@@ -36,7 +39,6 @@ class UpgradeQualityWindow(QMainWindow):
         self.refresh_signal.connect(self.refresh_plant_list)
         self.upgrade_finish_signal.connect(self.upgrade_finish)
         self.upgrade_quality_stoped_signal.connect(self.upgrade_quality_stoped)
-        self.force_upgrade = True
         self.pool_size = 3
         self.init_ui()
 
@@ -93,12 +95,6 @@ class UpgradeQualityWindow(QMainWindow):
         pool_layout.addWidget(self.pool_size_combobox)
         right_layout.addLayout(pool_layout)
 
-        self.force_upgrade_checkbox = QCheckBox("异常后继续刷品")
-        self.force_upgrade_checkbox.setChecked(self.force_upgrade)
-        self.force_upgrade_checkbox.stateChanged.connect(
-            self.force_upgrade_checkbox_state_changed
-        )
-        right_layout.addWidget(self.force_upgrade_checkbox)
 
         self.show_all_info = QCheckBox("显示所有信息")
         self.show_all_info.setChecked(False)
@@ -115,8 +111,6 @@ class UpgradeQualityWindow(QMainWindow):
     def pool_size_combobox_current_index_changed(self):
         self.pool_size = self.pool_size_combobox.currentIndex() + 1
 
-    def force_upgrade_checkbox_state_changed(self):
-        self.force_upgrade = self.force_upgrade_checkbox.isChecked()
 
     def refresh_plant_list(self, event: Event = None):
         self.plant_list.clear()
@@ -162,7 +156,6 @@ class UpgradeQualityWindow(QMainWindow):
                     self.interrupt_event,
                     self.refresh_signal,
                     self.rest_event,
-                    force_upgrade=self.force_upgrade,
                     pool_size=self.pool_size,
                 )
                 self.rest_event.clear()
@@ -204,7 +197,6 @@ class UpgradeQualityThread(Thread):
         interrupt_event: Event,
         refresh_signal,
         rest_event: Event,
-        force_upgrade=False,
         pool_size=3,
     ):
         super().__init__()
@@ -219,7 +211,6 @@ class UpgradeQualityThread(Thread):
         self.interrupt_event = interrupt_event
         self.refresh_signal = refresh_signal
         self.rest_event = rest_event
-        self.force_upgrade = force_upgrade
         self.pool_size = pool_size
 
     def _upgrade_quality(self, plant_id):
@@ -238,44 +229,18 @@ class UpgradeQualityThread(Thread):
                 return True
             error_flag = False
             while True:
-                cnt, max_retry = 0, 15
-                while cnt < max_retry:
-                    if self.interrupt_event.is_set():
-                        return True
-                    cnt += 1
-                    try:
-                        result = self.upgrade_man.upgrade_quality(plant_id)
-                    except Exception as e:
-                        self.logger.reverse_log(
-                            f"刷品异常，已跳过该植物，同时暂停1秒。原因种类：{type(e).__name__}",
-                            self.need_show_all_info,
-                        )
-                        error_flag = True
-                        sleep(1)
-                        break
-                    if result['success']:
-                        break
+                if self.interrupt_event.is_set():
+                    return True
+                result = self.upgrade_man.upgrade_quality(plant_id)
+                if not result['success']:
                     if result['error_type'] == 3:
                         self.logger.log("品质刷新书不足，已停止刷品")
                         return True
-                    if result['error_type'] == 6:
-                        self.logger.reverse_log(
-                            "请求升品过于频繁，选择等待1秒后重试，最多再重试{}".format(max_retry - cnt),
-                            self.need_show_all_info,
-                        )
-                        sleep(1)
-                        continue
                     else:
                         self.logger.reverse_log(
                             result['result'] + "。已跳过该植物", self.need_show_all_info
                         )
                         error_flag = True
-                        break
-                else:
-                    self.logger.reverse_log(
-                        "重试次数过多，放弃升级品质，跳过该植物", self.need_show_all_info
-                    )
-                    error_flag = True
                 if error_flag:
                     has_failure = True
                     break
@@ -285,9 +250,7 @@ class UpgradeQualityThread(Thread):
                 plant.quality_index = cur_quality_index
                 plant.quality_str = result['quality_name']
                 if cur_quality_index >= self.target_quality_index:
-                    self.logger.log(
-                        f"{plant.name(self.lib)}({plant.grade})升品完成"
-                    )
+                    self.logger.log(f"{plant.name(self.lib)}({plant.grade})升品完成")
                     break
                 msg = "{}({})升品成功。当前品质：{}".format(
                     plant.name(self.lib),
@@ -297,9 +260,9 @@ class UpgradeQualityThread(Thread):
                 self.logger.reverse_log(msg, self.need_show_all_info)
             signal_block_emit(self.refresh_signal)
         except Exception as e:
-            self.logger.log(f"刷品过程中出现异常，已停止。原因种类：{type(e).__name__}")
+            self.logger.log(f"刷品过程中出现异常，已跳过当前植物。原因种类：{type(e).__name__}")
             has_failure = True
-        if has_failure and self.force_upgrade:
+        if has_failure:
             return False
         return True
 
@@ -313,13 +276,14 @@ class UpgradeQualityThread(Thread):
                 for plant_id in plant_id_list
             ]
             for i, result in enumerate(futures):
-                if result.result():
-                    plant_id_set.remove(plant_id_list[i])
-            if len(plant_id_set) == 0 or not self.force_upgrade:
+                try:
+                    if result.result():
+                        plant_id_set.remove(plant_id_list[i])
+                except Exception as e:
+                    logging.warning("刷品过程中出现异常，异常类型：{}".format(type(e).__name__))
+            if len(plant_id_set) == 0:
                 break
-            self.logger.log(
-                "刷品过程中出现异常，重启刷品，一共还剩{}个植物需重新刷品".format(len(plant_id_set))
-            )
+            self.logger.log("刷品过程中出现异常，重启刷品，一共还剩{}个植物需重新刷品".format(len(plant_id_set)))
 
     def run(self):
         try:
