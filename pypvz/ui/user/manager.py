@@ -54,7 +54,7 @@ class AutoSynthesisMan:
     def check_data(self, refresh_repo=True):
         if refresh_repo:
             self.repo.refresh_repository()
-        if isinstance(self.main_plant_id, int):
+        if self.main_plant_id is not None:
             if self.repo.get_plant(self.main_plant_id) is None:
                 self.main_plant_id = None
         else:
@@ -125,6 +125,9 @@ class AutoSynthesisMan:
                     "result": "合成异常。因为吃底座的植物不见了",
                 }
             if self.main_plant_id is None:
+                if deputy_plant_id in self.auto_synthesis_pool_id:
+                    self.auto_synthesis_pool_id.remove(deputy_plant_id)
+                self.main_plant_id = deputy_plant_id
                 return {
                     "success": True,
                     "result": "合成异常，但是底座植物不存在，所以判定为合成成功",
