@@ -53,7 +53,13 @@ class PlantEvolution:
             "/pvz/index.php/organism/evolution/id/"
             + f"{id}/route/{pathItem.evolution_path['id']}/shortcut/2/sig/0"
         )  # TODO: 这里的2不知道是什么意思
-        xml_text = self.wr.get(url).decode("utf-8")
+        try:
+            xml_text = self.wr.get_retry(url, "进化").decode("utf-8")
+        except Exception as e:
+            return {
+                "success": False,
+                "result": "进化失败。异常类型：" + type(e).__name__,
+            }
         try:
             root = fromstring(xml_text)
         except Exception as e:
@@ -160,7 +166,7 @@ class PlantEvolution:
             "success": True,
             "result": f"在第{path_index+1}条路线中成功将{plant.name(self.lib)}进化为{saved_path[-1].start_plant.name}",
         }
-    
+
     def load(self, save_dir):
         save_path = os.path.join(save_dir, "evolution")
         if not path.exists(save_path):
@@ -170,7 +176,7 @@ class PlantEvolution:
         for saved_path in self.saved_evolution_paths:
             for item in saved_path:
                 item.lib = self.lib
-    
+
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "evolution")
         for saved_path in self.saved_evolution_paths:

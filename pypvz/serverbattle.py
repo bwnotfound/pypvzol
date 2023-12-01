@@ -9,8 +9,10 @@ class Serverbattle:
     def challenge(self):
         body = []
         response = self.wr.amf_post_retry(
-            body, 'api.serverbattle.challenge', "/pvz/amf/", "跨服挑战"
+            body, 'api.serverbattle.challenge', "/pvz/amf/", "跨服挑战", allow_empty=True
         )
+        if response is None:
+            return None
         if response.status != 0:
             return {
                 "success": False,
@@ -30,12 +32,4 @@ class Serverbattle:
             "获取跨服信息",
             except_retry=True,
         )
-        if response.status != 0:
-            return {
-                "success": False,
-                "result": f"获取跨服信息失败。错误原因：{response.body.description}",
-            }
-        return {
-            "success": True,
-            "result": response.body,
-        }
+        return response

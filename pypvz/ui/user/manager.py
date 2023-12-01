@@ -1,4 +1,5 @@
 import pickle
+import concurrent.futures
 from queue import Queue
 import logging
 import os
@@ -394,9 +395,6 @@ class TerritoryMan:
             logger=self.logger,
             except_retry=True,
         )
-        if response.status != 0:
-            self.logger.log("查询领地剩余次数失败，原因：{}".format(response.body.description))
-            return False
         rest_num = int(response.body["challengecount"])
         if rest_num < self.difficulty_choice:
             self.logger.log("剩余次数不足，剩余次数：{}".format(rest_num))
@@ -411,34 +409,27 @@ class TerritoryMan:
             "/pvz/amf/",
             "挑战领地",
             logger=self.logger,
+            except_retry=True,
         )
-        if response.status != 0:
-            return {"success": False, "result": response.body.description}
-        else:
-            return {"success": True, "result": response.body}
+        return response
 
     def auto_challenge(self, stop_channel: Queue):
         while True:
             message = f"挑战领地难度{self.difficulty_choice}"
-            try:
-                result = self.challenge()
-            except Exception as e:
-                self.logger.log("挑战领地异常，异常类型：{}".format(type(e).__name__))
-                return
-            success, result = result["success"], result["result"]
-            if not success:
-                message = message + "失败. 原因: {}.".format(result)
+            response = self.challenge()
+            if response.status == 1:
+                message = message + "失败. 原因: {}.".format(response.body.description)
                 self.logger.log(message)
-                return
-            else:
-                message = message + "成功. "
+                return False
+            result = response.body
+            message = message + "成功. "
             message = message + "挑战结果：{}".format(
                 "胜利" if result['fight']['is_winning'] else "失败"
             )
             message = message + ". 现在荣誉: {}".format(result['honor'])
             self.logger.log(message)
             if stop_channel.qsize() > 0:
-                return
+                return False
 
     def release_plant(self, user_id):
         body = [float(user_id)]
@@ -447,6 +438,7 @@ class TerritoryMan:
             "api.territory.quit",
             "/pvz/amf/",
             "释放领地",
+            except_retry=True,
         )
         if response.status != 0:
             if response.body.description == "重置所有植物成功!":
@@ -460,17 +452,29 @@ class TerritoryMan:
     def upload_team(self):
         if len(self.team) > 5:
             logging.warning("上场植物数超过5，但上场植物数只能小于等于5")
-        for i, plant_id in enumerate(self.team[:5]):
-            body = [float(f"100{i+1}"), [int(plant_id)], float(1), float(0)]
+
+        def run(body):
             response = self.wr.amf_post_retry(
                 body,
                 "api.territory.challenge",
                 "/pvz/amf/",
                 "上领地植物",
                 logger=self.logger,
+                allow_empty=True,
+                except_retry=True,
             )
-            if response.status != 0:
-                return {"success": False, "result": response.body.description}
+            return response
+
+        futures = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            for i, plant_id in enumerate(self.team[:5]):
+                body = [float(f"100{i+1}"), [int(plant_id)], float(1), float(0)]
+                futures.append(executor.submit(run, body))
+        concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
+        for f in futures:
+            response = f.result()
+            if response is None:
+                return {"success": False, "result": "上领地植物时有的植物不存在"}
         return {"success": True, "result": "共上场{}个植物".format(len(self.team))}
 
     def save(self, save_dir):
@@ -507,11 +511,12 @@ class DailyMan:
             "/pvz/amf/",
             "vip每日奖励",
             logger=self.logger,
+            allow_empty=True,
+            except_retry=True,
         )
-        if response.status != 0:
-            return {"success": False, "result": response.body.description}
-        else:
-            return {"success": True, "result": response.body}
+        if response is None:
+            return False
+        return True
 
     def daily_sign(self):
         response = self.wr.amf_post_retry(
@@ -520,6 +525,7 @@ class DailyMan:
             "/pvz/amf/",
             "每日签到",
             logger=self.logger,
+            except_retry=True,
         )
         if response.status != 0:
             return {"success": False, "result": response.body.description}
@@ -546,22 +552,14 @@ class GardenMan:
         ]
 
     def challenge_boss(self):
-        if self.team is None or len(self.team) == 0:
-            self.logger.log("未设置队伍")
-            return False
-        try:
-            self.wr.amf_post_retry(
-                [float(1), float(3), float(2), self.team],
-                "api.garden.challenge",
-                "/pvz/amf/",
-                "挑战花园boss",
-                logger=self.logger,
-                exit_response=True,
-            )
-        except Exception as e:
-            self.logger.log("挑战花园boss异常，异常类型：{}".format(type(e).__name__))
-            return False
-        return True
+        self.wr.amf_post_retry(
+            [float(1), float(3), float(2), self.team],
+            "api.garden.challenge",
+            "/pvz/amf/",
+            "挑战花园boss",
+            logger=self.logger,
+            exit_response=True,
+        )
 
     def get_lottery(self):
         response = self.wr.amf_post_retry(
@@ -577,18 +575,30 @@ class GardenMan:
             return {"success": True, "result": response.body}
 
     def auto_challenge(self, stop_channel: Queue):
+        if self.team is None or len(self.team) == 0:
+            self.logger.log("未设置队伍")
+            return False
         while True:
             failure = False
             message = "挑战花园boss"
+            cnt, max_retry = 0, 15
+            while cnt < max_retry:
+                cnt += 1
+                try:
+                    self.challenge_boss()
+                    break
+                except Exception as e:
+                    self.logger.log(
+                        "挑战花园boss异常，尝试继续，还能尝试{}次。异常类型：{}".format(
+                            max_retry - cnt, type(e).__name__
+                        )
+                    )
+                    continue
             try:
-                status = self.challenge_boss()
-                if not status:
-                    return
+                lottery_result = self.get_lottery()
             except Exception as e:
-                self.logger.log("挑战花园boss异常，异常类型：{}".format(type(e).__name__))
-                return
-
-            lottery_result = self.get_lottery()
+                self.logger.log("获取战利品异常，异常类型：{}".format(type(e).__name__))
+                continue
             if lottery_result["success"] and len(lottery_result["result"]["tools"]) > 0:
                 lottery_list = []
                 for item in lottery_result["result"]["tools"]:
@@ -599,11 +609,11 @@ class GardenMan:
                     lottery_list.append("{}({})".format(lib_tool.name, amount))
                 message = message + "成功.\n\t战利品: {}".format(" ".join(lottery_list))
             else:
-                message = message + "失败. 失败原因：{}".format(lottery_result["result"])
+                message = message + "失败。没有花园挑战次数了"
                 failure = True
             self.logger.log(message)
             if stop_channel.qsize() > 0 or failure:
-                return
+                return False
 
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "auto_garden")
@@ -633,33 +643,39 @@ class ServerBattleMan:
         self.rest_challenge_num_limit = 60
 
     def auto_challenge(self, stop_channel: Queue):
-        current_challenge_num = self.rest_challenge_num()
-        if current_challenge_num is None:
-            self.logger.log("获取跨服信息失败")
-            return
-
         while True:
-            if current_challenge_num <= self.rest_challenge_num_limit:
-                self.logger.log(
-                    "跨服挑战次数剩余量已达限定值：{}/{}".format(
-                        current_challenge_num, self.rest_challenge_num_limit
-                    )
-                )
-                return
-            result = self.serverbattle.challenge()
-            self.logger.log(result["result"])
-            if not result["success"]:
-                break
             if stop_channel.qsize() > 0:
-                break
-            current_challenge_num -= 1
+                return
+            current_challenge_num = self.rest_challenge_num()
+            while True:
+                if current_challenge_num <= self.rest_challenge_num_limit:
+                    self.logger.log(
+                        "跨服挑战次数剩余量已达限定值：{}/{}".format(
+                            current_challenge_num, self.rest_challenge_num_limit
+                        )
+                    )
+                    return
+                try:
+                    result = self.serverbattle.challenge()
+                    if result is None:
+                        self.logger.log("跨服挑战次数已用完。")
+                        return
+                except Exception as e:
+                    self.logger.log("跨服挑战异常，异常类型：{}".format(type(e).__name__))
+                    break
+                if not result["success"]:
+                    self.logger.log(result["result"])
+                    return
+                current_challenge_num -= 1
+                self.logger.log(
+                    result["result"] + ". 还剩{}次挑战次数".format(current_challenge_num)
+                )
+                if stop_channel.qsize() > 0:
+                    return
 
     def rest_challenge_num(self):
-        result = self.serverbattle.get_info()
-        if not result["success"]:
-            self.logger.log(result["result"])
-            return None
-        return int(result["result"]["remaining_challenges"])
+        response = self.serverbattle.get_info()
+        return int(response.body["result"]["remaining_challenges"])
 
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "serverbattle_man")

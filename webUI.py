@@ -342,15 +342,30 @@ class SettingWindow(QMainWindow):
         millsecond_delay_widget.setLayout(millsecond_delay_layout)
         menu_layout.addWidget(millsecond_delay_widget, 8, 0)
 
+        self.close_if_nothing_todo_checkbox = QCheckBox("无事可做时关闭用户")
+        self.close_if_nothing_todo_checkbox.setFont(normal_font)
+        self.close_if_nothing_todo_checkbox.setChecked(
+            self.usersettings.exit_if_nothing_todo
+        )
+        self.close_if_nothing_todo_checkbox.stateChanged.connect(
+            self.close_if_nothing_todo_checkbox_stateChanged
+        )
+        menu_layout.addWidget(self.close_if_nothing_todo_checkbox, 9, 0)
+
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-        
+
+    def close_if_nothing_todo_checkbox_stateChanged(self):
+        self.usersettings.exit_if_nothing_todo = (
+            self.close_if_nothing_todo_checkbox.isChecked()
+        )
+
     def serverbattle_rest_num_inputbox_textChanged(self):
-        self.usersettings.serverbattle_man.rest_challenge_num_limit = (
-            int(self.serverbattle_rest_num_inputbox.text())
+        self.usersettings.serverbattle_man.rest_challenge_num_limit = int(
+            self.serverbattle_rest_num_inputbox.text()
         )
 
     def territory_setting_btn_clicked(self):
@@ -585,10 +600,12 @@ class FunctionPanelWindow(QMainWindow):
 
 class CustomMainWindow(QMainWindow):
     logger_signal = pyqtSignal()
+    close_signal = pyqtSignal()
 
     def __init__(self, usersettings: UserSettings, cache_dir):
         super().__init__()
         self.usersettings = usersettings
+        self.close_signal.connect(self.close)
 
         if not os.path.exists(cache_dir):
             os.mkdir(cache_dir)
@@ -764,7 +781,7 @@ class CustomMainWindow(QMainWindow):
         while self.usersettings.stop_channel.qsize() > 0:
             self.usersettings.stop_channel.get()
         self.usersettings.logger.log("开始运行")
-        self.usersettings.start()
+        self.usersettings.start(self.close_signal)
 
     def stop_prcess(self):
         self.process_button.setText("开始")

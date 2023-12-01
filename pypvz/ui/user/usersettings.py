@@ -85,12 +85,14 @@ class UserSettings:
         self.daily_man = DailyMan(cfg, self.logger)
         self.garden_man = GardenMan(cfg, repo, lib, self.logger)
         self.garden_enabled = False
+        self.exit_if_nothing_todo = False
 
         self.pipeline_man = PipelineMan(cfg, lib, repo, user, self.logger)
 
-    def _start(self, stop_channel: Queue):
+    def _start(self, stop_channel: Queue, close_signal):
         self.repo.refresh_repository(self.logger)
         while stop_channel.qsize() == 0:
+            need_continue = False
             enter_time = perf_counter()
             # if self.shop_enabled:
             #     try:
@@ -138,7 +140,8 @@ class UserSettings:
             if self.garden_enabled:
                 self.garden_man.check_data(False)
                 try:
-                    self.garden_man.auto_challenge(stop_channel)
+                    if self.garden_man.auto_challenge(stop_channel):
+                        need_continue = True
                 except Exception as e:
                     self.logger.log(f"自动花园挑战失败，异常种类:{type(e).__name__}。跳过自动花园挑战")
                 if stop_channel.qsize() > 0:
@@ -147,23 +150,11 @@ class UserSettings:
                 try:
                     if self.territory_man.can_challenge():
                         self.territory_man.check_data(False)
-                        try:
-                            result = self.territory_man.upload_team()
-                            self.logger.log(result['result'])
-                        except Exception as e:
-                            self.logger.log(f"上领地植物失败，异常种类:{type(e).__name__}。跳过领地挑战")
-                        else:
-                            try:
-                                self.territory_man.auto_challenge(stop_channel)
-                            except Exception as e:
-                                self.logger.log(
-                                    f"自动领地挑战失败，异常种类:{type(e).__name__}。跳过自动领地挑战"
-                                )
-                        try:
-                            result = self.territory_man.release_plant(self.user.id)
-                            self.logger.log(result['result'])
-                        except Exception as e:
-                            self.logger.log(f"领地释放植物失败，异常种类:{type(e).__name__}。")
+                        result = self.territory_man.upload_team()
+                        self.logger.log(result['result'])
+                        self.territory_man.auto_challenge(stop_channel)
+                        result = self.territory_man.release_plant(self.user.id)
+                        self.logger.log(result['result'])
                 except Exception as e:
                     self.logger.log(f"领地挑战失败，异常种类:{type(e).__name__}。跳过领地挑战")
                 if stop_channel.qsize() > 0:
@@ -173,7 +164,6 @@ class UserSettings:
                     self.serverbattle_man.auto_challenge(stop_channel)
                 except Exception as e:
                     self.logger.log(f"跨服挑战失败，异常种类:{type(e).__name__}。跳过跨服挑战")
-                    break
                 if stop_channel.qsize() > 0:
                     break
             if self.fuben_enabled:
@@ -207,6 +197,10 @@ class UserSettings:
                     self.challenge4Level.auto_challenge(stop_channel)
                 except Exception as e:
                     self.logger.log(f"自动挑战失败，异常种类:{type(e).__name__}。跳过自动挑战")
+            if self.exit_if_nothing_todo and not need_continue:
+                self.logger.log("没有可以做的事情了，退出用户")
+                close_signal.emit()
+                return
             self.logger.log("工作完成，等待{}".format(second2str(self.rest_time)))
             if self.rest_time == 0:
                 sleep_time = max(0.3 - (perf_counter() - enter_time), 0)
@@ -217,11 +211,11 @@ class UserSettings:
                 time.sleep(1)
         self.logger.log("停止工作")
 
-    def start(self):
+    def start(self, close_signal):
         if self.start_thread is None or not self.start_thread.is_alive():
             self.start_thread = threading.Thread(
                 target=self._start,
-                args=(self.stop_channel,),
+                args=(self.stop_channel, close_signal),
             )
             self.start_thread.start()
 
@@ -230,21 +224,28 @@ class UserSettings:
         for tool_id in self.auto_use_item_list:
             if stop_channel.qsize() > 0:
                 break
-            repo_tool = self.repo.get_tool(tool_id)
-            if repo_tool is None:
-                continue
-            tool_type = self.lib.get_tool_by_id(tool_id).type
-            amount = repo_tool['amount']
-            if tool_type == 3:
-                while amount > 0:
-                    result = self.repo.open_box(tool_id, amount, self.lib)
+            while True:
+                skip = False
+                repo_tool = self.repo.get_tool(tool_id)
+                if repo_tool is None:
+                    break
+                tool_type = self.lib.get_tool_by_id(tool_id).type
+                if tool_type == 3:
+                    amount = repo_tool['amount']
+                    while amount > 0:
+                        result = self.repo.open_box(tool_id, amount, self.lib)
+                        self.logger.log(result['result'])
+                        if not result["success"]:
+                            break
+                        amount -= result["open_amount"]
+                    else:
+                        skip = True
+                else:
+                    result = self.repo.use_item(tool_id, amount, self.lib)
                     self.logger.log(result['result'])
-                    if not result["success"]:
-                        break
-                    amount -= result["open_amount"]
-            else:
-                result = self.repo.use_item(tool_id, amount, self.lib)
-                self.logger.log(result['result'])
+                    skip = True
+                if skip:
+                    break
 
     def save(self):
         self.challenge4Level.save(self.save_dir)
@@ -270,6 +271,7 @@ class UserSettings:
                     "territory_enabled": self.territory_enabled,
                     "daily_enabled": self.daily_enabled,
                     "garden_enabled": self.garden_enabled,
+                    "exit_if_nothing_todo": self.exit_if_nothing_todo,
                 },
                 f,
             )

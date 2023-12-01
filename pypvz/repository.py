@@ -268,11 +268,12 @@ class Repository:
         }
 
     def use_tool(self, tool_id, amount, lib: Library):
-        if amount == 0:
-            return None
         lib_tool = lib.get_tool_by_id(tool_id)
         if lib_tool is None:
-            return None
+            return {
+                "success": False,
+                "result": "未知的道具id:{}".format(tool_id),
+            }
         if lib_tool.type == 3:
             return self.open_box(tool_id, amount, lib)
         else:

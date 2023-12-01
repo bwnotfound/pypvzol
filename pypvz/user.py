@@ -69,7 +69,7 @@ class User:
         self.refresh()
 
     def refresh(self):
-        cnt, max_retry = 0, 10
+        cnt, max_retry = 0, 15
         while cnt < max_retry:
             try:
                 resp = self.wr.get_retry("/pvz/index.php/default/user/sig/0", "刷新用户信息")
@@ -77,11 +77,11 @@ class User:
                 break
             except Exception as e:
                 cnt += 1
-                msg = "刷新用户信息出现异常，异常类型：{}。选择等待1秒后重试。最多再等待{}次".format(
+                msg = "刷新用户信息出现异常，异常类型：{}。选择等待3秒后重试。最多再等待{}次".format(
                     type(e).__name__, max_retry - cnt
                 )
                 logging.info(msg)
-                sleep(1)
+                sleep(3)
         self.friendMan.refresh(root)
 
         user = root.find("user")

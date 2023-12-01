@@ -12,8 +12,8 @@ class Library:
 
     def refresh_library(self):
         results = self.wr.get_async_gather(
-            self.wr.get_async("/pvz/php_xml/tool.xml", "获取道具图鉴"),
-            self.wr.get_async("/pvz/php_xml/organism.xml", "获取植物图鉴"),
+            self.wr.get_async("/pvz/php_xml/tool.xml", "获取道具图鉴", except_retry=True),
+            self.wr.get_async("/pvz/php_xml/organism.xml", "获取植物图鉴", except_retry=True),
         )
         resp = results[0]
         tools = fromstring(resp.decode("utf-8")).find("tools")

@@ -158,12 +158,24 @@ class OpenBox(Pipeline):
                 "info": "使用物品失败，原因：植物数量超过上限",
             }
         pre_id2plant = self.repo.id2plant
-        result = self.repo.use_tool(self.box_id, self.amount, self.lib)
-        if result is None:
-            return {
-                "success": False,
-                "info": "使用物品失败，原因：未知",
-            }
+        while True:
+            try:
+                result = self.repo.use_tool(self.box_id, self.amount, self.lib)
+                break
+            except Exception as e:
+                pre_amount = tool['amount']
+                self.repo.refresh_repository()
+                current_tool = self.repo.get_tool(self.box_id)
+                if current_tool is None:
+                    current_amount = 0
+                else:
+                    current_amount = current_tool['amount']
+                if current_amount == pre_amount:
+                    self.logger.log("使用魔神箱异常，异常原因: {}。检测到箱子数量没有变化，重新开箱".format(type(e).__name__))
+                    continue
+                else:
+                    self.logger.log("使用魔神箱异常，异常原因: {}。检测到箱子数量变化，判定为开箱成功".format(type(e).__name__))
+                    break
         if not result['success']:
             return {
                 "success": False,

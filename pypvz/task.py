@@ -53,9 +53,8 @@ class Task:
         self.wr = WebRequest(cfg)
 
     def refresh_task(self):
-        body = []
         response = self.wr.amf_post_retry(
-            body, "api.duty.getAll", "/pvz/amf/", "刷新任务", except_retry=True
+            [], "api.duty.getAll", "/pvz/amf/", "刷新任务", except_retry=True
         )
         body = response.body
         self.main_task = [TaskItem(r, 1) for r in body['mainTask']]
@@ -71,13 +70,9 @@ class Task:
 
     def claim_reward(self, task_item: TaskItem, lib: Library):
         body = [float(task_item.id), float(task_item.choice)]
-        response = self.wr.amf_post_retry(
-            body, "api.duty.reward", "/pvz/amf/", "领取任务奖励"
+        self.wr.amf_post_retry(
+            body, "api.duty.reward", "/pvz/amf/", "领取任务奖励", except_retry=True
         )
-        if response.status != 0:
-            msg = "领取任务奖励失败。错误原因:{}".format(response.body.description)
-            logging.error(msg)
-            raise NotImplementedError(msg)
         result = "{}:{}领取成功。获得：".format(
             task_item.brief_title(), task_item.brief_description()
         )

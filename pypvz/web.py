@@ -9,7 +9,7 @@ import logging
 from time import sleep
 import threading
 from queue import Queue
-from pyamf import DecodeError, remoting, AMF0, AMF3
+from pyamf import remoting, AMF3
 
 from .config import Config
 
