@@ -204,7 +204,7 @@ class CaveMan:
     def use_sand(self, cave_id):
         body = [float(cave_id)]
         response = self.wr.amf_post_retry(
-            body, "api.cave.useTimesands", '/pvz/amf/', '使用时之沙'
+            body, "api.cave.useTimesands", '/pvz/amf/', '使用时之沙', except_retry=True
         )
         if response.status == 0:
             return {
@@ -226,7 +226,7 @@ class CaveMan:
         body = [float(1), float(0), float(0), []]
         while True:
             response = self.wr.amf_post_retry(
-                body, "api.garden.challenge", '/pvz/amf/', '切换花园层'
+                body, "api.garden.challenge", '/pvz/amf/', '切换花园层', except_retry=True
             )
             resp_text = response.body.description
             if "洞口已切换" not in resp_text:

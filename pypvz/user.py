@@ -96,6 +96,7 @@ class User:
         self.cave_amount_max = int(user.find("cave").get("max_amount"))
         self.territory_amount = int(user.find("territory").get("amount"))
         self.territory_amount_max = int(user.find("territory").get("max_amount"))
+        self.honor = int(user.find("territory").get("honor"))
         grade = user.find("grade")
         exp_min = int(grade.get("exp_min"))
         self.exp_now = int(grade.get("exp")) - exp_min

@@ -321,6 +321,10 @@ class WebRequest:
         while cnt < max_retry:
             cnt += 1
             try:
+                # import random
+
+                # if random.random() < 0.3:
+                #     raise requests.ConnectionError("test")
                 response = self.get(
                     url,
                     use_cache=use_cache,
@@ -333,21 +337,21 @@ class WebRequest:
                 try:
                     text = response.decode("utf-8")
                     if "请求过于频繁" in text:
+                        msg = "请求{}过于频繁，选择等待3秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
                         if logger is not None:
-                            logger.log(
-                                "请求{}过于频繁，选择等待3秒后重试。最多再等待{}次".format(
-                                    msg, max_retry - cnt
-                                )
-                            )
+                            logger.log(msg)
+                        else:
+                            logging.warning(msg)
                         sleep_freq(3)
                         continue
                     if "服务器更新" in text:
+                        msg = "请求{}的时候服务器频繁，选择等待10秒后重试。最多再等待{}次".format(
+                            msg, max_retry - cnt
+                        )
                         if logger is not None:
-                            logger.log(
-                                "请求{}的时候服务器频繁，选择等待10秒后重试。最多再等待{}次".format(
-                                    msg, max_retry - cnt
-                                )
-                            )
+                            logger.log(msg)
+                        else:
+                            logging.warning(msg)
                         sleep_freq(10)
                         continue
                 except:
@@ -355,16 +359,21 @@ class WebRequest:
                 break
             except Exception as e:
                 if except_retry:
-                    logging.info(
-                        "重新尝试请求{}，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
-                            msg, max_retry - cnt, type(e).__name__
-                        )
+                    msg = "重新尝试请求{}，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
+                        msg, max_retry - cnt, type(e).__name__
                     )
+                    if logger is not None:
+                        logger.log(msg)
+                    else:
+                        logging.warning(msg)
                     sleep(1)
                     continue
         else:
             msg = "尝试请求{}失败，超过最大尝试次数{}次".format(msg, max_retry)
-            logging.info(msg)
+            if logger is not None:
+                logger.log(msg)
+            else:
+                logging.warning(msg)
             raise Exception(msg)
         return response
 
@@ -422,7 +431,7 @@ class WebRequest:
                 freq_event.wait()
                 # import random
 
-                # if random.random() < 0.5:
+                # if random.random() < 0.3:
                 #     raise requests.ConnectionError("test")
                 response = self.amf_post(
                     body,
@@ -434,19 +443,21 @@ class WebRequest:
                     return
                 if response.status != 0:
                     if "频繁" in response.body.description:
+                        msg = "{}过于频繁，选择等待3秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
                         if logger is not None:
-                            logger.log(
-                                "{}过于频繁，选择等待3秒后重试。最多再等待{}次".format(msg, max_retry - cnt)
-                            )
+                            logger.log(msg)
+                        else:
+                            logging.warning(msg)
                         sleep_freq(3)
                         continue
                     if "更新" in response.body.description:
+                        msg = "{}的时候服务器频繁，选择等待10秒后重试。最多再等待{}次".format(
+                            msg, max_retry - cnt
+                        )
                         if logger is not None:
-                            logger.log(
-                                "{}的时候服务器频繁，选择等待10秒后重试。最多再等待{}次".format(
-                                    msg, max_retry - cnt
-                                )
-                            )
+                            logger.log(msg)
+                        else:
+                            logging.warning(msg)
                         sleep_freq(10)
                         continue
                 break
@@ -454,23 +465,25 @@ class WebRequest:
                 if "amf返回结果为空" in str(e) and allow_empty:
                     return None
                 if except_retry:
+                    msg = "{}失败，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
+                        msg, max_retry - cnt, type(e).__name__
+                    )
                     if logger is not None:
-                        logger.log(
-                            "{}失败，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
-                                msg, max_retry - cnt, type(e).__name__
-                            )
-                        )
+                        logger.log(msg)
+                    else:
+                        logging.warning(msg)
                     sleep(1)
                     continue
                 raise e
             except Exception as e:
                 if except_retry:
+                    msg = "{}失败，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
+                        msg, max_retry - cnt, type(e).__name__
+                    )
                     if logger is not None:
-                        logger.log(
-                            "{}失败，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
-                                msg, max_retry - cnt, type(e).__name__
-                            )
-                        )
+                        logger.log(msg)
+                    else:
+                        logging.warning(msg)
                     sleep(1)
                     continue
                 raise e
@@ -478,5 +491,7 @@ class WebRequest:
             msg = "{}失败，超过最大尝试次数{}次".format(msg, max_retry)
             if logger is not None:
                 logger.log(msg)
+            else:
+                logging.warning(msg)
             raise RuntimeError(msg)
         return response

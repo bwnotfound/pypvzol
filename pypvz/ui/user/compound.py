@@ -512,7 +512,7 @@ class AutoCompoundMan:
                 return False
             self.repo.refresh_repository()
             after_plant1 = self.repo.get_plant(id1)
-            for attr_name in self.attribute2plant_attribute.values()[:6]:
+            for attr_name in list(self.attribute2plant_attribute.values())[:6]:
                 if getattr(after_plant1, attr_name) != getattr(plant1, attr_name):
                     self.logger.log("全传异常。检测传出植物前后属性不一致，判断为传承成功。")
                     return True
