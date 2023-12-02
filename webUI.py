@@ -607,10 +607,9 @@ class CustomMainWindow(QMainWindow):
         self.usersettings = usersettings
         self.close_signal.connect(self.close)
 
-        if not os.path.exists(cache_dir):
-            os.mkdir(cache_dir)
         self.wr_cache = WebRequest(self.usersettings.cfg, cache_dir=cache_dir)
-
+        self.line_cnt = 0
+        self.textbox_lock = threading.Lock()
         self.init_ui()
 
         self.logger_signal.connect(self.update_text_box)
@@ -756,6 +755,9 @@ class CustomMainWindow(QMainWindow):
         self.setWindowTitle("Custom Window")
 
     def update_text_box(self):
+        if self.textbox_lock.locked():
+            return
+        self.textbox_lock.acquire()
         result = self.usersettings.io_logger.get_new_infos()
         document = self.text_box.document()
         # 冻结text_box显示，直到document更新完毕后更新
@@ -764,9 +766,18 @@ class CustomMainWindow(QMainWindow):
             cursor = QTextCursor(document)
             cursor.movePosition(QTextCursor.MoveOperation.Start)
             cursor.insertText(info + "\n")
+            self.line_cnt += 1
             # self.text_box.insertPlainText(info + "\n")
+        while self.line_cnt > self.usersettings.io_logger.max_info_capacity:
+            cursor = QTextCursor(document)
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            cursor.movePosition(QTextCursor.MoveOperation.Up)
+            cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+            cursor.removeSelectedText()
+            self.line_cnt -= 1
         self.text_box.viewport().setUpdatesEnabled(True)
         self.text_box.viewport().update()
+        self.textbox_lock.release()
 
     def open_setting_panel(self):
         self.settingWindow = SettingWindow(self.usersettings, parent=self)
@@ -1083,7 +1094,7 @@ class GetUsersettings(threading.Thread):
         setting_dir = os.path.join(data_dir, "usersettings")
         os.makedirs(setting_dir, exist_ok=True)
 
-        max_info_capacity = 10
+        max_info_capacity = 500
         # TODO: 从配置文件中读取
         logger = IOLogger(log_dir, max_info_capacity=max_info_capacity)
         logger_list.append(logger)

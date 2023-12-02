@@ -22,7 +22,7 @@ class Logger:
         self._info_channel.put(message)
         if log_info:
             logging.info(message)
-            
+
     def reverse_log(self, msg: str, log_info=True):
         message = self._log_str_format(msg)
         logging.info(message)
@@ -61,12 +61,12 @@ class _IOLoggerThread(threading.Thread):
                 info = self.info_channel.get()
                 self.info_list.appendleft(info)
                 self.new_info_list.appendleft(info)
-            num = len(self.info_list) > self.max_info_capacity
-            while num > 0:
+            num = len(self.info_list)
+            while num > self.max_info_capacity:
                 self.info_list.pop()
                 num -= 1
-            num = len(self.new_info_list) > self.max_info_capacity
-            while num > 0:
+            num = len(self.new_info_list)
+            while num > self.max_info_capacity:
                 self.new_info_list.pop()
                 num -= 1
             self.lock.release()
@@ -109,14 +109,14 @@ class IOLogger:
     def get_new_infos(self):
         self._lock.acquire()
         result = list(self._new_info_list)
-        self._new_info_list.clear()        
+        self._new_info_list.clear()
         self._lock.release()
         return result
-    
+
     def close(self):
         self._stop_channel.put(1)
         self._thread_logger.join()
-        
+
     def save(self):
         raise NotImplementedError
         # self._lock.acquire()

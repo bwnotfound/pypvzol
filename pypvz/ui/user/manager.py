@@ -397,7 +397,7 @@ class TerritoryMan:
         )
         rest_num = int(response.body["challengecount"])
         if rest_num < self.difficulty_choice:
-            self.logger.log("剩余次数不足，剩余次数：{}".format(rest_num))
+            self.logger.log("领地剩余次数不足，剩余次数：{}".format(rest_num))
             return False
         return True
 
@@ -675,7 +675,7 @@ class ServerBattleMan:
 
     def rest_challenge_num(self):
         response = self.serverbattle.get_info()
-        return int(response.body["result"]["remaining_challenges"])
+        return int(response.body["remaining_challenges"])
 
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "serverbattle_man")
