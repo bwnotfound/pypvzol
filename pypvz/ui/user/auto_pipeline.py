@@ -171,10 +171,17 @@ class OpenBox(Pipeline):
                 else:
                     current_amount = current_tool['amount']
                 if current_amount == pre_amount:
-                    self.logger.log("使用魔神箱异常，异常原因: {}。检测到箱子数量没有变化，重新开箱".format(type(e).__name__))
+                    self.logger.log(
+                        "使用魔神箱异常，异常原因: {}。检测到箱子数量没有变化，重新开箱".format(type(e).__name__)
+                    )
                     continue
                 else:
-                    self.logger.log("使用魔神箱异常，异常原因: {}。检测到箱子数量变化，判定为开箱成功".format(type(e).__name__))
+                    self.logger.log(
+                        "使用魔神箱异常，异常原因: {}。检测到箱子数量变化，判定为开箱成功".format(type(e).__name__)
+                    )
+                    result = {
+                        "success": True,
+                    }
                     break
         if not result['success']:
             return {

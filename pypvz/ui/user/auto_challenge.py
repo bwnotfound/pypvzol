@@ -220,7 +220,7 @@ class Challenge4Level:
         return team
 
     def _recover(self):
-        cnt, max_retry = 0, 3
+        cnt, max_retry = 0, 20
         success_num_all = 0
         while cnt < max_retry:
             recover_list = self.repo.hp_below(0, id_only=True)
@@ -608,7 +608,7 @@ class Challenge4Level:
         ):
             return True
 
-        cnt, max_retry = 0, 3
+        cnt, max_retry = 0, 20
         while cnt < max_retry:
             cnt += 1
             try:

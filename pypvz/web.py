@@ -420,6 +420,10 @@ class WebRequest:
             cnt += 1
             try:
                 freq_event.wait()
+                # import random
+
+                # if random.random() < 0.5:
+                #     raise requests.ConnectionError("test")
                 response = self.amf_post(
                     body,
                     target,
@@ -445,16 +449,21 @@ class WebRequest:
                             )
                         sleep_freq(10)
                         continue
-                    # if on_result:
-                    #     if logger is not None:
-                    #         logger.log(
-                    #             "{}失败，失败原因：{}".format(msg, response.body.description)
-                    #         )
-                    #     raise RuntimeError(f"{msg}失败")
                 break
             except RuntimeError as e:
                 if "amf返回结果为空" in str(e) and allow_empty:
                     return None
+                if except_retry:
+                    if logger is not None:
+                        logger.log(
+                            "{}失败，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
+                                msg, max_retry - cnt, type(e).__name__
+                            )
+                        )
+                    sleep(1)
+                    continue
+                raise e
+            except Exception as e:
                 if except_retry:
                     if logger is not None:
                         logger.log(

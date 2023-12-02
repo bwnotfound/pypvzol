@@ -269,7 +269,7 @@ class FubenMan:
         return self.fuben_request.get_caves(layer, self.logger)
 
     def _recover(self):
-        cnt, max_retry = 0, 5
+        cnt, max_retry = 0, 20
         success_num_all = 0
         while cnt < max_retry:
             recover_list = list(
