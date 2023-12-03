@@ -573,6 +573,7 @@ class AutoCompoundMan:
             return False
 
         if self.allow_inherite2target:
+            self.repo.refresh_repository()
             success = self.exchange_all(
                 self.liezhi_plant_id,
                 self.receiver_plant_id,
@@ -596,6 +597,51 @@ class AutoCompoundMan:
             if not continue_loop:
                 break
         self.logger.log("复合完成")
+
+    def auto_set_source_plant(self):
+        attr_plant_dict = {}
+        for plant in self.repo.plants:
+            if plant.quality_index < quality_name_list.index("魔神"):
+                continue
+            if plant.grade < 100 or plant.fight < 1e18:
+                continue
+            large_attr_cnt, larget_attr_name = 0, None
+            for attr_name in list(self.attribute2plant_attribute.values())[:6]:
+                if getattr(plant, attr_name) >= 1e18:
+                    large_attr_cnt += 1
+                    larget_attr_name = attr_name
+            if large_attr_cnt != 1:
+                continue
+            if larget_attr_name not in attr_plant_dict:
+                attr_plant_dict[larget_attr_name] = []
+            attr_plant_dict[larget_attr_name].append(plant)
+        for v in attr_plant_dict.values():
+            v.sort(key=lambda x: x.grade, reverse=True)
+        for scheme in self.scheme_list:
+            if not scheme.enabled:
+                continue
+            if scheme.source_plant_id is not None:
+                continue
+            chosen_attribute = self.attribute2plant_attribute[scheme.chosen_attribute]
+            if chosen_attribute not in attr_plant_dict:
+                continue
+            plant_list = attr_plant_dict[chosen_attribute]
+            if len(plant_list) == 0:
+                continue
+            plant_id = plant_list[-1].id
+            if (
+                plant_id == self.liezhi_plant_id
+                or plant_id == self.receiver_plant_id
+                or plant_id in self.auto_compound_pool_id
+            ):
+                continue
+            for scheme2 in self.scheme_list:
+                if not scheme2.enabled:
+                    continue
+                if scheme2.source_plant_id == plant_id:
+                    break
+            else:
+                scheme.source_plant_id = plant_list.pop(-1).id
 
     def save(self, save_dir):
         d = {

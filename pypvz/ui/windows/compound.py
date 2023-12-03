@@ -207,6 +207,9 @@ class AutoCompoundWindow(QMainWindow):
         self.auto_compound_btn = auto_compound_btn = QPushButton("全部复合")
         auto_compound_btn.clicked.connect(self.auto_compound_btn_clicked)
         widget6_layout.addWidget(auto_compound_btn)
+        self.auto_set_plant_btn = QPushButton("自动上底座")
+        self.auto_set_plant_btn.clicked.connect(self.auto_set_plant_btn_clicked)
+        widget6_layout.addWidget(self.auto_set_plant_btn)
         # self.auto_compound_single_btn = auto_compound_single_btn = QPushButton("复合一批")
         # auto_compound_single_btn.clicked.connect(self.auto_compound_single_btn_clicked)
         # widget6_layout.addWidget(auto_compound_single_btn)
@@ -295,6 +298,10 @@ class AutoCompoundWindow(QMainWindow):
         for scheme in selected_scheme:
             scheme.enabled = False
         self.refresh_scheme_list()
+    
+    def auto_set_plant_btn_clicked(self):
+        self.auto_compound_man.auto_set_source_plant()
+        self.refresh_all()
 
     def refresh_scheme_list(self):
         self.scheme_list.clear()
