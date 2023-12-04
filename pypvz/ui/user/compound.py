@@ -159,9 +159,11 @@ class CompoundScheme:
     def synthesis_plant(self, plant_id, num, refresh_signal):
         self.export_deputy_plant_to_synthesis(num)
         self.auto_synthesis_man.main_plant_id = plant_id
-        self.auto_synthesis_man.synthesis_all(
+        success = self.auto_synthesis_man.synthesis_all(
             self.logger, refresh_signal=refresh_signal
         )
+        if not success:
+            return None
         plant_id = self.auto_synthesis_man.main_plant_id
         self.auto_synthesis_man.main_plant_id = None
         return plant_id
@@ -198,10 +200,16 @@ class CompoundScheme:
         if not success:
             self.logger.log(f'方案"{self.name}"在复制植物时出现传承错误，中断复合')
             return None
-        self.source_plant_id = self.synthesis_plant(
+        plant_id = self.synthesis_plant(
             self.source_plant_id, self.n1, refresh_signal
         )
-        copy_plant_id = self.synthesis_plant(copy_plant_id, self.n2, refresh_signal)
+        if plant_id is None:
+            return None
+        self.source_plant_id = plant_id
+        plant_id = self.synthesis_plant(copy_plant_id, self.n2, refresh_signal)
+        if plant_id is None:
+            return None
+        copy_plant_id = plant_id
         return copy_plant_id
 
     def _synthesis(self, id1, id2, book_id, reinforce_num):
@@ -235,6 +243,7 @@ class CompoundScheme:
             copy_plant_id = self.copy_source_plant(refresh_signal)
             if copy_plant_id is None:
                 self.logger.log(f'方案"{self.name}"复制第{i+1}个植物失败，中止复合')
+                return False
             result = self._synthesis(
                 self.liezhi_plant_id, copy_plant_id, self.synthesis_book['id'], 10
             )
@@ -543,9 +552,6 @@ class AutoCompoundMan:
                 )
                 return False
             scheme.import_deputy_plant(plant_list)
-
-        # for scheme in enabled_scheme_list:
-        #     scheme.compound_one_cycle(refresh_signal)
 
         futures = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:

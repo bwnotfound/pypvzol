@@ -173,26 +173,26 @@ class AutoSynthesisMan:
                 length = min(synthesis_number, length)
             if length == 0:
                 logger.log("合成池为空")
-                return
+                return False
             elif length < 0:
                 logger.log("合成次数不能为负数")
-                return
+                return False
             self.check_data()
             signal_block_emit(refresh_signal)
             while not (len(self.auto_synthesis_pool_id) == 0) and length > 0:
                 if interrupt_event is not None and interrupt_event.is_set():
                     logger.log("中止合成")
-                    return
+                    return False
                 if need_synthesis is not None:
                     if not need_synthesis():
-                        return
+                        return False
                 result = self.synthesis(need_check=False)
                 logger.log(result['result'])
                 self.check_data(False)
                 signal_block_emit(refresh_signal)
                 if not result["success"]:
                     logger.log("合成异常，已跳出合成")
-                    return
+                    return False
                 length -= 1
             logger.log("合成完成")
         except Exception as e:
@@ -204,6 +204,8 @@ class AutoSynthesisMan:
                 self.check_data()
                 signal_block_emit(refresh_signal)
             logger.log("合成异常，已跳出合成")
+            return False
+        return True
 
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "user_autosynthesisman")
