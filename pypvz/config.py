@@ -1,7 +1,8 @@
 import json
 import logging
-from threading import Lock
+from threading import Lock, Event
 from time import perf_counter, sleep
+
 
 class Config:
     def __init__(self, config_path):
@@ -12,9 +13,11 @@ class Config:
             self.config = config_path
         else:
             raise TypeError('config_path must be str or dict')
+
         def error(msg):
             logging.error(f"config.json中缺少{msg}字段。请删除对应登录账号并重新登录。账号数据并不会丢失")
             raise KeyError(f'config.json中缺少{msg}字段。请删除对应登录账号并重新登录。账号数据并不会丢失')
+
         if 'cookie' not in self.config:
             error("cookie")
         if 'username' not in self.config:
@@ -30,7 +33,19 @@ class Config:
         self._lock = Lock()
         self.last_time = 0
         self.wait_requests_over = False
-    
+        self.freq_event = Event()
+        self.freq_event.set()
+        self._freq_lock = Lock()
+
+    def sleep_freq(self, t):
+        try:
+            self._freq_lock.acquire()
+            self.freq_event.clear()
+            sleep(t)
+        finally:
+            self._freq_lock.release()
+            self.freq_event.set()
+
     def acquire(self):
         self._lock.acquire()
         now = perf_counter()
@@ -39,12 +54,12 @@ class Config:
         if not self.wait_requests_over:
             self._lock.release()
             self.last_time = perf_counter()
-        
+
     def release(self):
         if self.wait_requests_over:
             self._lock.release()
             self.last_time = perf_counter()
-            
+
     @property
     def username(self):
         return self.config['username']
@@ -52,15 +67,15 @@ class Config:
     @property
     def cookie(self):
         return self.config['cookie']
-    
+
     @property
     def region(self):
         return self.config['region']
-    
+
     @property
     def host(self):
         return self.config['host']
-    
+
     @property
     def server(self):
         return self.config['server']

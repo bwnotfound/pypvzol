@@ -15,19 +15,6 @@ from .config import Config
 
 proxies = {"http": None, "https": None}
 proxies = None
-freq_event = threading.Event()
-freq_event.set()
-_freq_lock = threading.Lock()
-
-
-def sleep_freq(t):
-    try:
-        _freq_lock.acquire()
-        freq_event.clear()
-        sleep(t)
-    finally:
-        _freq_lock.release()
-        freq_event.set()
 
 
 class TimeCounter(object):
@@ -325,6 +312,7 @@ class WebRequest:
 
                 # if random.random() < 0.3:
                 #     raise requests.ConnectionError("test")
+                self.cfg.freq_event.wait()
                 response = self.get(
                     url,
                     use_cache=use_cache,
@@ -344,7 +332,7 @@ class WebRequest:
                             logger.log(warning_msg)
                         else:
                             logging.warning(warning_msg)
-                        sleep_freq(3)
+                        self.cfg.sleep_freq(3)
                         continue
                     if "服务器更新" in text:
                         warning_msg = "请求{}的时候服务器频繁，选择等待10秒后重试。最多再等待{}次".format(
@@ -354,7 +342,7 @@ class WebRequest:
                             logger.log(warning_msg)
                         else:
                             logging.warning(warning_msg)
-                        sleep_freq(10)
+                        self.cfg.sleep_freq(10)
                         continue
                 except:
                     pass
@@ -430,7 +418,7 @@ class WebRequest:
         while cnt < max_retry:
             cnt += 1
             try:
-                freq_event.wait()
+                self.cfg.freq_event.wait()
                 # import random
 
                 # if random.random() < 0.3:
@@ -452,7 +440,7 @@ class WebRequest:
                             logger.log(warning_msg)
                         else:
                             logging.warning(warning_msg)
-                        sleep_freq(3)
+                        self.cfg.sleep_freq(3)
                         continue
                     if "更新" in response.body.description:
                         warning_msg = "{}的时候服务器频繁，选择等待10秒后重试。最多再等待{}次".format(
@@ -462,7 +450,7 @@ class WebRequest:
                             logger.log(warning_msg)
                         else:
                             logging.warning(warning_msg)
-                        sleep_freq(10)
+                        self.cfg.sleep_freq(10)
                         continue
                 break
             except RuntimeError as e:
