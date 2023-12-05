@@ -59,7 +59,9 @@ class Task:
         body = response.body
         self.main_task = [TaskItem(r, 1) for r in body['mainTask']]
         self.side_task = [TaskItem(r, 2) for r in body['sideTask']]
-        self.daily_task = [TaskItem(r, 3) for r in body['dailyTask']]
+        self.daily_task = [
+            TaskItem(r, 3) for r in body['dailyTask'] if r['title'] != "暂未开启"
+        ]
         self.active_task = [TaskItem(r, 4) for r in body['activeTask']]
         self.task_list = [
             self.main_task,
