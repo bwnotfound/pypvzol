@@ -421,15 +421,20 @@ class TerritoryMan:
             response = self.challenge()
             if response.status == 1:
                 message = message + "失败. 原因: {}.".format(response.body.description)
+                if "匹配对手中" in response.body.description:
+                    message = message + "继续运行"
+                    self.logger.log(message)
+                else:
+                    self.logger.log(message)
+                    return False
+            else:
+                result = response.body
+                message = message + "成功. "
+                message = message + "挑战结果：{}".format(
+                    "胜利" if result['fight']['is_winning'] else "失败"
+                )
+                message = message + ". 现在荣誉: {}".format(result['honor'])
                 self.logger.log(message)
-                return False
-            result = response.body
-            message = message + "成功. "
-            message = message + "挑战结果：{}".format(
-                "胜利" if result['fight']['is_winning'] else "失败"
-            )
-            message = message + ". 现在荣誉: {}".format(result['honor'])
-            self.logger.log(message)
             if stop_channel.qsize() > 0:
                 return False
 
@@ -667,7 +672,8 @@ class ServerBattleMan:
                     break
                 if not result["success"]:
                     self.logger.log(result["result"])
-                    return
+                    if "匹配" not in result["result"]:
+                        return
                 current_challenge_num -= 1
                 self.logger.log(
                     result["result"] + ". 还剩{}次挑战次数".format(current_challenge_num)
