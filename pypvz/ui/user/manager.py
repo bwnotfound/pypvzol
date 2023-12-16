@@ -730,13 +730,13 @@ class ArenaMan:
         challenge_num = self.get_challenge_num()
         while challenge_num >= 100 and stop_channel.qsize() == 0:
             amount = None
-            if challenge_num > 10000:
+            if challenge_num >= 10000:
                 result = self.arena.batch_challenge(10000)
                 amount = 10000
-            elif challenge_num > 1000:
+            elif challenge_num >= 1000:
                 result = self.arena.batch_challenge(1000)
                 amount = 1000
-            elif challenge_num > 100:
+            elif challenge_num >= 100:
                 result = self.arena.batch_challenge(100)
                 amount = 100
             else:
