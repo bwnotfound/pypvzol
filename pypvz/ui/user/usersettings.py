@@ -13,7 +13,7 @@ from ... import (
     Library,
     User,
     Task,
-    ArenaMan,
+    Arena,
     HeritageMan,
 )
 from ..message import IOLogger
@@ -27,6 +27,7 @@ from .manager import (
     DailyMan,
     GardenMan,
     ServerBattleMan,
+    ArenaMan,
 )
 from .compound import AutoCompoundMan
 from . import PipelineMan
@@ -69,7 +70,7 @@ class UserSettings:
         self.garden_cave_list = []
         self.rest_time = 0
         self.arena_enabled = False
-        self.arena_man = ArenaMan(cfg)
+        self.arena_man = ArenaMan(cfg, self.logger)
         self.auto_synthesis_man = AutoSynthesisMan(cfg, lib, repo)
         self.heritage_man = HeritageMan(self.cfg, self.lib)
         self.serverbattle_man = ServerBattleMan(self.cfg, logger=self.logger)
@@ -175,19 +176,7 @@ class UserSettings:
                     break
             if self.arena_enabled:
                 try:
-                    self.arena_man.refresh_arena()
-                    while self.arena_man.challenge_num > 0:
-                        result = self.arena_man.challenge_first()
-                        if result['success']:
-                            result['result'] += ".还剩{}次挑战机会".format(
-                                self.arena_man.challenge_num - 1
-                            )
-                        self.logger.log(result['result'])
-                        if not result['success']:
-                            break
-                        self.arena_man.refresh_arena()
-                        if stop_channel.qsize() > 0:
-                            break
+                    self.arena_man.auto_challenge(stop_channel)
                 except Exception as e:
                     self.logger.log(f"竞技场挑战失败，异常种类:{type(e).__name__}。跳过竞技场挑战")
                 if stop_channel.qsize() > 0:

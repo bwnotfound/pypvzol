@@ -55,6 +55,7 @@ from pypvz.ui.windows import (
     # GameWindow,
     # run_game_window,
 )
+from pypvz.ui.windows.common import delete_layout_children
 
 
 class SettingWindow(QMainWindow):
@@ -611,21 +612,24 @@ class CustomMainWindow(QMainWindow):
         self.line_cnt = 0
         self.textbox_lock = threading.Lock()
         self.init_ui()
+        self.refresh_user_info()
 
         self.logger_signal.connect(self.update_text_box)
         self.usersettings.io_logger.set_signal(self.logger_signal)
 
     def init_ui(self):
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.7), int(screen_size.height() * 0.7))
-        self.move(int(screen_size.width() * 0.15), int(screen_size.height() * 0.15))
-
-        self.page_widget = QTabWidget()
+        self.resize(int(screen_size.width() * 0.6), int(screen_size.height() * 0.7))
+        self.move(int(screen_size.width() * 0.2), int(screen_size.height() * 0.15))
 
         main_widget = QWidget()
-        main_layout = QVBoxLayout()
-        top_widget = QWidget()
-        top_layout = QHBoxLayout()
+        main_layout = QHBoxLayout()
+        main_widget.setLayout(main_layout)
+
+        left_panel = QWidget()
+        left_layout = QVBoxLayout()
+        left_panel.setLayout(left_layout)
+        left_panel.setFixedWidth(int(screen_size.width() * 0.13))
 
         user_show_layout = QHBoxLayout()
 
@@ -645,61 +649,19 @@ class CustomMainWindow(QMainWindow):
             img.tobytes(), img.width, img.height, QImage.Format.Format_RGB888
         )
         user_show_layout.addWidget(QLabel().setPixmap(QPixmap.fromImage(user_face_img)))
-
-        user_info_layout = QVBoxLayout()
-        user_info_layout.addWidget(QLabel(f"{self.usersettings.user.name}"))
-        user_info_layout.addWidget(QLabel(f"等级: {self.usersettings.user.grade}"))
-        user_info_layout.addWidget(
-            QLabel(
-                f"经验值: {self.usersettings.user.exp_now}/{self.usersettings.user.exp_max}"
-            )
-        )
-        user_info_layout.addWidget(QLabel(self.usersettings.user.name))
-        user_show_layout.addLayout(user_info_layout)
-
-        top_layout.addLayout(user_show_layout)
-        top_layout.addStretch(1)
-
-        # 设置top_layout的高度为main_layout的0.2倍
-        top_widget.setFixedHeight(int(screen_size.height() * 0.1))
-        top_widget.setLayout(top_layout)
-        main_layout.addWidget(top_widget)
-
-        # Middle Section
-        middle_splitter = QSplitter(Qt.Orientation.Horizontal)
-        middle_splitter.setFixedHeight(int(self.height() * 0.7))
-        middle_splitter.setHandleWidth(10)
-        middle_splitter.setStyleSheet(
-            "QSplitter::handle{background: rgb(245, 245, 245);}"
-        )
+        self.user_info_1 = QVBoxLayout()
+        user_show_layout.addLayout(self.user_info_1)
+        left_layout.addLayout(user_show_layout)
 
         # Left Panel
-        left_panel = QWidget()
-        left_layout = QVBoxLayout()
-        left_text_layout = QVBoxLayout()
-        left_text_layout.setSpacing(5)
-        left_text_layout.addWidget(QLabel(f"金币: {self.usersettings.user.money}"))
-        left_text_layout.addWidget(
-            QLabel(
-                f"今日经验: {self.usersettings.user.today_exp} / {self.usersettings.user.today_exp_max}"
-            )
-        )
-        left_text_layout.addWidget(
-            QLabel(
-                f"挑战次数: {self.usersettings.user.cave_amount} / {self.usersettings.user.cave_amount_max}"
-            )
-        )
-        left_text_layout.addWidget(
-            QLabel(
-                f"领地次数: {self.usersettings.user.territory_amount} / {self.usersettings.user.territory_amount_max}"
-            )
-        )
 
-        left_layout.addLayout(left_text_layout)
+        self.user_info_2 = QVBoxLayout()
+        # self.user_info_2.setSpacing(5)
+        left_layout.addLayout(self.user_info_2)
 
         # Buttons
         button_layout = QHBoxLayout()
-        button_layout.setSpacing(10)
+        # button_layout.setSpacing(10)
         self.process_button = process_button = QPushButton("开始")
         process_button.clicked.connect(self.process_button_clicked)
         clear_button = QPushButton("设置")
@@ -723,11 +685,13 @@ class CustomMainWindow(QMainWindow):
         refresh_repository_btn = QPushButton("刷新仓库")
         refresh_repository_btn.clicked.connect(self.refresh_repository_btn)
         left_layout.addWidget(refresh_repository_btn)
-
+        
+        refresh_user_info_btn = QPushButton("刷新用户信息")
+        refresh_user_info_btn.clicked.connect(self.refresh_user_info_btn_clicked)
+        left_layout.addWidget(refresh_user_info_btn)
+        
         left_layout.addStretch(1)
-
-        left_layout.setSpacing(10)
-        left_panel.setLayout(left_layout)
+        # left_layout.setSpacing(10)
 
         # Right Panel
         right_panel = QWidget()
@@ -740,19 +704,56 @@ class CustomMainWindow(QMainWindow):
         right_layout.addWidget(text_box)
         right_panel.setLayout(right_layout)
 
-        left_panel.setFixedWidth(int(screen_size.width() * 0.13))
-        middle_splitter.addWidget(left_panel)
-        middle_splitter.addWidget(right_panel)
-        # 设置left_panel的宽度为screen的0.1倍
-        main_layout.addWidget(middle_splitter)
-
+        main_layout.addWidget(left_panel)
+        main_layout.addWidget(right_panel)
         main_widget.setLayout(main_layout)
-        self.page_widget.addTab(main_widget, "Main")
         # 设置主窗口常驻屏幕
         # self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint)
 
-        self.setCentralWidget(self.page_widget)
+        self.setCentralWidget(main_widget)
         self.setWindowTitle("Custom Window")
+
+    def refresh_user_info(self, refresh_all=False):
+        delete_layout_children(self.user_info_1)
+        delete_layout_children(self.user_info_2)
+        self.user_info_1.addWidget(QLabel(f"{self.usersettings.user.name}"))
+        self.user_info_1.addWidget(QLabel(f"等级: {self.usersettings.user.grade}"))
+        self.user_info_1.addWidget(
+            QLabel(
+                f"经验值: {self.usersettings.user.exp_now}/{self.usersettings.user.exp_max}"
+            )
+        )
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            futures = []
+            futures.append(
+                executor.submit(self.usersettings.territory_man.get_rest_num)
+            )
+            futures.append(
+                executor.submit(self.usersettings.arena_man.get_challenge_num)
+            )
+            if refresh_all:
+                futures.append(
+                    executor.submit(self.usersettings.repo.refresh_repository)
+                )
+                futures.append(executor.submit(self.usersettings.user.refresh()))
+        concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
+        self.user_info_2.addWidget(
+            QLabel(
+                f"今日经验: {self.usersettings.user.today_exp} / {self.usersettings.user.today_exp_max}"
+            )
+        )
+        self.user_info_2.addWidget(
+            QLabel(
+                f"挑战次数: {self.usersettings.user.cave_amount} / {self.usersettings.user.cave_amount_max}"
+            )
+        )
+        self.user_info_2.addWidget(QLabel("领地次数: {}".format(futures[0].result())))
+        self.user_info_2.addWidget(QLabel("竞技场次数: {}".format(futures[1].result())))
+        QApplication.processEvents()
+        
+    def refresh_user_info_btn_clicked(self):
+        self.refresh_user_info(refresh_all=True)
+        self.usersettings.logger.log("用户信息刷新完成")
 
     def update_text_box(self):
         if self.textbox_lock.locked():
@@ -992,7 +993,6 @@ class LoginWindow(QMainWindow):
             self.configs.append(cfg)
         self.save_config()
         self.refresh_login_user_list()
-        # 强制重新渲染login窗口元素
         QApplication.processEvents()
         self.create_main_window(Config(cfg))
 

@@ -1150,6 +1150,8 @@ class RequirePermissionWindow(QMainWindow):
         main_layout = QVBoxLayout()
 
         msg_label = QLabel(self.msg)
+        # 令msg_label文字可以复制
+        msg_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         msg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(msg_label)
 

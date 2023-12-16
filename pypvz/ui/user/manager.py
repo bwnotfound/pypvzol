@@ -4,6 +4,7 @@ from queue import Queue
 import logging
 import os
 from threading import Event
+import time
 from ... import (
     Config,
     Repository,
@@ -12,7 +13,7 @@ from ... import (
     WebRequest,
 )
 from ..message import Logger
-from ... import FubenRequest, Serverbattle
+from ... import FubenRequest, Serverbattle, Arena
 from ...fuben import FubenCave
 from ...utils.recover import RecoverMan
 from ..wrapped import signal_block_emit
@@ -386,8 +387,8 @@ class TerritoryMan:
             for plant_id in self.team
             if self.repo.get_plant(plant_id) is not None
         ]
-
-    def can_challenge(self):
+    
+    def get_rest_num(self):
         body = []
         response = self.wr.amf_post_retry(
             body,
@@ -397,7 +398,10 @@ class TerritoryMan:
             logger=self.logger,
             except_retry=True,
         )
-        rest_num = int(response.body["challengecount"])
+        return int(response.body["challengecount"])
+
+    def can_challenge(self):
+        rest_num = self.get_rest_num()
         if rest_num < self.difficulty_choice:
             self.logger.log("领地剩余次数不足，剩余次数：{}".format(rest_num))
             return False
@@ -662,14 +666,21 @@ class ServerBattleMan:
                         )
                     )
                     return
-                try:
-                    result = self.serverbattle.challenge()
-                    if result is None:
-                        self.logger.log("跨服挑战次数已用完。")
-                        return
-                except Exception as e:
-                    self.logger.log("跨服挑战异常，异常类型：{}".format(type(e).__name__))
-                    break
+                cnt, max_retry = 0, 10
+                while cnt < max_retry:
+                    try:
+                        result = self.serverbattle.challenge()
+                        if result is None:
+                            self.logger.log("跨服挑战次数已用完。")
+                            return
+                        break
+                    except Exception as e:
+                        self.logger.log(
+                            "跨服挑战异常，异常类型：{}。尝试等待1s后重试，最多再试{}次".format(
+                                type(e).__name__, max_retry - cnt
+                            )
+                        )
+                        time.sleep(1)
                 if not result["success"]:
                     self.logger.log(result["result"])
                     if "匹配" not in result["result"]:
@@ -703,3 +714,48 @@ class ServerBattleMan:
             for k, v in d.items():
                 if hasattr(self, k):
                     setattr(self, k, v)
+
+
+class ArenaMan:
+    def __init__(self, cfg: Config, logger: Logger):
+        self.cfg = cfg
+        self.logger = logger
+        self.arena = Arena(cfg)
+    
+    def get_challenge_num(self):
+        self.arena.refresh_arena()
+        return self.arena.challenge_num
+
+    def auto_challenge(self, stop_channel: Queue):
+        challenge_num = self.get_challenge_num()
+        while challenge_num >= 100 and stop_channel.qsize() == 0:
+            amount = None
+            if challenge_num > 10000:
+                result = self.arena.batch_challenge(10000)
+                amount = 10000
+            elif challenge_num > 1000:
+                result = self.arena.batch_challenge(1000)
+                amount = 1000
+            elif challenge_num > 100:
+                result = self.arena.batch_challenge(100)
+                amount = 100
+            else:
+                raise NotImplementedError("挑战次数{}异常".format(challenge_num))
+            if not result["success"]:
+                error_type = result["error_type"]
+                if error_type == 1:
+                    self.logger.log(
+                        "挑战竞技场出现异常。原因：{}。判断为挑战次数不足，终止挑战".format(result["result"])
+                    )
+                    return
+                elif error_type == 2:
+                    self.logger.log("挑战竞技场出现异常。原因：{}。".format(result["result"]))
+                    return
+                self.logger.log(result["result"])
+                return
+            challenge_num -= amount
+            self.logger.log("挑战竞技场成功。剩余挑战次数{}次".format(challenge_num))
+        if stop_channel.qsize() > 0:
+            return
+        self.logger.log("挑战竞技场完成，剩余挑战次数：{}".format(challenge_num))
+        return

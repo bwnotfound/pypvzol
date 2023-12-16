@@ -8,7 +8,7 @@ class ArenaOpponent:
         self.user_id = int(root['userid'])  # 不是platform_id
 
 
-class ArenaMan:
+class Arena:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.wr = WebRequest(cfg)
@@ -40,3 +40,28 @@ class ArenaMan:
                 "成功" if response.body["is_winning"] else "失败",
             ),
         }
+    
+    def batch_challenge(self, num):
+        body = [f"/arena {num}"]
+        response = self.wr.amf_post_retry(
+            body,
+            "api.gift.get",
+            "/pvz/amf/",
+            "批量挑战竞技场",
+        )
+        if response.body['msg'] == "使用成功":
+            return {
+                "success": True,
+            }
+        elif response.body['msg'] == "道具异常":
+            return {
+                "success": False,
+                "error_type": 1,
+                "result": "挑战竞技场出现异常。原因：{}".format(response.body['msg']),
+            }
+        elif "指令有误" in response.body['msg'] :
+            return {
+                "success": False,
+                "error_type": 2,
+                "result": "挑战竞技场出现异常。原因：{}".format(response.body['msg']),
+            }
