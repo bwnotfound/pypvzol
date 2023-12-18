@@ -387,7 +387,7 @@ class TerritoryMan:
             for plant_id in self.team
             if self.repo.get_plant(plant_id) is not None
         ]
-    
+
     def get_rest_num(self):
         body = []
         response = self.wr.amf_post_retry(
@@ -514,6 +514,69 @@ class DailyMan:
         self.cfg = cfg
         self.wr = WebRequest(cfg)
         self.logger = logger
+
+    def daily_accumulated_reward_acquire(self):
+        self.wr.amf_post_retry(
+            [float(5)],
+            "api.active.rewardTimes",
+            "/pvz/amf/",
+            "累计每日奖励领取",
+            logger=self.logger,
+            except_retry=True,
+        )
+
+    def get_arena_reward_info(self):
+        response = self.wr.amf_post_retry(
+            [],
+            "api.arena.getAwardWeekInfo",
+            "/pvz/amf/",
+            "竞技场奖励信息获取",
+            logger=self.logger,
+            except_retry=True,
+        )
+        body = response.body
+        rank = int(body['rank']['rank'])
+        award_info_list = []
+        for item in body['award']:
+            award_info_list.append(
+                (
+                    int(item['min_rank']),
+                    int(item['max_rank']),
+                    [
+                        {"id": int(tool['id']), "amount": int(tool['amount'])}
+                        for tool in item['tool']
+                    ],
+                )
+            )
+        return rank, award_info_list
+
+    def arena_reward_acquire(self, lib: Library):
+        rank, award_info_list = self.get_arena_reward_info()
+        for item in award_info_list:
+            if rank >= item[0] and rank <= item[1]:
+                break
+        else:
+            self.logger.log("排名不够，无法领取竞技场奖励")
+            return
+        response = self.wr.amf_post_retry(
+            [],
+            "api.arena.awardWeek",
+            "/pvz/amf/",
+            "竞技场奖励领取",
+            logger=self.logger,
+            except_retry=True,
+        )
+        if response.status == 1:
+            self.logger.log("竞技场" + response.body.description)
+        else:
+            msg = f"领取第{rank}名竞技场奖励成功。领取了"
+            for reward_tool in item[2]:
+                tool = lib.get_tool_by_id(reward_tool['id'])
+                if tool is None:
+                    continue
+                msg += "{}个{},".format(reward_tool['amount'], tool.name)
+            msg = msg[:-1]
+            self.logger.log(msg)
 
     def vip_reward_acquire(self):
         response = self.wr.amf_post_retry(
@@ -721,7 +784,7 @@ class ArenaMan:
         self.cfg = cfg
         self.logger = logger
         self.arena = Arena(cfg)
-    
+
     def get_challenge_num(self):
         self.arena.refresh_arena()
         return self.arena.challenge_num
@@ -759,3 +822,8 @@ class ArenaMan:
             return
         self.logger.log("挑战竞技场完成，剩余挑战次数：{}".format(challenge_num))
         return
+
+    def challenge_first(self):
+        self.arena.refresh_arena()
+        result = self.arena.challenge_first()
+        return result

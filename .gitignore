@@ -169,3 +169,5 @@ data/
 /scripts
 /build.py
 /test.py
+
+/information/

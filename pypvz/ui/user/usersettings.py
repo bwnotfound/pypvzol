@@ -87,6 +87,8 @@ class UserSettings:
         self.garden_man = GardenMan(cfg, repo, lib, self.logger)
         self.garden_enabled = False
         self.exit_if_nothing_todo = False
+        self.arena_challenge_mode = 0
+        self.daily_settings = [True, True, True, True]
 
         self.pipeline_man = PipelineMan(cfg, lib, repo, user, self.logger)
 
@@ -116,11 +118,17 @@ class UserSettings:
                     break
             if self.daily_enabled:
                 try:
-                    self.daily_man.daily_sign()
-                    self.daily_man.vip_reward_acquire()
-                    self.logger.log("每日签到完成")
+                    if self.daily_settings[0]:
+                        self.daily_man.daily_sign()
+                    if self.daily_settings[1]:
+                        self.daily_man.vip_reward_acquire()
+                    if self.daily_settings[2]:
+                        self.daily_man.daily_accumulated_reward_acquire()
+                    if self.daily_settings[3]:
+                        self.daily_man.arena_reward_acquire(self.lib)
+                    self.logger.log("每日日常完成")
                 except Exception as e:
-                    self.logger.log(f"每日签到失败，异常种类:{type(e).__name__}。跳过每日签到")
+                    self.logger.log(f"每日日常失败，异常种类:{type(e).__name__}。跳过每日日常")
                 if stop_channel.qsize() > 0:
                     break
             if self.task_enabled:
@@ -176,7 +184,14 @@ class UserSettings:
                     break
             if self.arena_enabled:
                 try:
-                    self.arena_man.auto_challenge(stop_channel)
+                    if self.arena_challenge_mode == 0:
+                        self.arena_man.auto_challenge(stop_channel)
+                    elif self.arena_challenge_mode == 1:
+                        while stop_channel.qsize() == 0:
+                            result = self.arena_man.challenge_first()
+                            self.logger.log(result['result'])
+                            if not result['success']:
+                                break
                 except Exception as e:
                     self.logger.log(f"竞技场挑战失败，异常种类:{type(e).__name__}。跳过竞技场挑战")
                 if stop_channel.qsize() > 0:
@@ -261,6 +276,8 @@ class UserSettings:
                     "daily_enabled": self.daily_enabled,
                     "garden_enabled": self.garden_enabled,
                     "exit_if_nothing_todo": self.exit_if_nothing_todo,
+                    "arena_challenge_mode": self.arena_challenge_mode,
+                    "daily_settings" : self.daily_settings,
                 },
                 f,
             )

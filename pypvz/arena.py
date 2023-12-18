@@ -26,7 +26,14 @@ class Arena:
             "api.arena.challenge",
             "/pvz/amf/",
             "挑战竞技场",
+            allow_empty=True,
+            except_retry=True
         )
+        if response == None:
+            return {
+                "success": False,
+                "result": "挑战竞技场，但服务器返回为空。可能是竞技场次数不够或挑战对手不存在导致的。",
+            }
 
         if response.status == 1:
             return {

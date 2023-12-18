@@ -6,6 +6,9 @@ import logging
 import concurrent.futures
 import threading
 import shutil
+import warnings
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from PyQt6 import QtGui
 from PyQt6.QtWidgets import (
@@ -15,11 +18,9 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QTabWidget,
     QListWidget,
     QListWidgetItem,
     QPushButton,
-    QSplitter,
     QGridLayout,
     QCheckBox,
     QPlainTextEdit,
@@ -52,6 +53,7 @@ from pypvz.ui.windows import (
     PipelineSettingWindow,
     ShopAutoBuySetting,
     Challenge4levelSettingWindow,
+    DailySettingWindow,
     # GameWindow,
     # run_game_window,
 )
@@ -229,6 +231,17 @@ class SettingWindow(QMainWindow):
         arena_checkbox.setChecked(self.usersettings.arena_enabled)
         arena_checkbox.stateChanged.connect(self.arena_checkbox_stateChanged)
         arena_layout.addWidget(arena_checkbox)
+        self.arena_challenge_mode_combobox = QComboBox()
+        self.arena_challenge_mode_combobox.addItem("指令")
+        self.arena_challenge_mode_combobox.addItem("手打")
+        self.arena_challenge_mode_combobox.setCurrentIndex(
+            self.usersettings.arena_challenge_mode
+        )
+        self.arena_challenge_mode_combobox.currentIndexChanged.connect(
+            self.arena_challenge_mode_combobox_index_changed
+        )
+        arena_layout.addWidget(self.arena_challenge_mode_combobox)
+        arena_layout.addStretch(1)
         arena_widget.setLayout(arena_layout)
         menu_layout.addWidget(arena_widget, 4, 0)
 
@@ -260,11 +273,14 @@ class SettingWindow(QMainWindow):
 
         daily_widget = QWidget()
         daily_layout = QHBoxLayout()
-        self.daily_checkbox = daily_checkbox = QCheckBox("日常签到和vip")
+        self.daily_checkbox = daily_checkbox = QCheckBox("每日日常")
         daily_checkbox.setFont(normal_font)
         daily_checkbox.setChecked(self.usersettings.daily_enabled)
         daily_checkbox.stateChanged.connect(self.daily_checkbox_stateChanged)
         daily_layout.addWidget(daily_checkbox)
+        daily_setting_btn = QPushButton("设置")
+        daily_setting_btn.clicked.connect(self.daily_setting_btn_clicked)
+        daily_layout.addWidget(daily_setting_btn)
         daily_widget.setLayout(daily_layout)
         menu_layout.addWidget(daily_widget, 4, 2)
 
@@ -359,6 +375,11 @@ class SettingWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
+    def arena_challenge_mode_combobox_index_changed(self):
+        self.usersettings.arena_challenge_mode = (
+            self.arena_challenge_mode_combobox.currentIndex()
+        )
+
     def close_if_nothing_todo_checkbox_stateChanged(self):
         self.usersettings.exit_if_nothing_todo = (
             self.close_if_nothing_todo_checkbox.isChecked()
@@ -368,6 +389,10 @@ class SettingWindow(QMainWindow):
         self.usersettings.serverbattle_man.rest_challenge_num_limit = int(
             self.serverbattle_rest_num_inputbox.text()
         )
+        
+    def daily_setting_btn_clicked(self):
+        self.daily_setting_window = DailySettingWindow(self.usersettings, self)
+        self.daily_setting_window.show()
 
     def territory_setting_btn_clicked(self):
         self.territory_setting_window = TerritorySettingWindow(
@@ -685,11 +710,11 @@ class CustomMainWindow(QMainWindow):
         refresh_repository_btn = QPushButton("刷新仓库")
         refresh_repository_btn.clicked.connect(self.refresh_repository_btn)
         left_layout.addWidget(refresh_repository_btn)
-        
+
         refresh_user_info_btn = QPushButton("刷新用户信息")
         refresh_user_info_btn.clicked.connect(self.refresh_user_info_btn_clicked)
         left_layout.addWidget(refresh_user_info_btn)
-        
+
         left_layout.addStretch(1)
         # left_layout.setSpacing(10)
 
@@ -750,7 +775,7 @@ class CustomMainWindow(QMainWindow):
         self.user_info_2.addWidget(QLabel("领地次数: {}".format(futures[0].result())))
         self.user_info_2.addWidget(QLabel("竞技场次数: {}".format(futures[1].result())))
         QApplication.processEvents()
-        
+
     def refresh_user_info_btn_clicked(self):
         self.refresh_user_info(refresh_all=True)
         self.usersettings.logger.log("用户信息刷新完成")

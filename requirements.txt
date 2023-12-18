@@ -1,6 +1,6 @@
 requests
 setuptools
-sip
+# sip
 pyqt6
 PyQt6-tools
 py3amf
