@@ -139,7 +139,7 @@ class FubenSettingWindow(QMainWindow):
         widget3 = QWidget()
         widget3.setMinimumWidth(int(self.width() * 0.1))
         layout3 = QVBoxLayout()
-        self.set_plant_team_btn = QPushButton("设置为出战植物")
+        self.set_plant_team_btn = QPushButton("添加出战植物")
         self.set_plant_team_btn.clicked.connect(self.set_plant_team_btn_clicked)
         layout3.addWidget(self.set_plant_team_btn)
         widget3.setLayout(layout3)
@@ -236,11 +236,12 @@ class FubenSettingWindow(QMainWindow):
         self.fuben_select_window.show()
 
     def set_plant_team_btn_clicked(self):
-        team = [
-            item.data(Qt.ItemDataRole.UserRole)
-            for item in self.plant_list.selectedItems()
-        ]
-        self.usersettings.fuben_man.team = team
+        self.usersettings.fuben_man.team.extend(
+            [
+                item.data(Qt.ItemDataRole.UserRole)
+                for item in self.plant_list.selectedItems()
+            ]
+        )
         self.refresh_team_list()
         self.refresh_plant_list()
         

@@ -36,7 +36,6 @@ from pypvz import WebRequest, Config, User, Repository, Library
 from pypvz.ui.message import IOLogger
 from pypvz.ui.wrapped import QLabel, normal_font
 from pypvz.ui.windows.common import (
-    AutoUseItemSettingWindow,
     HeritageWindow,
     PlantRelativeWindow,
 )
@@ -54,6 +53,8 @@ from pypvz.ui.windows import (
     ShopAutoBuySetting,
     Challenge4levelSettingWindow,
     DailySettingWindow,
+    SimulateWindow,
+    AutoUseItemSettingWindow,
     # GameWindow,
     # run_game_window,
 )
@@ -389,7 +390,7 @@ class SettingWindow(QMainWindow):
         self.usersettings.serverbattle_man.rest_challenge_num_limit = int(
             self.serverbattle_rest_num_inputbox.text()
         )
-        
+
     def daily_setting_btn_clicked(self):
         self.daily_setting_window = DailySettingWindow(self.usersettings, self)
         self.daily_setting_window.show()
@@ -566,11 +567,19 @@ class FunctionPanelWindow(QMainWindow):
         )
         menu_layout.addWidget(repository_tool_record_btn, 7, 0)
 
+        simulate_btn = QPushButton("模拟面板")
+        simulate_btn.clicked.connect(self.simulate_btn_clicked)
+        menu_layout.addWidget(simulate_btn, 8, 0)
+
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def simulate_btn_clicked(self):
+        self.simulate_window = SimulateWindow(parent=self)
+        self.simulate_window.show()
 
     def auto_pipeline_btn_clicked(self):
         self.auto_pipeline_window = PipelineSettingWindow(

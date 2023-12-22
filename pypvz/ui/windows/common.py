@@ -1,8 +1,5 @@
-import logging
-import threading
 from queue import Queue
 from copy import deepcopy
-import typing
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -11,12 +8,10 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QListWidget,
     QListWidgetItem,
-    QTabWidget,
     QPlainTextEdit,
     QComboBox,
     QCheckBox,
     QApplication,
-    QSpinBox,
 )
 from PyQt6.QtGui import QPixmap
 from PyQt6 import QtGui
@@ -282,284 +277,6 @@ class AddCaveWindow(QMainWindow):
                 cave, difficulty=self.difficulty_choice.currentIndex() + 1
             )
         self.cave_add_update.emit()
-
-
-class AutoUseItemSettingWindow(QMainWindow):
-    def __init__(self, usersettings: UserSettings, parent=None):
-        super().__init__(parent=parent)
-        self.usersettings = usersettings
-        self.init_ui()
-        self.refresh_item_list()
-        self.refresh_auto_use_item_list()
-        self.refresh_plant_list()
-
-    def init_ui(self):
-        self.setWindowTitle("自动使用道具设置")
-
-        # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
-        screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.5), int(screen_size.height() * 0.5))
-        self.move(int(screen_size.width() * 0.25), int(screen_size.height() * 0.25))
-
-        main_widget = QWidget()
-        main_layout = QHBoxLayout()
-
-        item_list_widget = QWidget()
-        item_list_widget.setFixedWidth(int(self.width() * 0.35))
-        item_list_layout = QVBoxLayout()
-        item_list_layout.addWidget(QLabel("道具列表"))
-
-        self.item_list_tab = item_list_tab = QTabWidget()
-        self.item_list = QListWidget()
-        self.item_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        item_list_tab.addTab(self.item_list, "道具")
-        self.box_list = QListWidget()
-        self.box_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        item_list_tab.addTab(self.box_list, "宝箱")
-        self.plant_list = QListWidget()
-        self.plant_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        item_list_tab.addTab(self.plant_list, "植物")
-        item_list_layout.addWidget(item_list_tab)
-
-        item_list_widget.setLayout(item_list_layout)
-        main_layout.addWidget(item_list_widget)
-
-        use_item_panel_widget = QWidget()
-        use_item_panel_layout = QVBoxLayout()
-        use_item_panel_layout.addStretch(1)
-
-        self.use_item_all_btn = use_item_all_btn = QPushButton("全部使用")
-        use_item_all_btn.clicked.connect(self.use_item_all_btn_clicked)
-        use_item_panel_layout.addWidget(use_item_all_btn)
-
-        self.auto_use_item_btn = auto_use_item_btn = QPushButton("设为自动使用")
-        auto_use_item_btn.clicked.connect(self.auto_use_item_btn_clicked)
-        use_item_panel_layout.addWidget(auto_use_item_btn)
-
-        part_use_widget = QWidget()
-        part_use_layout = QHBoxLayout()
-        self.part_use_amount = part_use_amount = QSpinBox()
-        part_use_amount.setMinimum(1)
-        part_use_amount.setMaximum(99999)
-        part_use_amount.setValue(1)
-        part_use_layout.addWidget(part_use_amount)
-        self.part_use_item_btn = part_use_item_btn = QPushButton("部分使用")
-        part_use_item_btn.clicked.connect(self.part_use_item_btn_clicked)
-        part_use_layout.addWidget(part_use_item_btn)
-        part_use_widget.setLayout(part_use_layout)
-        use_item_panel_layout.addWidget(part_use_widget)
-
-        self.sell_item_all_btn = sell_item_all_btn = QPushButton("全部出售")
-        sell_item_all_btn.clicked.connect(self.sell_item_all_btn_clicked)
-        use_item_panel_layout.addWidget(sell_item_all_btn)
-
-        use_item_panel_layout.addStretch(1)
-        use_item_panel_widget.setLayout(use_item_panel_layout)
-        main_layout.addWidget(use_item_panel_widget)
-
-        auto_use_item_list_widget = QWidget()
-        auto_use_item_list_widget.setFixedWidth(int(self.width() * 0.35))
-        auto_use_item_list_layout = QVBoxLayout()
-        auto_use_item_list_layout.addWidget(QLabel("自动使用道具列表"))
-        self.auto_use_item_list = QListWidget()
-        self.auto_use_item_list.setSelectionMode(
-            QListWidget.SelectionMode.ExtendedSelection
-        )
-        auto_use_item_list_layout.addWidget(self.auto_use_item_list)
-        auto_use_item_list_widget.setLayout(auto_use_item_list_layout)
-        main_layout.addWidget(auto_use_item_list_widget)
-
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
-
-    def refresh_item_list(self):
-        self.item_list.clear()
-        self.box_list.clear()
-        for tool in self.usersettings.repo.tools:
-            lib_tool = self.usersettings.lib.get_tool_by_id(tool['id'])
-            item = QListWidgetItem(f"{lib_tool.name}({tool['amount']})")
-            item.setData(Qt.ItemDataRole.UserRole, tool['id'])
-            if lib_tool.type != 3:
-                self.item_list.addItem(item)
-            if lib_tool.type == 3:
-                self.box_list.addItem(item)
-
-    def refresh_auto_use_item_list(self):
-        self.auto_use_item_list.clear()
-        for tool_id in self.usersettings.auto_use_item_list:
-            lib_tool = self.usersettings.lib.get_tool_by_id(tool_id)
-            item = QListWidgetItem(f"{lib_tool.name}")
-            item.setData(Qt.ItemDataRole.UserRole, tool_id)
-            self.auto_use_item_list.addItem(item)
-
-    def refresh_plant_list(self):
-        self.plant_list.clear()
-        for plant in self.usersettings.repo.plants:
-            item = QListWidgetItem(
-                f"{plant.name(self.usersettings.lib)} ({plant.grade})[{plant.quality_str}]"
-            )
-            item.setData(Qt.ItemDataRole.UserRole, plant.id)
-            self.plant_list.addItem(item)
-        pass
-
-    def part_use_item_btn_clicked(self):
-        self.part_use_item_btn.setDisabled(True)
-        QApplication.processEvents()
-        try:
-            cur_index = self.item_list_tab.currentIndex()
-            if cur_index == 0:
-                selected_items = self.item_list.selectedItems()
-            elif cur_index == 1:
-                selected_items = self.box_list.selectedItems()
-            else:
-                self.usersettings.logger.log("请选择道具或宝箱")
-                return
-            if len(selected_items) == 0:
-                self.usersettings.logger.log("请先选中物品")
-                return
-            amount = self.part_use_amount.value()
-            for item in selected_items:
-                tool_id = item.data(Qt.ItemDataRole.UserRole)
-                repo_tool = self.usersettings.repo.get_tool(tool_id)
-                if repo_tool is None:
-                    continue
-                tool_type = self.usersettings.lib.get_tool_by_id(tool_id).type
-                if tool_type == 3:
-                    result = self.usersettings.repo.open_box(
-                        tool_id, amount, self.usersettings.lib
-                    )
-                else:
-                    result = self.usersettings.repo.use_item(
-                        tool_id, amount, self.usersettings.lib
-                    )
-                self.usersettings.logger.log(result['result'])
-                if not result['success']:
-                    continue
-            self.usersettings.repo.refresh_repository()
-            self.refresh_item_list()
-        except Exception as e:
-            self.usersettings.logger.log(
-                "部分使用道具出错，已暂停。原因类型：{}".format(type(e).__name__)
-            )
-        finally:
-            self.part_use_item_btn.setEnabled(True)
-
-    def use_item_all_btn_clicked(self):
-        self.use_item_all_btn.setDisabled(True)
-        QApplication.processEvents()
-        try:
-            cur_index = self.item_list_tab.currentIndex()
-            if cur_index == 0:
-                selected_items = self.item_list.selectedItems()
-            elif cur_index == 1:
-                selected_items = self.box_list.selectedItems()
-            else:
-                self.usersettings.logger.log("请选择道具或宝箱")
-                return
-            if len(selected_items) == 0:
-                self.usersettings.logger.log("请先选中物品")
-                return
-            for item in selected_items:
-                tool_id = item.data(Qt.ItemDataRole.UserRole)
-                repo_tool = self.usersettings.repo.get_tool(tool_id)
-                if repo_tool is None:
-                    continue
-                tool_type = self.usersettings.lib.get_tool_by_id(tool_id).type
-                amount = repo_tool['amount']
-                if tool_type == 3:
-                    while amount > 0:
-                        result = self.usersettings.repo.open_box(
-                            tool_id, 99999, self.usersettings.lib
-                        )
-                        self.usersettings.logger.log(result['result'])
-                        if not result['success']:
-                            break
-                        amount -= result['open_amount']
-                else:
-                    result = self.usersettings.repo.use_item(
-                        tool_id, amount, self.usersettings.lib
-                    )
-                    self.usersettings.logger.log(result['result'])
-            self.usersettings.repo.refresh_repository()
-            self.refresh_item_list()
-        except Exception as e:
-            self.usersettings.logger.log(
-                "全部使用道具出错，已暂停。原因类型：{}".format(type(e).__name__)
-            )
-        finally:
-            self.use_item_all_btn.setEnabled(True)
-
-    def auto_use_item_btn_clicked(self):
-        cur_index = self.item_list_tab.currentIndex()
-        if cur_index == 0:
-            selected_items = self.item_list.selectedItems()
-        elif cur_index == 1:
-            selected_items = self.box_list.selectedItems()
-        else:
-            self.usersettings.logger.log("请选择道具或宝箱")
-            return
-        for item in selected_items:
-            self.usersettings.auto_use_item_list.append(
-                item.data(Qt.ItemDataRole.UserRole)
-            )
-        self.refresh_auto_use_item_list()
-
-    def sell_item_all_btn_clicked(self):
-        cur_index = self.item_list_tab.currentIndex()
-        if cur_index == 0:
-            selected_items = self.item_list.selectedItems()
-        elif cur_index == 1:
-            self.usersettings.logger.log("现在还暂时不开放宝箱售卖功能")
-            return
-        elif cur_index == 2:
-            selected_items = self.plant_list.selectedItems()
-        else:
-            self.usersettings.logger.log("请选择道具或植物")
-            return
-        selected_data = [item.data(Qt.ItemDataRole.UserRole) for item in selected_items]
-        if cur_index == 0:
-            for tool_id in selected_data:
-                repo_tool = self.usersettings.repo.get_tool(tool_id)
-                if repo_tool is None:
-                    continue
-                tool_type = self.usersettings.lib.get_tool_by_id(tool_id).type
-                amount = repo_tool['amount']
-                if tool_type == 3:
-                    logging.error("宝箱数据混入道具列表了")
-                    continue
-                result = self.usersettings.repo.sell_item(
-                    tool_id, amount, self.usersettings.lib
-                )
-                self.usersettings.logger.log(result['result'])
-        else:
-            for plant_id in selected_data:
-                repo_plant = self.usersettings.repo.get_plant(plant_id)
-                if repo_plant is None:
-                    continue
-                result = self.usersettings.repo.sell_plant(
-                    plant_id, repo_plant.info(lib=self.usersettings.lib)
-                )
-                self.usersettings.logger.log(result['result'])
-        self.usersettings.repo.refresh_repository()
-        if cur_index == 0:
-            self.refresh_item_list()
-        elif cur_index == 2:
-            self.refresh_plant_list()
-        else:
-            raise RuntimeError
-
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
-            selected_item = self.auto_use_item_list.selectedItems()
-            tool_id_list = [
-                item.data(Qt.ItemDataRole.UserRole) for item in selected_item
-            ]
-            self.usersettings.auto_use_item_list = [
-                tool_id
-                for tool_id in self.usersettings.auto_use_item_list
-                if tool_id not in tool_id_list
-            ]
-            self.refresh_auto_use_item_list()
 
 
 # class ChallengeGardenCaveSetting(QMainWindow):
@@ -1024,7 +741,6 @@ class PlantRelativeWindow(QMainWindow):
         self.refresh_plant_attribute_textbox()
         if self.function_choice_box.currentIndex() == 0:
             self.refresh_skill_list()
-            pass
 
     def refresh_plant_list_btn_clicked(self):
         self.usersettings.repo.refresh_repository()
@@ -1041,13 +757,15 @@ class PlantRelativeWindow(QMainWindow):
                 "仓库里没有id为{}的植物，可能已被删除".format(self.current_plant_id)
             )
             return
-        for skill in plant.skills:
-            item = QListWidgetItem(skill["name"] + f"(id:{skill['id']})")
+        for skill_id in plant.skill_id_list:
+            skill = self.usersettings.lib.get_skill(skill_id)
+            item = QListWidgetItem(skill["name"] + f"({skill['grade']}级)")
             item.setData(Qt.ItemDataRole.UserRole, skill)
             self.skill_list.addItem(item)
-        if plant.special_skill is not None:
-            item = QListWidgetItem(plant.special_skill["name"] + f"(id:{skill['id']})")
-            item.setData(Qt.ItemDataRole.UserRole, plant.special_skill)
+        if plant.special_skill_id is not None:
+            spec_skill = self.usersettings.lib.get_spec_skill(plant.special_skill_id)
+            item = QListWidgetItem(spec_skill["name"] + f"({spec_skill['grade']}级)")
+            item.setData(Qt.ItemDataRole.UserRole, spec_skill)
             self.skill_list.addItem(item)
 
     def skill_list_item_clicked(self, item):
@@ -1081,7 +799,7 @@ class PlantRelativeWindow(QMainWindow):
             else:
                 if result["upgrade_success"]:
                     self.usersettings.logger.log("技能升级成功")
-                    for s in plant.skills:
+                    for s in plant.skill_id_list:
                         if (
                             s["id"] == pre_skill["id"]
                             and s["name"] == pre_skill["name"]
@@ -1089,12 +807,12 @@ class PlantRelativeWindow(QMainWindow):
                             s["id"] = skill["id"]
                             break
                     else:
-                        if plant.special_skill is not None:
+                        if plant.special_skill_id is not None:
                             if (
-                                plant.special_skill["id"] == pre_skill["id"]
-                                and plant.special_skill["name"] == pre_skill["name"]
+                                plant.special_skill_id["id"] == pre_skill["id"]
+                                and plant.special_skill_id["name"] == pre_skill["name"]
                             ):
-                                plant.special_skill["id"] = skill["id"]
+                                plant.special_skill_id["id"] = skill["id"]
                     self.skill_list.setCurrentRow(self.current_skill_row_index)
                     self.refresh_skill_list()
                 else:

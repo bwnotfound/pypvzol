@@ -1,7 +1,21 @@
 from xml.etree.ElementTree import Element, fromstring
+import json
 
 from .web import WebRequest
 from .config import Config
+
+
+class Tool:
+    def __init__(self, root: Element):
+        self.id = int(root.get("id"))
+        self.name = root.get("name")
+        self.type = int(root.get("type"))
+        self.type_name = root.get("type_name")
+        self.sell_price = root.get("sell_price")
+        self.use_result = root.get("use_result")
+        self.describe = root.get("describe")
+        self.rare = root.get("rare")
+        self.lottery_name = root.get("lottery_name")
 
 
 class Library:
@@ -28,6 +42,11 @@ class Library:
 
         self.name2tool = {tool.name: tool for tool in self.tools.values()}
 
+        with open("./data/cache/pvz/skills.json", "r", encoding="utf-8") as f:
+            self.skills = json.load(f)
+        with open("./data/cache/pvz/spec_skills.json", "r", encoding="utf-8") as f:
+            self.spec_skills = json.load(f)
+
     def get_plant_by_id(self, pid):
         if isinstance(pid, str):
             pid = int(pid)
@@ -40,17 +59,17 @@ class Library:
         result = self.tools.get(id, None)
         return result
 
+    def get_skill(self, skill_id: int):
+        for item in self.skills:
+            if int(item['id']) == skill_id:
+                return item
+        return None
 
-class Tool:
-    def __init__(self, root: Element):
-        self.id = int(root.get("id"))
-        self.name = root.get("name")
-        self.type = int(root.get("type"))
-        self.type_name = root.get("type_name")
-        self.sell_price = root.get("sell_price")
-        self.use_result = root.get("use_result")
-        self.describe = root.get("describe")
-        self.rare = root.get("rare")
+    def get_spec_skill(self, skill_id: int):
+        for item in self.spec_skills:
+            if int(item['id']) == skill_id:
+                return item
+        return None
 
 
 class EvolutionLibPath:

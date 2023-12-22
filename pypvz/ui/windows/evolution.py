@@ -1,4 +1,5 @@
 import logging
+import concurrent.futures
 from time import sleep
 from threading import Event
 from PyQt6.QtWidgets import (
@@ -11,43 +12,47 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QCheckBox,
     QApplication,
+    QComboBox,
 )
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 
-from ..wrapped import QLabel, signal_block_emit
+from ..wrapped import QLabel, signal_block_emit, WaitEventThread
 from ..user import UserSettings
 
 
 class EvolutionPanelWindow(QMainWindow):
-    refresh_path_panel_signal = pyqtSignal(Event)
-    refresh_plant_list_signal = pyqtSignal()
+    refresh_path_panel_signal = pyqtSignal()
+    refresh_plant_list_signal = pyqtSignal(Event)
     evolution_finish_signal = pyqtSignal()
+    evolution_stop_signal = pyqtSignal()
 
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
         self.usersettings = usersettings
-        self.force_evolution = True
         self.init_ui()
         self.rest_event = Event()
         self.rest_event.set()
+        self.interrupt_event = Event()
         self.run_thread = None
         self.refresh_path_panel_signal.connect(self.refresh_evolution_path_list)
         self.refresh_plant_list_signal.connect(self.refresh_plant_list)
+        self.evolution_finish_signal.connect(self.evolution_finished)
+        self.evolution_stop_signal.connect(self.evolution_stopped)
 
     def init_ui(self):
         self.setWindowTitle("进化面板")
 
         # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.5), int(screen_size.height() * 0.5))
-        self.move(int(screen_size.width() * 0.25), int(screen_size.height() * 0.25))
+        self.resize(int(screen_size.width() * 0.6), int(screen_size.height() * 0.5))
+        self.move(int(screen_size.width() * 0.2), int(screen_size.height() * 0.25))
 
         main_widget = QWidget()
         main_layout = QHBoxLayout()
 
         plant_list_widget = QWidget()
-        plant_list_widget.setFixedWidth(int(self.width() * 0.4))
+        plant_list_widget.setFixedWidth(int(self.width() * 0.3))
         plant_list_layout = QVBoxLayout()
         plant_list_layout.addWidget(QLabel("植物列表"))
         self.plant_list = QListWidget()
@@ -67,6 +72,7 @@ class EvolutionPanelWindow(QMainWindow):
         main_layout.addWidget(plant_list_widget)
 
         evolution_path_widget = QWidget()
+        evolution_path_widget.setFixedWidth(int(self.width() * 0.45))
         evolution_path_layout = QVBoxLayout()
         evolution_path_layout.addWidget(QLabel("进化路径"))
         self.evolution_path_list = QListWidget()
@@ -93,18 +99,21 @@ class EvolutionPanelWindow(QMainWindow):
         main_layout.addWidget(evolution_path_widget)
 
         right_panel_layout = QVBoxLayout()
+        right_panel_layout.addStretch(1)
 
-        self.evolution_start_btn = evolution_start_btn = QPushButton("开始进化")
-        evolution_start_btn.clicked.connect(self.evolution_start_btn_clicked)
-        right_panel_layout.addWidget(evolution_start_btn)
+        self.evolution_start_btn = QPushButton("开始进化")
+        self.evolution_start_btn.clicked.connect(self.evolution_start_btn_clicked)
+        right_panel_layout.addWidget(self.evolution_start_btn)
 
-        self.force_evolution_checkbox = force_evolution_checkbox = QCheckBox("强制进化")
-        force_evolution_checkbox.setChecked(self.force_evolution)
-        force_evolution_checkbox.stateChanged.connect(
-            self.force_evolution_checkbox_stateChanged
-        )
-        right_panel_layout.addWidget(force_evolution_checkbox)
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("并发线程数:"))
+        self.pool_size_combobox = QComboBox()
+        self.pool_size_combobox.addItems([str(i) for i in range(1, 31)])
+        self.pool_size_combobox.setCurrentIndex(2)
+        layout.addWidget(self.pool_size_combobox)
+        right_panel_layout.addLayout(layout)
 
+        right_panel_layout.addStretch(1)
         main_layout.addLayout(right_panel_layout)
 
         main_widget.setLayout(main_layout)
@@ -136,10 +145,7 @@ class EvolutionPanelWindow(QMainWindow):
         ]
         return selected_data
 
-    def force_evolution_checkbox_stateChanged(self):
-        self.force_evolution = self.force_evolution_checkbox.isChecked()
-
-    def refresh_evolution_path_list(self, event: Event = None):
+    def refresh_evolution_path_list(self):
         self.evolution_path_list.clear()
         for i, path in enumerate(
             self.usersettings.plant_evolution.saved_evolution_paths
@@ -150,31 +156,52 @@ class EvolutionPanelWindow(QMainWindow):
             )
             item.setData(Qt.ItemDataRole.UserRole, i)
             self.evolution_path_list.addItem(item)
-        if event is not None:
-            event.set()
+
+    def evolution_finished(self):
+        self.evolution_start_btn.setText("开始进化")
+        self.run_thread = None
+        self.interrupt_event.clear()
+
+    def evolution_stopped(self):
+        self.evolution_start_btn.setText("开始进化")
+        self.evolution_start_btn.setEnabled(True)
 
     def evolution_start_btn_clicked(self):
-        try:
-            self.evolution_start_btn.setDisabled(True)
-            QApplication.processEvents()
-            if self.current_evolution_path_index is None:
-                self.usersettings.logger.log("请先选择一个进化路线")
-                return
-            if len(self.selected_plant_id) == 0:
-                self.usersettings.logger.log("请先选择一个或多个植物")
-                return
-            for plant_id in self.selected_plant_id:
-                result = self.usersettings.plant_evolution.plant_evolution_all(
-                    self.current_evolution_path_index, plant_id
+        self.evolution_start_btn.setDisabled(True)
+        QApplication.processEvents()
+        if self.evolution_start_btn.text() == "开始进化":
+            try:
+                if self.current_evolution_path_index is None:
+                    self.usersettings.logger.log("请先选择一个进化路线")
+                    return
+                if len(self.selected_plant_id) == 0:
+                    self.usersettings.logger.log("请先选择一个或多个植物")
+                    return
+                self.evolution_start_btn.setText("停止进化")
+                self.run_thread = EvolutionPanelThread(
+                    self.current_evolution_path_index,
+                    self.selected_plant_id,
+                    self.usersettings,
+                    self.evolution_finish_signal,
+                    self.interrupt_event,
+                    self.refresh_plant_list_signal,
+                    self.rest_event,
+                    pool_size=self.pool_size_combobox.currentIndex() + 1,
                 )
-                self.usersettings.logger.log(result["result"])
-            self.plant_list_refresh_btn_clicked()
-        except Exception as e:
-            self.usersettings.logger.log(str(e))
-        finally:
+                self.rest_event.clear()
+                self.run_thread.start()
+            finally:
+                self.evolution_start_btn.setEnabled(True)
+        elif self.evolution_start_btn.text() == "停止进化":
+            self.interrupt_event.set()
+            WaitEventThread(self.rest_event, self.evolution_stop_signal).start()
+        else:
             self.evolution_start_btn.setEnabled(True)
+            raise NotImplementedError(
+                "开始进化按钮文本：{} 未知".format(self.evolution_start_btn.text())
+            )
 
-    def refresh_plant_list(self):
+    def refresh_plant_list(self, event: Event = None):
         self.plant_list.clear()
         for plant in self.usersettings.repo.plants:
             item = QListWidgetItem(
@@ -182,6 +209,8 @@ class EvolutionPanelWindow(QMainWindow):
             )
             item.setData(Qt.ItemDataRole.UserRole, plant.id)
             self.plant_list.addItem(item)
+        if event is not None:
+            event.set()
 
     def plant_list_refresh_btn_clicked(self):
         self.usersettings.repo.refresh_repository()
@@ -226,7 +255,7 @@ class EvolutionPanelThread(QThread):
         interrupt_event: Event,
         refresh_signal,
         rest_event: Event,
-        force_evolution=False,
+        pool_size=3,
     ):
         super().__init__()
         self.current_evolution_path_index = current_evolution_path_index
@@ -236,34 +265,55 @@ class EvolutionPanelThread(QThread):
         self.interrupt_event = interrupt_event
         self.refresh_signal = refresh_signal
         self.rest_event = rest_event
-        self.force_evolution = force_evolution
+        self.pool_size = pool_size
+
+    def _evolution(self, plant_id):
+        result = self.usersettings.plant_evolution.plant_evolution_all(
+            self.current_evolution_path_index,
+            plant_id,
+            self.interrupt_event,
+        )
+        self.usersettings.logger.log(result["result"])
 
     def evolution(self):
-        try:
-            if self.current_evolution_path_index is None:
-                self.usersettings.logger.log("请先选择一个进化路线")
+        evolution_plant_id_set = set(self.selected_plant_id)
+        while True:
+            if self.interrupt_event.is_set():
                 return
-            if len(self.selected_plant_id) == 0:
-                self.usersettings.logger.log("请先选择一个或多个植物")
-                return
-            for plant_id in self.selected_plant_id:
-                result = self.usersettings.plant_evolution.plant_evolution_all(
-                    self.current_evolution_path_index, plant_id
-                )
-                self.usersettings.logger.log(result["result"])
-            signal_block_emit(self.refresh_signal)
-        except Exception as e:
-            if not self.force_evolution:
-                raise e
-            self.usersettings.logger.log("进化异常中断，选择暂停1秒重试。异常种类：" + type(e).__name__)
-            sleep(1)
+            plant_id_list = list(evolution_plant_id_set)
+            futures = [
+                self.pool.submit(self._evolution, plant_id)
+                for plant_id in plant_id_list
+            ]
+            for i, result in enumerate(futures):
+                if self.interrupt_event.is_set():
+                    break
+                try:
+                    result.result()
+                    evolution_plant_id_set.remove(plant_id_list[i])
+                except Exception as e:
+                    plant = self.usersettings.repo.get_plant(plant_id_list[i])
+                    if plant is None:
+                        self.usersettings.logger.log(
+                            "进化植物不存在并出现异常，异常种类：{}".format(type(e).__name__)
+                        )
+                    else:
+                        self.usersettings.logger.log(
+                            "进化植物{}出现异常，异常种类：{}".format(
+                                plant.name(self.usersettings.lib), type(e).__name__
+                            )
+                        )
             self.usersettings.repo.refresh_repository()
+            signal_block_emit(self.refresh_signal)
+            if self.interrupt_event.is_set() or len(evolution_plant_id_set) == 0:
+                return
 
     def run(self):
         try:
+            self.pool = concurrent.futures.ThreadPoolExecutor(
+                max_workers=self.pool_size
+            )
             self.evolution()
-        except Exception as e:
-            self.usersettings.logger.log("进化异常中断，异常种类：" + type(e).__name__)
         finally:
             self.rest_event.set()
             self.evolution_finish_signal.emit()

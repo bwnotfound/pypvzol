@@ -174,7 +174,7 @@ class CompoundScheme:
             result = self.heritage_man.exchange_one(id1, id2, book_id, num)
         except Exception as e:
             if "amf返回结果为空" in str(e):
-                msg = "可能由以下原因引起：参与复合的植物不见了、传承增强卷轴不够、传承书不够"
+                msg = "可能由以下原因引起：参与复合的植物不见了、植物等级不足100级、传承增强卷轴不够、传承书不够"
                 self.logger.log("复合异常，已跳出复合。{}".format(msg))
                 return False
             self.repo.refresh_repository()

@@ -31,21 +31,15 @@ class Plant:
         except:
             self.quality_index = -1
             logging.warning(f"未知的品质{self.quality_str}")
-        self.skills = []
+        self.skill_id_list = []
         for item in root.find("sk").findall("item"):
-            self.skills.append(
-                {
-                    "id": int(item.get("id")),
-                    "name": item.get("na"),
-                }
+            self.skill_id_list.append(
+                int(item.get("id")),
             )
-        self.special_skill = None
+        self.special_skill_id = None
         item = root.find("ssk").find("item")
         if item is not None:
-            self.special_skill = {
-                "id": int(item.get("id")),
-                "name": item.get("name"),
-            }
+            self.special_skill_id = int(item.get("id"))
 
     def width(self, lib: Library):
         assert hasattr(self, "_width") or lib is not None
@@ -183,6 +177,9 @@ class Repository:
         return True
 
     def use_item(self, tool_id, amount, lib: Library):
+        if isinstance(amount, str):
+            amount = int(amount)
+        amount = min(amount, 99999)
         body = [float(tool_id), float(amount)]
         response = self.wr.amf_post_retry(body, "api.tool.useOf", "/pvz/amf/", "使用物品")
         if response.status == 0:

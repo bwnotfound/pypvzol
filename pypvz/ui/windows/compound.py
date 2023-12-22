@@ -218,6 +218,9 @@ class AutoCompoundWindow(QMainWindow):
         illustration_btn = QPushButton("查看原理")
         illustration_btn.clicked.connect(self.illustration_btn_clicked)
         widget6_layout.addWidget(illustration_btn)
+        parameter_recommend_btn = QPushButton("参数推荐")
+        parameter_recommend_btn.clicked.connect(self.parameter_recommend_btn_clicked)
+        widget6_layout.addWidget(parameter_recommend_btn)
 
         widget6_layout.addWidget(QLabel("以下是部分合成信息"))
         self.information_text_box = QPlainTextEdit()
@@ -234,6 +237,9 @@ class AutoCompoundWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+    
+    def parameter_recommend_btn_clicked(self):
+        ImageWindow("data/image/参数推荐.png", self).show()
 
     def set_chosen_attribute(self, chosen_attribute):
         self.chosen_attribute = chosen_attribute
@@ -318,7 +324,7 @@ class AutoCompoundWindow(QMainWindow):
         )
 
     def illustration_btn_clicked(self):
-        ImageWindow("data/复合通用方案.png", self).show()
+        ImageWindow("data/image/复合通用方案.png", self).show()
 
     def format_plant_info(self, plant, chosen_attribute=None):
         if isinstance(plant, str):

@@ -1,4 +1,5 @@
 from os import path
+from threading import Event
 import re
 import os
 from typing import Literal
@@ -140,7 +141,7 @@ class PlantEvolution:
     def evolution_info(self, pid):
         pass
 
-    def plant_evolution_all(self, path_index, id):
+    def plant_evolution_all(self, path_index, id, interrupt_event: Event = None):
         assert (
             path_index < len(self.saved_evolution_paths)
             and path_index >= 0
@@ -159,6 +160,11 @@ class PlantEvolution:
                 "result": f"在第{path_index+1}条路线中没有找到植物：{plant.name(self.lib)}",
             }
         for j in range(i, len(saved_path) - 1):
+            if interrupt_event is not None and interrupt_event.is_set():
+                return {
+                    "success": False,
+                    "result": f"在第{path_index+1}个节点被中断",
+                }
             result = self.evolution(id, saved_path[j])
             if not result["success"]:
                 return result

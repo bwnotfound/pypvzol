@@ -283,6 +283,7 @@ class FubenMan:
             )
             if len(recover_list) == 0:
                 return True
+            recover_list = [plant.id for plant in recover_list]
             success_num, fail_num = self.recover_man.recover_list(
                 recover_list, choice=self.recover_hp_choice
             )
@@ -730,12 +731,21 @@ class ServerBattleMan:
                     )
                     return
                 cnt, max_retry = 0, 10
+                empty_cnt, max_empty_retry = 0, 3
                 while cnt < max_retry:
                     try:
                         result = self.serverbattle.challenge()
                         if result is None:
-                            self.logger.log("跨服挑战次数已用完。")
-                            return
+                            if empty_cnt >= max_empty_retry:
+                                self.logger.log("跨服挑战异常，可能是次数用完了。退出跨服挑战。")
+                                return
+                            self.logger.log(
+                                "跨服挑战异常，可能是次数用完了。重新尝试，最多尝试{}次".format(
+                                    max_empty_retry - empty_cnt
+                                )
+                            )
+                            empty_cnt += 1
+                            continue
                         break
                     except Exception as e:
                         self.logger.log(

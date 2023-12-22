@@ -45,7 +45,7 @@ class GardenChallengeSettingWindow(QMainWindow):
         widget3 = QWidget()
         widget3.setMinimumWidth(int(self.width() * 0.16))
         layout3 = QVBoxLayout()
-        self.set_plant_team_btn = QPushButton("设置为出战植物")
+        self.set_plant_team_btn = QPushButton("添加出战植物")
         self.set_plant_team_btn.clicked.connect(self.set_plant_team_btn_clicked)
         layout3.addWidget(self.set_plant_team_btn)
         widget3.setLayout(layout3)
@@ -72,11 +72,16 @@ class GardenChallengeSettingWindow(QMainWindow):
             plant = int(plant)
         if isinstance(plant, int):
             plant = self.usersettings.repo.get_plant(plant)
-        return "{}({})[{}]".format(
+        msg = "{}({})[{}]".format(
             plant.name(self.usersettings.lib),
             plant.grade,
             plant.quality_str,
+            self.usersettings.lib.get_spec_skill(plant.special_skill_id),
         )
+        if plant.special_skill_id is not None:
+            spec_skill = self.usersettings.lib.get_spec_skill(plant.special_skill_id)
+            msg += " 专属:{}({}级)".format(spec_skill["name"], spec_skill['grade'])
+        return msg
 
     def refresh_plant_list(self):
         self.plant_list.clear()
@@ -98,11 +103,12 @@ class GardenChallengeSettingWindow(QMainWindow):
             self.team_list_widget.addItem(item)
 
     def set_plant_team_btn_clicked(self):
-        team = [
-            item.data(Qt.ItemDataRole.UserRole)
-            for item in self.plant_list.selectedItems()
-        ]
-        self.usersettings.garden_man.team = team
+        self.usersettings.garden_man.team.extend(
+            [
+                item.data(Qt.ItemDataRole.UserRole)
+                for item in self.plant_list.selectedItems()
+            ]
+        )
         self.refresh_team_list()
         self.refresh_plant_list()
 
