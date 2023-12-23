@@ -237,7 +237,7 @@ class AutoCompoundWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-    
+
     def parameter_recommend_btn_clicked(self):
         ImageWindow("data/image/参数推荐.png", self).show()
 
@@ -304,7 +304,7 @@ class AutoCompoundWindow(QMainWindow):
         for scheme in selected_scheme:
             scheme.enabled = False
         self.refresh_scheme_list()
-    
+
     def auto_set_plant_btn_clicked(self):
         self.auto_compound_man.auto_set_source_plant()
         self.refresh_all()
@@ -696,6 +696,7 @@ class CompoundThread(Thread):
         interrupt_event: Event,
         refresh_all_signal,
         rest_event: Event,
+        reach_target_event: Event = None,
     ):
         super().__init__()
         self.auto_compound_man = auto_compound_man
@@ -703,11 +704,14 @@ class CompoundThread(Thread):
         self.interrupt_event = interrupt_event
         self.refresh_all_signal = refresh_all_signal
         self.rest_event = rest_event
+        self.reach_target_event = reach_target_event
 
     def run(self):
         try:
             self.auto_compound_man.compound_loop(
-                self.interrupt_event, self.refresh_all_signal
+                self.interrupt_event,
+                self.refresh_all_signal,
+                reach_target_event=self.reach_target_event,
             )
         finally:
             if self.compound_finish_signal is not None:

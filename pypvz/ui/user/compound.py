@@ -200,9 +200,7 @@ class CompoundScheme:
         if not success:
             self.logger.log(f'方案"{self.name}"在复制植物时出现传承错误，中断复合')
             return None
-        plant_id = self.synthesis_plant(
-            self.source_plant_id, self.n1, refresh_signal
-        )
+        plant_id = self.synthesis_plant(self.source_plant_id, self.n1, refresh_signal)
         if plant_id is None:
             return None
         self.source_plant_id = plant_id
@@ -530,9 +528,6 @@ class AutoCompoundMan:
         return result["success"]
 
     def compound_one_cycle(self, refresh_signal):
-        self.check_data()
-        if not self.need_compound():
-            return False
         result = self.one_cycle_consume_check()
         enabled_scheme_list = [scheme for scheme in self.scheme_list if scheme.enabled]
         if len(result) > 0:
@@ -589,17 +584,20 @@ class AutoCompoundMan:
                 return False
         return True
 
-    def compound_loop(self, interrupt_event: Event, refresh_signal):
-        is_first = True
+    def compound_loop(
+        self, interrupt_event: Event, refresh_signal, reach_target_event: Event = None
+    ):
         while True:
             if interrupt_event.is_set():
                 self.logger.log("手动中止复合")
                 return
-            if not is_first:
-                signal_block_emit(refresh_signal)
-            if is_first:
-                is_first = False
+            self.check_data()
+            if not self.need_compound():
+                if reach_target_event is not None:
+                    reach_target_event.set()
+                return
             continue_loop = self.compound_one_cycle(refresh_signal)
+            signal_block_emit(refresh_signal)
             if not continue_loop:
                 break
         self.logger.log("复合完成")

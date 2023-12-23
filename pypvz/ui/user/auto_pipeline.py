@@ -386,6 +386,7 @@ class AutoComponent(Pipeline):
             self.auto_component_man.auto_compound_pool_id.add(plant.id)
         from ..windows.compound import CompoundThread
 
+        reach_target_event = Event()
         self.rest_event.clear()
         self.component_theard = CompoundThread(
             self.auto_component_man,
@@ -393,6 +394,7 @@ class AutoComponent(Pipeline):
             self.interrupt_event,
             None,
             self.rest_event,
+            reach_target_event=reach_target_event,
         )
         self.component_theard.start()
         while stop_channel.qsize() == 0 and not self.rest_event.is_set():
@@ -425,10 +427,16 @@ class AutoComponent(Pipeline):
                 "info": "复合失败，原因：复合池中仍然有植物",
             }
         else:
-            result = {
-                "success": True,
-                "info": "复合成功",
-            }
+            if reach_target_event.is_set():
+                result = {
+                    "success": False,
+                    "info": "复合成功，达到目标",
+                }
+            else:
+                result = {
+                    "success": True,
+                    "info": "复合成功",
+                }
         self.auto_component_man.auto_compound_pool_id.clear()
         return result
 
