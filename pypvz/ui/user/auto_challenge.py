@@ -71,6 +71,8 @@ class Challenge4Level:
 
         self.main_plant_recover = False
         self.main_plant_recover_rate = 0.1
+        
+        self.has_challenged = False
 
     def add_cave(
         self,
@@ -483,6 +485,7 @@ class Challenge4Level:
                             return
                         else:
                             message = message + "成功. "
+                            self.has_challenged = True
                             break
                     except Exception as e:
                         if isinstance(e, RuntimeError):
@@ -567,6 +570,7 @@ class Challenge4Level:
                             return
                         else:
                             message = message + "成功. "
+                            self.has_challenged = True
                             break
                     except Exception as e:
                         if isinstance(e, RuntimeError):
@@ -643,7 +647,6 @@ class Challenge4Level:
     def auto_challenge(self, stop_channel: Queue):
         # TODO: 显示功能：将process显示，可加速版
         assert self.main_plant_list is not None and self.trash_plant_list is not None
-
         if self.enable_stone:
             self.challenge_stone_fuben(stop_channel)
         if self.cfg.server == "官服":
