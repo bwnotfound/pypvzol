@@ -13,7 +13,7 @@ from ... import (
     WebRequest,
 )
 from ..message import Logger
-from ... import FubenRequest, Serverbattle, Arena
+from ... import FubenRequest, Serverbattle, Arena, Command
 from ...fuben import FubenCave
 from ...utils.recover import RecoverMan
 from ..wrapped import signal_block_emit
@@ -837,3 +837,48 @@ class ArenaMan:
         self.arena.refresh_arena()
         result = self.arena.challenge_first()
         return result
+
+
+class CommandMan:
+    
+    def __init__(self, cfg: Config, logger: Logger):
+        self.cfg = cfg
+        self.logger = logger
+        self.command = Command(cfg)
+        self.command_list = []
+        
+    def start(self, stop_queue: Queue):
+        for command_str in self.command_list:
+            while True:
+                if stop_queue.qsize() > 0:
+                    return
+                result = self.command.send(command_str)
+                if result['success']:
+                    self.logger.log("{}执行成功".format(command_str))
+                else:
+                    if result['error_type'] == 2:
+                        self.logger.log("指令{}有误，请重新设定该指令。".format(command_str))
+                    elif result['error_type'] == 3:
+                        self.logger.log("指令{}执行时发现未稳定通过，请先稳定通过".format(command_str))
+                    elif result['error_type'] == 1:
+                        self.logger.log("指令{}执行至道具异常，认定执行完毕".format(command_str))
+                    break
+    
+    def save(self, save_dir):
+        save_path = os.path.join(save_dir, "command_man")
+        with open(save_path, "wb") as f:
+            pickle.dump(
+                {
+                    "command_list": self.command_list,
+                },
+                f,
+            )
+
+    def load(self, load_dir):
+        load_path = os.path.join(load_dir, "command_man")
+        if os.path.exists(load_path):
+            with open(load_path, "rb") as f:
+                d = pickle.load(f)
+            for k, v in d.items():
+                if hasattr(self, k):
+                    setattr(self, k, v)

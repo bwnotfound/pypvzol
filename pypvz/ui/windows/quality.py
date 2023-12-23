@@ -179,7 +179,7 @@ class UpgradeQualityWindow(QMainWindow):
     def closeEvent(self, event):
         if self.run_thread is not None:
             self.interrupt_event.set()
-            self.rest_event.wait()
+            # self.rest_event.wait()
         return super().closeEvent(event)
 
 

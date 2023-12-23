@@ -27,6 +27,7 @@ from .manager import (
     GardenMan,
     ServerBattleMan,
     ArenaMan,
+    CommandMan,
 )
 from .compound import AutoCompoundMan
 from . import PipelineMan
@@ -86,8 +87,9 @@ class UserSettings:
         self.exit_if_nothing_todo = False
         self.arena_challenge_mode = 0
         self.daily_settings = [True, True, True, True]
-
         self.pipeline_man = PipelineMan(cfg, lib, repo, user, self.logger)
+        self.command_man = CommandMan(cfg, self.logger)
+        self.command_enabled = False
 
     def _start(self, stop_channel: Queue, close_signal):
         self.repo.refresh_repository(self.logger)
@@ -145,6 +147,27 @@ class UserSettings:
                     self.logger.log(f"自动花园挑战失败，异常种类:{type(e).__name__}。跳过自动花园挑战")
                 if stop_channel.qsize() > 0:
                     break
+            if self.arena_enabled:
+                try:
+                    if self.arena_challenge_mode == 0:
+                        self.arena_man.auto_challenge(stop_channel)
+                    elif self.arena_challenge_mode == 1:
+                        while stop_channel.qsize() == 0:
+                            result = self.arena_man.challenge_first()
+                            self.logger.log(result['result'])
+                            if not result['success']:
+                                break
+                except Exception as e:
+                    self.logger.log(f"竞技场挑战失败，异常种类:{type(e).__name__}。跳过竞技场挑战")
+                if stop_channel.qsize() > 0:
+                    break
+            if self.command_enabled:
+                try:
+                    self.command_man.start(stop_channel)
+                except Exception as e:
+                    self.logger.log(f"自动指令执行失败，异常种类:{type(e).__name__}。跳过自动指令")
+                if stop_channel.qsize() > 0:
+                    break
             if self.territory_enabled:
                 try:
                     if self.territory_man.can_challenge():
@@ -170,20 +193,6 @@ class UserSettings:
                     self.fuben_man.auto_challenge(stop_channel)
                 except Exception as e:
                     self.logger.log(f"自动副本挑战失败，异常种类:{type(e).__name__}。跳过自动副本挑战")
-                if stop_channel.qsize() > 0:
-                    break
-            if self.arena_enabled:
-                try:
-                    if self.arena_challenge_mode == 0:
-                        self.arena_man.auto_challenge(stop_channel)
-                    elif self.arena_challenge_mode == 1:
-                        while stop_channel.qsize() == 0:
-                            result = self.arena_man.challenge_first()
-                            self.logger.log(result['result'])
-                            if not result['success']:
-                                break
-                except Exception as e:
-                    self.logger.log(f"竞技场挑战失败，异常种类:{type(e).__name__}。跳过竞技场挑战")
                 if stop_channel.qsize() > 0:
                     break
             if self.challenge4Level_enabled:
@@ -243,6 +252,7 @@ class UserSettings:
                     "exit_if_nothing_todo": self.exit_if_nothing_todo,
                     "arena_challenge_mode": self.arena_challenge_mode,
                     "daily_settings": self.daily_settings,
+                    "command_enabled": self.command_enabled,
                 },
                 f,
             )
@@ -255,6 +265,7 @@ class UserSettings:
         self.garden_man.save(self.save_dir)
         self.pipeline_man.save(self.save_dir)
         self.serverbattle_man.save(self.save_dir)
+        self.command_man.save(self.save_dir)
 
     def load(self):
         self.challenge4Level.load(self.save_dir)
@@ -278,3 +289,4 @@ class UserSettings:
         self.garden_man.load(self.save_dir)
         self.pipeline_man.load(self.save_dir)
         self.serverbattle_man.load(self.save_dir)
+        self.command_man.load(self.save_dir)

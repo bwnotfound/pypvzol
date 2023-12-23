@@ -1,5 +1,6 @@
 from .config import Config
 from .web import WebRequest
+from .command import Command
 from .library import Library
 from .repository import Repository
 from .garden import GardenMan

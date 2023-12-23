@@ -33,6 +33,7 @@ class PipelineSettingWindow(QMainWindow):
         self.usersettings = usersettings
         self.stop_queue = Queue()
         self.rest_event = Event()
+        self.run_thread = None
         self.finish_signal.connect(self.finish_signal_handler)
         self.stop_signal.connect(self.stop_handler)
         self.init_ui()
@@ -182,6 +183,12 @@ class PipelineSettingWindow(QMainWindow):
         self.run_thread = None
         while self.stop_queue.qsize() > 0:
             self.stop_queue.get()
+    
+    def closeEvent(self, event):
+        if self.run_thread is not None:
+            self.stop_queue.put(True)
+            # self.rest_event.wait()
+        super().closeEvent(event)
 
 
 class SchemeWidget(QWidget):

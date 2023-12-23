@@ -244,6 +244,11 @@ class EvolutionPanelWindow(QMainWindow):
         self.usersettings.plant_evolution.remove_path(self.current_evolution_path_index)
         self.refresh_evolution_path_list()
 
+    def closeEvent(self, event):
+        if self.run_thread is not None:
+            self.interrupt_event.set()
+            # self.rest_event.wait()
+        super().closeEvent(event)
 
 class EvolutionPanelThread(QThread):
     def __init__(

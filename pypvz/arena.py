@@ -1,4 +1,4 @@
-from . import Config, WebRequest
+from . import Config, WebRequest, Command
 
 
 class ArenaOpponent:
@@ -12,6 +12,7 @@ class Arena:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.wr = WebRequest(cfg)
+        self.command = Command(cfg)
 
     def refresh_arena(self):
         response = self.wr.amf_post_retry(
@@ -27,7 +28,7 @@ class Arena:
             "/pvz/amf/",
             "挑战竞技场",
             allow_empty=True,
-            except_retry=True
+            except_retry=True,
         )
         if response == None:
             return {
@@ -47,28 +48,6 @@ class Arena:
                 "成功" if response.body["is_winning"] else "失败",
             ),
         }
-    
+
     def batch_challenge(self, num):
-        body = [f"/arena {num}"]
-        response = self.wr.amf_post_retry(
-            body,
-            "api.gift.get",
-            "/pvz/amf/",
-            "批量挑战竞技场",
-        )
-        if response.body['msg'] == "使用成功":
-            return {
-                "success": True,
-            }
-        elif response.body['msg'] == "道具异常":
-            return {
-                "success": False,
-                "error_type": 1,
-                "result": "挑战竞技场出现异常。原因：{}".format(response.body['msg']),
-            }
-        elif "指令有误" in response.body['msg'] :
-            return {
-                "success": False,
-                "error_type": 2,
-                "result": "挑战竞技场出现异常。原因：{}".format(response.body['msg']),
-            }
+        return self.command.send(f"/arena {num}", "批量挑战竞技场")

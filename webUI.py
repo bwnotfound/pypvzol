@@ -55,6 +55,7 @@ from pypvz.ui.windows import (
     DailySettingWindow,
     SimulateWindow,
     AutoUseItemSettingWindow,
+    CommandSettingWindow,
     # GameWindow,
     # run_game_window,
 )
@@ -115,11 +116,11 @@ class SettingWindow(QMainWindow):
 
         fuben_widget = QWidget()
         fuben_layout = QHBoxLayout()
-        self.fuben_checkbox = fuben_checkbox = QCheckBox("副本")
-        fuben_checkbox.setFont(normal_font)
-        fuben_checkbox.setChecked(self.usersettings.fuben_enabled)
-        fuben_checkbox.stateChanged.connect(self.fuben_checkbox_stateChanged)
-        fuben_layout.addWidget(fuben_checkbox)
+        self.fuben_checkbox = QCheckBox("副本")
+        self.fuben_checkbox.setFont(normal_font)
+        self.fuben_checkbox.setChecked(self.usersettings.fuben_enabled)
+        self.fuben_checkbox.stateChanged.connect(self.fuben_checkbox_stateChanged)
+        fuben_layout.addWidget(self.fuben_checkbox)
         fuben_setting_btn = QPushButton("设置")
         fuben_setting_btn.clicked.connect(self.fuben_setting_btn_clicked)
         fuben_layout.addWidget(fuben_setting_btn)
@@ -127,75 +128,97 @@ class SettingWindow(QMainWindow):
         fuben_widget.setLayout(fuben_layout)
         menu_layout.addWidget(fuben_widget, 0, 1)
 
-        shop_enable_widget = QWidget()
-        shop_enable_layout = QHBoxLayout()
-        self.shop_enable_checkbox = shop_enable_checkbox = QCheckBox("商店购买")
-        shop_enable_checkbox.setFont(normal_font)
-        shop_enable_checkbox.setChecked(self.usersettings.shop_enabled)
-        shop_enable_checkbox.stateChanged.connect(
-            self.shop_enable_checkbox_stateChanged
+        command_widget = QWidget()
+        command_layout = QHBoxLayout()
+        self.command_enable_checkbox = QCheckBox("指令")
+        self.command_enable_checkbox.setFont(normal_font)
+        self.command_enable_checkbox.setChecked(self.usersettings.command_enabled)
+        self.command_enable_checkbox.stateChanged.connect(
+            self.command_enable_checkbox_stateChanged
         )
-        shop_enable_layout.addWidget(shop_enable_checkbox)
-        shop_auto_buy_setting_btn = QPushButton("设置")
-        shop_auto_buy_setting_btn.clicked.connect(
-            self.shop_auto_buy_setting_btn_clicked
-        )
-        shop_enable_layout.addWidget(shop_auto_buy_setting_btn)
-        shop_enable_layout.addStretch(1)
-        shop_enable_widget.setLayout(shop_enable_layout)
-        menu_layout.addWidget(shop_enable_widget, 1, 0)
+        command_layout.addWidget(self.command_enable_checkbox)
+        command_setting_btn = QPushButton("设置")
+        command_setting_btn.clicked.connect(self.command_setting_btn_clicked)
+        command_layout.addWidget(command_setting_btn)
+        command_layout.addStretch(1)
+        command_widget.setLayout(command_layout)
+        menu_layout.addWidget(command_widget, 0, 2)
+
+        # shop_enable_widget = QWidget()
+        # shop_enable_layout = QHBoxLayout()
+        # self.shop_enable_checkbox = shop_enable_checkbox = QCheckBox("商店购买")
+        # shop_enable_checkbox.setFont(normal_font)
+        # shop_enable_checkbox.setChecked(self.usersettings.shop_enabled)
+        # shop_enable_checkbox.stateChanged.connect(
+        #     self.shop_enable_checkbox_stateChanged
+        # )
+        # shop_enable_layout.addWidget(shop_enable_checkbox)
+        # shop_auto_buy_setting_btn = QPushButton("设置")
+        # shop_auto_buy_setting_btn.clicked.connect(
+        #     self.shop_auto_buy_setting_btn_clicked
+        # )
+        # shop_enable_layout.addWidget(shop_auto_buy_setting_btn)
+        # shop_enable_layout.addStretch(1)
+        # shop_enable_widget.setLayout(shop_enable_layout)
+        # menu_layout.addWidget(shop_enable_widget, 1, 0)
 
         task_panel = QWidget()
         task_panel_layout = QVBoxLayout()
-        self.task_setting_checkbox = task_setting_checkbox = QCheckBox("自动领取任务")
-        task_setting_checkbox.setFont(normal_font)
-        task_setting_checkbox.setChecked(self.usersettings.task_enabled)
-        task_setting_checkbox.stateChanged.connect(
+        self.task_setting_checkbox = QCheckBox("自动领取任务")
+        self.task_setting_checkbox.setFont(normal_font)
+        self.task_setting_checkbox.setChecked(self.usersettings.task_enabled)
+        self.task_setting_checkbox.stateChanged.connect(
             self.task_setting_checkbox_stateChanged
         )
-        task_panel_layout.addWidget(task_setting_checkbox)
+        task_panel_layout.addWidget(self.task_setting_checkbox)
         task_widget = QWidget()
         task_layout = QHBoxLayout()
 
         main_task_widget = QWidget()
         main_task_layout = QHBoxLayout()
-        self.main_task_checkbox = main_task_checkbox = QCheckBox("主线")
-        main_task_checkbox.setFont(normal_font)
-        main_task_checkbox.setChecked(self.usersettings.enable_list[0])
-        main_task_checkbox.stateChanged.connect(self.main_task_checkbox_stateChanged)
-        main_task_layout.addWidget(main_task_checkbox)
+        self.main_task_checkbox = QCheckBox("主线")
+        self.main_task_checkbox.setFont(normal_font)
+        self.main_task_checkbox.setChecked(self.usersettings.enable_list[0])
+        self.main_task_checkbox.stateChanged.connect(
+            self.main_task_checkbox_stateChanged
+        )
+        main_task_layout.addWidget(self.main_task_checkbox)
         main_task_widget.setLayout(main_task_layout)
         task_layout.addWidget(main_task_widget)
 
         side_task_widget = QWidget()
         side_task_layout = QHBoxLayout()
-        self.side_task_checkbox = side_task_checkbox = QCheckBox("支线")
-        side_task_checkbox.setFont(normal_font)
-        side_task_checkbox.setChecked(self.usersettings.enable_list[1])
-        side_task_checkbox.stateChanged.connect(self.side_task_checkbox_stateChanged)
-        side_task_layout.addWidget(side_task_checkbox)
+        self.side_task_checkbox = QCheckBox("支线")
+        self.side_task_checkbox.setFont(normal_font)
+        self.side_task_checkbox.setChecked(self.usersettings.enable_list[1])
+        self.side_task_checkbox.stateChanged.connect(
+            self.side_task_checkbox_stateChanged
+        )
+        side_task_layout.addWidget(self.side_task_checkbox)
         side_task_widget.setLayout(side_task_layout)
         task_layout.addWidget(side_task_widget)
 
         daily_task_widget = QWidget()
         daily_task_layout = QHBoxLayout()
-        self.daily_task_checkbox = daily_task_checkbox = QCheckBox("日常")
-        daily_task_checkbox.setFont(normal_font)
-        daily_task_checkbox.setChecked(self.usersettings.enable_list[2])
-        daily_task_checkbox.stateChanged.connect(self.daily_task_checkbox_stateChanged)
-        daily_task_layout.addWidget(daily_task_checkbox)
+        self.daily_task_checkbox = QCheckBox("日常")
+        self.daily_task_checkbox.setFont(normal_font)
+        self.daily_task_checkbox.setChecked(self.usersettings.enable_list[2])
+        self.daily_task_checkbox.stateChanged.connect(
+            self.daily_task_checkbox_stateChanged
+        )
+        daily_task_layout.addWidget(self.daily_task_checkbox)
         daily_task_widget.setLayout(daily_task_layout)
         task_layout.addWidget(daily_task_widget)
 
         active_task_widget = QWidget()
         active_task_layout = QHBoxLayout()
-        self.active_task_checkbox = active_task_checkbox = QCheckBox("活动")
-        active_task_checkbox.setFont(normal_font)
-        active_task_checkbox.setChecked(self.usersettings.enable_list[3])
-        active_task_checkbox.stateChanged.connect(
+        self.active_task_checkbox = QCheckBox("活动")
+        self.active_task_checkbox.setFont(normal_font)
+        self.active_task_checkbox.setChecked(self.usersettings.enable_list[3])
+        self.active_task_checkbox.stateChanged.connect(
             self.active_task_checkbox_stateChanged
         )
-        active_task_layout.addWidget(active_task_checkbox)
+        active_task_layout.addWidget(self.active_task_checkbox)
         active_task_widget.setLayout(active_task_layout)
         task_layout.addWidget(active_task_widget)
         task_layout.addStretch(1)
@@ -208,11 +231,11 @@ class SettingWindow(QMainWindow):
 
         arena_widget = QWidget()
         arena_layout = QHBoxLayout()
-        self.arena_checkbox = arena_checkbox = QCheckBox("竞技场")
-        arena_checkbox.setFont(normal_font)
-        arena_checkbox.setChecked(self.usersettings.arena_enabled)
-        arena_checkbox.stateChanged.connect(self.arena_checkbox_stateChanged)
-        arena_layout.addWidget(arena_checkbox)
+        self.arena_checkbox = QCheckBox("竞技场")
+        self.arena_checkbox.setFont(normal_font)
+        self.arena_checkbox.setChecked(self.usersettings.arena_enabled)
+        self.arena_checkbox.stateChanged.connect(self.arena_checkbox_stateChanged)
+        arena_layout.addWidget(self.arena_checkbox)
         self.arena_challenge_mode_combobox = QComboBox()
         self.arena_challenge_mode_combobox.addItem("指令")
         self.arena_challenge_mode_combobox.addItem("手打")
@@ -230,13 +253,13 @@ class SettingWindow(QMainWindow):
         serverbattle_widget = QWidget()
         serverbattle_layout = QVBoxLayout()
         layout1 = QHBoxLayout()
-        self.serverbattle_checkbox = serverbattle_checkbox = QCheckBox("跨服战")
-        serverbattle_checkbox.setFont(normal_font)
-        serverbattle_checkbox.setChecked(self.usersettings.serverbattle_enabled)
-        serverbattle_checkbox.stateChanged.connect(
+        self.serverbattle_checkbox = QCheckBox("跨服战")
+        self.serverbattle_checkbox.setFont(normal_font)
+        self.serverbattle_checkbox.setChecked(self.usersettings.serverbattle_enabled)
+        self.serverbattle_checkbox.stateChanged.connect(
             self.serverbattle_checkbox_stateChanged
         )
-        layout1.addWidget(serverbattle_checkbox)
+        layout1.addWidget(self.serverbattle_checkbox)
         serverbattle_layout.addLayout(layout1)
         layout2 = QHBoxLayout()
         layout2.addWidget(QLabel("跨服次数保存数量:"))
@@ -255,11 +278,11 @@ class SettingWindow(QMainWindow):
 
         daily_widget = QWidget()
         daily_layout = QHBoxLayout()
-        self.daily_checkbox = daily_checkbox = QCheckBox("每日日常")
-        daily_checkbox.setFont(normal_font)
-        daily_checkbox.setChecked(self.usersettings.daily_enabled)
-        daily_checkbox.stateChanged.connect(self.daily_checkbox_stateChanged)
-        daily_layout.addWidget(daily_checkbox)
+        self.daily_checkbox = QCheckBox("每日日常")
+        self.daily_checkbox.setFont(normal_font)
+        self.daily_checkbox.setChecked(self.usersettings.daily_enabled)
+        self.daily_checkbox.stateChanged.connect(self.daily_checkbox_stateChanged)
+        daily_layout.addWidget(self.daily_checkbox)
         daily_setting_btn = QPushButton("设置")
         daily_setting_btn.clicked.connect(self.daily_setting_btn_clicked)
         daily_layout.addWidget(daily_setting_btn)
@@ -268,11 +291,13 @@ class SettingWindow(QMainWindow):
 
         territory_widget = QWidget()
         territory_layout = QHBoxLayout()
-        self.territory_checkbox = territory_checkbox = QCheckBox("领地")
-        territory_checkbox.setFont(normal_font)
-        territory_checkbox.setChecked(self.usersettings.territory_enabled)
-        territory_checkbox.stateChanged.connect(self.territory_checkbox_stateChanged)
-        territory_layout.addWidget(territory_checkbox)
+        self.territory_checkbox = QCheckBox("领地")
+        self.territory_checkbox.setFont(normal_font)
+        self.territory_checkbox.setChecked(self.usersettings.territory_enabled)
+        self.territory_checkbox.stateChanged.connect(
+            self.territory_checkbox_stateChanged
+        )
+        territory_layout.addWidget(self.territory_checkbox)
 
         self.territory_setting_btn = QPushButton("设置")
         self.territory_setting_btn.clicked.connect(self.territory_setting_btn_clicked)
@@ -289,11 +314,11 @@ class SettingWindow(QMainWindow):
         # menu_layout.addWidget(self.garden_checkbox, 5, 1)
         garden_widget = QWidget()
         garden_layout = QHBoxLayout()
-        self.garden_checkbox = garden_checkbox = QCheckBox("自动花园boss")
-        garden_checkbox.setFont(normal_font)
-        garden_checkbox.setChecked(self.usersettings.garden_enabled)
-        garden_checkbox.stateChanged.connect(self.garden_checkbox_stateChanged)
-        garden_layout.addWidget(garden_checkbox)
+        self.garden_checkbox = QCheckBox("自动花园boss")
+        self.garden_checkbox.setFont(normal_font)
+        self.garden_checkbox.setChecked(self.usersettings.garden_enabled)
+        self.garden_checkbox.stateChanged.connect(self.garden_checkbox_stateChanged)
+        garden_layout.addWidget(self.garden_checkbox)
         setting_btn = QPushButton("设置")
         setting_btn.clicked.connect(self.garden_setting_btn_clicked)
         garden_layout.addWidget(setting_btn)
@@ -316,28 +341,28 @@ class SettingWindow(QMainWindow):
         max_timeout_widget = QWidget()
         max_timeout_layout = QHBoxLayout()
         max_timeout_layout.addWidget(QLabel("请求最大超时时间(秒):"))
-        self.max_timeout_input_box = max_timeout_input_box = QSpinBox()
-        max_timeout_input_box.setMinimum(1)
-        max_timeout_input_box.setMaximum(60)
-        max_timeout_input_box.setValue(self.usersettings.cfg.timeout)
-        max_timeout_input_box.valueChanged.connect(
+        self.max_timeout_input_box = QSpinBox()
+        self.max_timeout_input_box.setMinimum(1)
+        self.max_timeout_input_box.setMaximum(60)
+        self.max_timeout_input_box.setValue(self.usersettings.cfg.timeout)
+        self.max_timeout_input_box.valueChanged.connect(
             self.max_timeout_input_box_valueChanged
         )
-        max_timeout_layout.addWidget(max_timeout_input_box)
+        max_timeout_layout.addWidget(self.max_timeout_input_box)
         max_timeout_widget.setLayout(max_timeout_layout)
         menu_layout.addWidget(max_timeout_widget, 7, 0)
 
         millsecond_delay_widget = QWidget()
         millsecond_delay_layout = QHBoxLayout()
         millsecond_delay_layout.addWidget(QLabel("请求间隔(毫秒):"))
-        self.millsecond_delay_input_box = millsecond_delay_input_box = QSpinBox()
-        millsecond_delay_input_box.setMinimum(0)
-        millsecond_delay_input_box.setMaximum(60 * 1000)
-        millsecond_delay_input_box.setValue(self.usersettings.cfg.millsecond_delay)
-        millsecond_delay_input_box.valueChanged.connect(
+        self.millsecond_delay_input_box = QSpinBox()
+        self.millsecond_delay_input_box.setMinimum(0)
+        self.millsecond_delay_input_box.setMaximum(60 * 1000)
+        self.millsecond_delay_input_box.setValue(self.usersettings.cfg.millsecond_delay)
+        self.millsecond_delay_input_box.valueChanged.connect(
             self.millsecond_delay_input_box_valueChanged
         )
-        millsecond_delay_layout.addWidget(millsecond_delay_input_box)
+        millsecond_delay_layout.addWidget(self.millsecond_delay_input_box)
         millsecond_delay_widget.setLayout(millsecond_delay_layout)
         menu_layout.addWidget(millsecond_delay_widget, 8, 0)
 
@@ -356,6 +381,9 @@ class SettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+    
+    def command_enable_checkbox_stateChanged(self):
+        self.usersettings.command_enabled = self.command_enable_checkbox.isChecked()
 
     def arena_challenge_mode_combobox_index_changed(self):
         self.usersettings.arena_challenge_mode = (
@@ -371,6 +399,10 @@ class SettingWindow(QMainWindow):
         self.usersettings.serverbattle_man.rest_challenge_num_limit = int(
             self.serverbattle_rest_num_inputbox.text()
         )
+    
+    def command_setting_btn_clicked(self):
+        self.command_setting_window = CommandSettingWindow(self.usersettings, parent=self)
+        self.command_setting_window.show()
 
     def daily_setting_btn_clicked(self):
         self.daily_setting_window = DailySettingWindow(self.usersettings, self)
@@ -509,7 +541,7 @@ class FunctionPanelWindow(QMainWindow):
         menu_layout = QGridLayout()
         menu_layout.setHorizontalSpacing(150)
         menu_layout.setVerticalSpacing(60)
-        
+
         self.auto_use_item_setting_btn = QPushButton("道具面板")
         self.auto_use_item_setting_btn.clicked.connect(
             self.auto_use_item_setting_btn_clicked
@@ -527,7 +559,7 @@ class FunctionPanelWindow(QMainWindow):
         auto_synthesis_btn = QPushButton("自动合成面板")
         auto_synthesis_btn.clicked.connect(self.auto_synthesis_btn_clicked)
         menu_layout.addWidget(auto_synthesis_btn, 2, 1)
-        
+
         repository_tool_record_btn = QPushButton("仓库物品记录面板")
         repository_tool_record_btn.clicked.connect(
             self.repository_tool_record_btn_clicked

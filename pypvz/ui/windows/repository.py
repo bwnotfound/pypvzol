@@ -35,6 +35,7 @@ class AutoUseItemSettingWindow(QMainWindow):
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
         self.usersettings = usersettings
+        self.run_thread = None
         self.refresh_all_signal.connect(self.refresh_all)
         self.use_item_finish_signal.connect(self.use_item_finished)
         self.use_item_stop_signal.connect(self.use_item_stoped)

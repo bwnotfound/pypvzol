@@ -12,4 +12,5 @@ from .auto_challenge import Challenge4levelSettingWindow
 from .daily import DailySettingWindow
 from .simulate import SimulateWindow
 from .repository import AutoUseItemSettingWindow
+from .command import CommandSettingWindow
 # from .flash_web import GameWindow, run_game_window
