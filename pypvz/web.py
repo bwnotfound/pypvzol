@@ -14,7 +14,7 @@ from pyamf import remoting, AMF3
 from .config import Config
 
 proxies = {"http": None, "https": None}
-proxies = None
+# proxies = None
 
 
 class TimeCounter(object):

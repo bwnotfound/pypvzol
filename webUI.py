@@ -206,25 +206,6 @@ class SettingWindow(QMainWindow):
 
         menu_layout.addWidget(task_panel, 2, 0)
 
-        auto_use_item_widget = QWidget()
-        auto_use_item_layout = QHBoxLayout()
-        self.auto_use_item_checkbox = auto_use_item_checkbox = QCheckBox("自动使用道具")
-        auto_use_item_checkbox.setFont(normal_font)
-        auto_use_item_checkbox.setChecked(self.usersettings.auto_use_item_enabled)
-        auto_use_item_checkbox.stateChanged.connect(
-            self.auto_use_item_checkbox_stateChanged
-        )
-        auto_use_item_layout.addWidget(auto_use_item_checkbox)
-
-        self.auto_use_item_setting_btn = auto_use_item_setting_btn = QPushButton("道具面板")
-        auto_use_item_setting_btn.clicked.connect(
-            self.auto_use_item_setting_btn_clicked
-        )
-        auto_use_item_layout.addWidget(auto_use_item_setting_btn)
-        auto_use_item_layout.addStretch(1)
-        auto_use_item_widget.setLayout(auto_use_item_layout)
-        menu_layout.addWidget(auto_use_item_widget, 3, 0)
-
         arena_widget = QWidget()
         arena_layout = QHBoxLayout()
         self.arena_checkbox = arena_checkbox = QCheckBox("竞技场")
@@ -488,12 +469,6 @@ class SettingWindow(QMainWindow):
         )
         self.challenge4level_setting_window.show()
 
-    def auto_use_item_setting_btn_clicked(self):
-        self.auto_use_item_setting_window = AutoUseItemSettingWindow(
-            self.usersettings, parent=self
-        )
-        self.auto_use_item_setting_window.show()
-
     def closeEvent(self, a0) -> None:
         self.usersettings.save()
         return super().closeEvent(a0)
@@ -532,50 +507,64 @@ class FunctionPanelWindow(QMainWindow):
 
         menu_widget = QWidget()
         menu_layout = QGridLayout()
+        menu_layout.setHorizontalSpacing(150)
+        menu_layout.setVerticalSpacing(60)
+        
+        self.auto_use_item_setting_btn = QPushButton("道具面板")
+        self.auto_use_item_setting_btn.clicked.connect(
+            self.auto_use_item_setting_btn_clicked
+        )
+        menu_layout.addWidget(self.auto_use_item_setting_btn, 0, 0)
 
         evolution_panel_btn = QPushButton("进化路线面板")
         evolution_panel_btn.clicked.connect(self.evolution_panel_btn_clicked)
-        menu_layout.addWidget(evolution_panel_btn, 0, 0)
+        menu_layout.addWidget(evolution_panel_btn, 0, 1)
 
         upgrade_quality_btn = QPushButton("升品面板")
         upgrade_quality_btn.clicked.connect(self.upgrade_quality_btn_clicked)
-        menu_layout.addWidget(upgrade_quality_btn, 1, 0)
+        menu_layout.addWidget(upgrade_quality_btn, 1, 1)
 
         auto_synthesis_btn = QPushButton("自动合成面板")
         auto_synthesis_btn.clicked.connect(self.auto_synthesis_btn_clicked)
-        menu_layout.addWidget(auto_synthesis_btn, 2, 0)
-
-        heritage_btn = QPushButton("传承面板")
-        heritage_btn.clicked.connect(self.heritage_btn_clicked)
-        menu_layout.addWidget(heritage_btn, 3, 0)
-
-        compound_btn = QPushButton("自动复合面板")
-        compound_btn.clicked.connect(self.compound_btn_clicked)
-        menu_layout.addWidget(compound_btn, 4, 0)
-
-        auto_pipeline_btn = QPushButton("全自动面板")
-        auto_pipeline_btn.clicked.connect(self.auto_pipeline_btn_clicked)
-        menu_layout.addWidget(auto_pipeline_btn, 5, 0)
-
-        plant_relative_btn = QPushButton("植物相关面板")
-        plant_relative_btn.clicked.connect(self.plant_relative_btn_clicked)
-        menu_layout.addWidget(plant_relative_btn, 6, 0)
-
+        menu_layout.addWidget(auto_synthesis_btn, 2, 1)
+        
         repository_tool_record_btn = QPushButton("仓库物品记录面板")
         repository_tool_record_btn.clicked.connect(
             self.repository_tool_record_btn_clicked
         )
-        menu_layout.addWidget(repository_tool_record_btn, 7, 0)
+        menu_layout.addWidget(repository_tool_record_btn, 1, 0)
+
+        heritage_btn = QPushButton("传承面板")
+        heritage_btn.clicked.connect(self.heritage_btn_clicked)
+        menu_layout.addWidget(heritage_btn, 2, 0)
+
+        compound_btn = QPushButton("自动复合面板")
+        compound_btn.clicked.connect(self.compound_btn_clicked)
+        menu_layout.addWidget(compound_btn, 3, 1)
+
+        auto_pipeline_btn = QPushButton("全自动面板")
+        auto_pipeline_btn.clicked.connect(self.auto_pipeline_btn_clicked)
+        menu_layout.addWidget(auto_pipeline_btn, 4, 1)
+
+        plant_relative_btn = QPushButton("植物相关面板")
+        plant_relative_btn.clicked.connect(self.plant_relative_btn_clicked)
+        menu_layout.addWidget(plant_relative_btn, 3, 0)
 
         simulate_btn = QPushButton("模拟面板")
         simulate_btn.clicked.connect(self.simulate_btn_clicked)
-        menu_layout.addWidget(simulate_btn, 8, 0)
+        menu_layout.addWidget(simulate_btn, 4, 0)
 
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def auto_use_item_setting_btn_clicked(self):
+        self.auto_use_item_setting_window = AutoUseItemSettingWindow(
+            self.usersettings, parent=self
+        )
+        self.auto_use_item_setting_window.show()
 
     def simulate_btn_clicked(self):
         self.simulate_window = SimulateWindow(parent=self)

@@ -13,7 +13,6 @@ from ... import (
     Library,
     User,
     Task,
-    Arena,
     HeritageMan,
 )
 from ..message import IOLogger
@@ -65,8 +64,6 @@ class UserSettings:
         self.task = Task(cfg)
         self.enable_list = [False for _ in range(4)]
         self.task_enabled = False
-        self.auto_use_item_enabled = False
-        self.auto_use_item_list = []
         self.garden_cave_list = []
         self.rest_time = 0
         self.arena_enabled = False
@@ -109,13 +106,6 @@ class UserSettings:
             #         self.logger.log(f"购买失败，异常种类:{type(e).__name__}。跳过购买")
             #     if stop_channel.qsize() > 0:
             #         break
-            if self.auto_use_item_enabled:
-                try:
-                    self.auto_use_item(stop_channel)
-                except Exception as e:
-                    self.logger.log(f"自动使用道具失败，异常种类:{type(e).__name__}。跳过自动使用道具")
-                if stop_channel.qsize() > 0:
-                    break
             if self.daily_enabled:
                 try:
                     if self.daily_settings[0]:
@@ -223,34 +213,6 @@ class UserSettings:
             )
             self.start_thread.start()
 
-    def auto_use_item(self, stop_channel: Queue):
-        self.repo.refresh_repository(logger=self.logger)
-        for tool_id in self.auto_use_item_list:
-            if stop_channel.qsize() > 0:
-                break
-            while True:
-                skip = False
-                repo_tool = self.repo.get_tool(tool_id)
-                if repo_tool is None:
-                    break
-                tool_type = self.lib.get_tool_by_id(tool_id).type
-                if tool_type == 3:
-                    amount = repo_tool['amount']
-                    while amount > 0:
-                        result = self.repo.open_box(tool_id, amount, self.lib)
-                        self.logger.log(result['result'])
-                        if not result["success"]:
-                            break
-                        amount -= result["open_amount"]
-                    else:
-                        skip = True
-                else:
-                    result = self.repo.use_item(tool_id, amount, self.lib)
-                    self.logger.log(result['result'])
-                    skip = True
-                if skip:
-                    break
-
     def save(self):
         self.challenge4Level.save(self.save_dir)
         save_path = os.path.join(self.save_dir, "usersettings_state")
@@ -260,7 +222,6 @@ class UserSettings:
                     "challenge4Level_enabled": self.challenge4Level_enabled,
                     "shop_enabled": self.shop_enabled,
                     "shop_auto_buy_dict": self.shop_auto_buy_dict,
-                    "auto_use_item_list": self.auto_use_item_list,
                     "garden_cave_list": self.garden_cave_list,
                     "enable_list": self.enable_list,
                     "rest_time": self.rest_time,
@@ -277,7 +238,7 @@ class UserSettings:
                     "garden_enabled": self.garden_enabled,
                     "exit_if_nothing_todo": self.exit_if_nothing_todo,
                     "arena_challenge_mode": self.arena_challenge_mode,
-                    "daily_settings" : self.daily_settings,
+                    "daily_settings": self.daily_settings,
                 },
                 f,
             )

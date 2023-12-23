@@ -1,8 +1,6 @@
 import logging
 import concurrent.futures
 from threading import Event, Thread
-from queue import Queue
-from copy import deepcopy
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -12,13 +10,10 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QTabWidget,
-    QPlainTextEdit,
     QComboBox,
-    QCheckBox,
     QApplication,
     QSpinBox,
 )
-from PyQt6.QtGui import QPixmap
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -26,13 +21,9 @@ from ...repository import Repository
 from ...library import Library
 from ..wrapped import QLabel
 from ..user import UserSettings
-from ...upgrade import SkillStoneMan
-from ...utils.common import format_number
-from ...repository import Plant
 from ..message import Logger
-from ..user.auto_challenge import Challenge4Level
 
-from ... import Config, Library, User
+from ... import Library
 from ..wrapped import signal_block_emit, WaitEventThread
 
 
