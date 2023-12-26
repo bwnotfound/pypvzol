@@ -200,7 +200,10 @@ class UserSettings:
                     while True:
                         self.challenge4Level.has_challenged = False
                         self.challenge4Level.auto_challenge(stop_channel)
-                        if not self.challenge4Level.has_challenged:
+                        if (
+                            not self.challenge4Level.has_challenged
+                            or stop_channel.qsize() > 0
+                        ):
                             break
                 except Exception as e:
                     self.logger.log(f"自动挑战失败，异常种类:{type(e).__name__}。跳过自动挑战")

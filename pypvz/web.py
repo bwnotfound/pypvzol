@@ -335,7 +335,7 @@ class WebRequest:
                         self.cfg.sleep_freq(3)
                         continue
                     if "服务器更新" in text:
-                        warning_msg = "请求{}的时候服务器频繁，选择等待10秒后重试。最多再等待{}次".format(
+                        warning_msg = "请求{}的时候服务器更新，选择等待10秒后重试。最多再等待{}次".format(
                             warning_msg, max_retry - cnt
                         )
                         if logger is not None:
@@ -348,6 +348,16 @@ class WebRequest:
                     pass
                 break
             except Exception as e:
+                if "429" in str(e):
+                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试。最多再等待{}次。异常类型: {}".format(
+                        msg, max_retry - cnt, type(e).__name__
+                    )
+                    if logger is not None:
+                        logger.log(warning_msg)
+                    else:
+                        logging.warning(warning_msg)
+                    self.cfg.sleep_freq(10)
+                    continue
                 if except_retry:
                     warning_msg = "重新尝试请求{}，选择等待1秒后重试。最多再等待{}次。异常类型: {}".format(
                         msg, max_retry - cnt, type(e).__name__
@@ -443,7 +453,7 @@ class WebRequest:
                         self.cfg.sleep_freq(3)
                         continue
                     if "更新" in response.body.description:
-                        warning_msg = "{}的时候服务器频繁，选择等待10秒后重试。最多再等待{}次".format(
+                        warning_msg = "{}的时候服务器更新，选择等待10秒后重试。最多再等待{}次".format(
                             msg, max_retry - cnt
                         )
                         if logger is not None:
@@ -454,6 +464,16 @@ class WebRequest:
                         continue
                 break
             except RuntimeError as e:
+                if "429" in str(e):
+                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试。最多再等待{}次。异常类型: {}".format(
+                        msg, max_retry - cnt, type(e).__name__
+                    )
+                    if logger is not None:
+                        logger.log(warning_msg)
+                    else:
+                        logging.warning(warning_msg)
+                    self.cfg.sleep_freq(10)
+                    continue
                 if "amf返回结果为空" in str(e) and allow_empty:
                     return None
                 if except_retry:

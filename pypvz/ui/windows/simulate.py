@@ -39,13 +39,13 @@ class SimulateWindow(QMainWindow):
         layout = QHBoxLayout()
         layout.addWidget(QLabel("满级禁锢数量:"))
         self.simulate_imprisonment_book_choice = QComboBox()
-        self.simulate_imprisonment_book_choice.addItems([str(i) for i in range(0, 11)])
+        self.simulate_imprisonment_book_choice.addItems([str(i) for i in range(0, 16)])
         self.simulate_imprisonment_book_choice.setCurrentIndex(0)
         layout.addWidget(self.simulate_imprisonment_book_choice)
         layout.addWidget(QLabel("炮灰日光等级:"))
         self.simulate_imprisonment_riguang_choice = QComboBox()
         self.simulate_imprisonment_riguang_choice.addItems(
-            [str(i) for i in range(0, 11)]
+            [str(i) for i in range(0, 16)]
         )
         self.simulate_imprisonment_riguang_choice.setCurrentIndex(0)
         layout.addWidget(self.simulate_imprisonment_riguang_choice)
@@ -70,5 +70,5 @@ class SimulateWindow(QMainWindow):
         result = simulate_imprisonment(n, riguang_level)
         self.simulate_imprisonment_result_textbox.clear()
         self.simulate_imprisonment_result_textbox.appendPlainText(
-            f"平均回合数: {int(result)}"
+            f"前提：金龙攻击能够一刀死，场上有n个植物有满级禁锢\n1回合=5箱子\n平均回合数: {int(result)}"
         )
