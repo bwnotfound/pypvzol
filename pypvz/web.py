@@ -336,7 +336,7 @@ class WebRequest:
                         continue
                     if "服务器更新" in text:
                         warning_msg = "请求{}的时候服务器更新，选择等待10秒后重试。最多再等待{}次".format(
-                            warning_msg, max_retry - cnt
+                            msg, max_retry - cnt
                         )
                         if logger is not None:
                             logger.log(warning_msg)
@@ -368,6 +368,7 @@ class WebRequest:
                         logging.warning(warning_msg)
                     sleep(1)
                     continue
+                raise e
         else:
             warning_msg = "尝试请求{}失败，超过最大尝试次数{}次".format(msg, max_retry)
             if logger is not None:

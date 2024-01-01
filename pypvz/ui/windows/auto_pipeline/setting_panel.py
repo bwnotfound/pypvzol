@@ -13,8 +13,8 @@ from ...user.auto_pipeline import UpgradeQuality, OpenBox
 
 
 class OpenBoxWidget(QWidget):
-    def __init__(self, pipeline: OpenBox):
-        super().__init__()
+    def __init__(self, pipeline: OpenBox, parent=None):
+        super().__init__(parent=parent)
         self.pipeline = pipeline
         self.init_ui()
 
@@ -37,8 +37,8 @@ class OpenBoxWidget(QWidget):
 
 
 class UpgradeQualityWidget(QWidget):
-    def __init__(self, pipeline: UpgradeQuality):
-        super().__init__()
+    def __init__(self, pipeline: UpgradeQuality, parent=None):
+        super().__init__(parent=parent)
         self.pipeline = pipeline
         self.init_ui()
 

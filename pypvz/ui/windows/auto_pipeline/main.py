@@ -183,7 +183,7 @@ class PipelineSettingWindow(QMainWindow):
         self.run_thread = None
         while self.stop_queue.qsize() > 0:
             self.stop_queue.get()
-    
+
     def closeEvent(self, event):
         if self.run_thread is not None:
             self.stop_queue.put(True)
@@ -229,7 +229,7 @@ class SchemeWidget(QWidget):
             self.pipeline_scheme.pipeline1,
             self.pipeline_scheme.pipeline1_choice_index,
             self.change_pipeline1_choice_index_signal,
-            self,
+            parent=self,
         )
         self.pipeline1_widget.setMaximumWidth(int(self.width() * 0.25))
         self.main_layout.addWidget(self.pipeline1_widget)
@@ -239,7 +239,7 @@ class SchemeWidget(QWidget):
             self.pipeline_scheme.pipeline2,
             self.pipeline_scheme.pipeline2_choice_index,
             self.change_pipeline2_choice_index_signal,
-            self,
+            parent=self,
         )
         self.pipeline2_widget.setMaximumWidth(int(self.width() * 0.25))
         self.main_layout.addWidget(self.pipeline2_widget)
@@ -249,7 +249,7 @@ class SchemeWidget(QWidget):
             self.pipeline_scheme.pipeline3,
             self.pipeline_scheme.pipeline3_choice_index,
             self.change_pipeline3_choice_index_signal,
-            self,
+            parent=self,
         )
         self.pipeline3_widget.setMaximumWidth(int(self.width() * 0.25))
         self.main_layout.addWidget(self.pipeline3_widget)
@@ -259,7 +259,7 @@ class SchemeWidget(QWidget):
             self.pipeline_scheme.pipeline4,
             self.pipeline_scheme.pipeline4_choice_index,
             self.change_pipeline4_choice_index_signal,
-            self,
+            parent=self,
         )
         self.pipeline4_widget.setMaximumWidth(int(self.width() * 0.25))
         self.main_layout.addWidget(self.pipeline4_widget)
@@ -287,6 +287,7 @@ class PipelineSettingWidget(QWidget):
         parent=None,
     ):
         super().__init__(parent=parent)
+        self.parent_widget = parent
         self.msg = msg
         self.pipeline_list = pipeline_list
         self.pipeline_choice_index = pipeline_choice_index
@@ -332,7 +333,7 @@ class PipelineSettingWidget(QWidget):
         if self.pipeline_list[self.pipeline_choice_index].has_setting_widget():
             setting_widget = self.pipeline_list[
                 self.pipeline_choice_index
-            ].setting_widget()
+            ].setting_widget(parent=self.parent_widget)
             self.pipeline_setting_widget_layout.addWidget(setting_widget)
         if self.pipeline_list[self.pipeline_choice_index].has_setting_window():
             self.pipeline1_setting_btn.setEnabled(True)
@@ -343,7 +344,7 @@ class PipelineSettingWidget(QWidget):
         if self.pipeline_list[self.pipeline_choice_index].has_setting_window():
             self.setting_window = self.pipeline_list[
                 self.pipeline_choice_index
-            ].setting_window()
+            ].setting_window(parent=self.parent_widget)
             self.setting_window.show()
 
     def pipeline_combobox_currentIndexChanged(self):

@@ -450,6 +450,7 @@ class Challenge4Level:
                 cnt, max_retry = 0, 20
                 need_skip = False
                 while cnt < max_retry:
+                    cnt -= 1
                     try:
                         result = self.caveMan.challenge(
                             cave_id, team, difficulty, sc.cave.type
@@ -561,6 +562,7 @@ class Challenge4Level:
                 )
                 cnt, max_retry = 0, 20
                 while cnt < max_retry:
+                    cnt -= 1
                     try:
                         result = self.caveMan.challenge(cave.id, team, difficulty, 4)
                         success, result = result["success"], result["result"]

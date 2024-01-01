@@ -28,11 +28,14 @@ class Pipeline:
     def has_setting_widget(self):
         return False
 
-    def setting_window(self):
+    def setting_window(self, parent=None):
         return None
 
-    def setting_widget(self):
+    def setting_widget(self, parent=None):
         return None
+
+    def check_requirements(self):
+        return []
 
     def serialize(self):
         return {}
@@ -112,11 +115,11 @@ class Purchase(Pipeline):
             "result": purchased_plant_list,
         }
 
-    def setting_window(self):
+    def setting_window(self, parent=None):
         from ..windows import ShopAutoBuySetting
 
         return ShopAutoBuySetting(
-            self.lib, self.shop, self.logger, self.shop_auto_buy_dict
+            self.lib, self.shop, self.logger, self.shop_auto_buy_dict, parent=parent
         )
 
     def has_setting_window(self):
@@ -139,6 +142,23 @@ class OpenBox(Pipeline):
 
     def use_tool(self):
         return
+
+    def check_requirements(self):
+        result = []
+        tool = self.repo.get_tool(self.box_id)
+        if tool is None or tool['amount'] < self.amount:
+            result.append(
+                "使用物品失败，原因：魔神箱需要{}个，实际有{}个".format(
+                    self.amount, (tool['amount'] if tool is not None else 0)
+                )
+            )
+        if len(self.repo.plants) + self.amount > self.repo.organism_grid_amount:
+            result.append(
+                "使用物品失败，原因：植物数量超过上限，需要开箱{}个，但仓库只有{}个空位".format(
+                    self.amount, self.repo.organism_grid_amount - len(self.repo.plants)
+                )
+            )
+        return result
 
     def run(self, stop_channel: Queue):
         tool = self.repo.get_tool(self.box_id)
@@ -208,10 +228,10 @@ class OpenBox(Pipeline):
             "result": plant_list,
         }
 
-    def setting_widget(self):
+    def setting_widget(self, parent=None):
         from ..windows.auto_pipeline.setting_panel import OpenBoxWidget
 
-        return OpenBoxWidget(self)
+        return OpenBoxWidget(self, parent=parent)
 
     def has_setting_widget(self):
         return True
@@ -250,11 +270,17 @@ class AutoChallenge(Pipeline):
                 }
         return {"success": True, "info": "挑战成功", "result": plant_list}
 
-    def setting_window(self):
+    def setting_window(self, parent=None):
         from ..windows import Challenge4levelSettingWindow
 
         return Challenge4levelSettingWindow(
-            self.cfg, self.lib, self.repo, self.user, self.logger, self.challenge4level
+            self.cfg,
+            self.lib,
+            self.repo,
+            self.user,
+            self.logger,
+            self.challenge4level,
+            parent=parent,
         )
 
     def has_setting_window(self):
@@ -289,6 +315,38 @@ class UpgradeQuality(Pipeline):
         self.upgrade_plant_amount = 1
         self.interrupt_event = Event()
         self.rest_event = Event()
+
+    def check_requirements(self):
+        from ...upgrade import quality_name_list
+
+        if self.target_quality_index > quality_name_list.index("魔神"):
+
+            def get_tool(book_name):
+                for tool in self.lib.tools.values():
+                    if tool.name == book_name:
+                        return tool
+
+            quality_book = [
+                get_tool("耀世盛典"),
+                get_tool("上古奇书"),
+                get_tool("永恒天书"),
+                get_tool("太上宝典"),
+                get_tool("混沌宝鉴"),
+                get_tool("无极玉碟"),
+            ]
+            result = []
+            for i in range(self.target_quality_index - quality_name_list.index("魔神")):
+                tool = self.repo.get_tool(quality_book[i].id)
+                if tool is None or tool['amount'] < self.upgrade_plant_amount:
+                    result.append(
+                        "{}数量不足，需要{}个，实际{}个".format(
+                            quality_book[i].name,
+                            self.upgrade_plant_amount,
+                            (tool['amount'] if tool is not None else 0),
+                        )
+                    )
+            return result
+        return []
 
     def run(self, plant_list, stop_channel: Queue):
         if len(plant_list) < self.upgrade_plant_amount:
@@ -345,10 +403,10 @@ class UpgradeQuality(Pipeline):
             "result": plant_list,
         }
 
-    def setting_widget(self):
+    def setting_widget(self, parent=None):
         from ..windows.auto_pipeline.setting_panel import UpgradeQualityWidget
 
-        return UpgradeQualityWidget(self)
+        return UpgradeQualityWidget(self, parent=parent)
 
     def has_setting_widget(self):
         return True
@@ -379,6 +437,14 @@ class AutoComponent(Pipeline):
         self.auto_component_man = AutoCompoundMan(cfg, lib, repo, logger)
         self.interrupt_event = Event()
         self.rest_event = Event()
+
+    def check_requirements(self):
+        self.auto_component_man.check_data(refresh_repo=False)
+        result = self.auto_component_man.one_cycle_consume_check()
+        result = [info for info in result if "品质的植物数量现" not in info]
+        if not self.auto_component_man.need_compound():
+            result.append("复合已经达成目标数值")
+        return result
 
     def run(self, plant_list, stop_channel: Queue):
         self.auto_component_man.auto_compound_pool_id.clear()
@@ -443,11 +509,16 @@ class AutoComponent(Pipeline):
     def has_setting_window(self):
         return True
 
-    def setting_window(self):
+    def setting_window(self, parent=None):
         from ..windows import AutoCompoundWindow
 
         return AutoCompoundWindow(
-            self.cfg, self.lib, self.repo, self.logger, self.auto_component_man
+            self.cfg,
+            self.lib,
+            self.repo,
+            self.logger,
+            self.auto_component_man,
+            parent=parent,
         )
 
     def serialize(self):
@@ -496,6 +567,15 @@ class PipelineScheme:
         self.pipeline4: list[Pipeline] = [AutoComponent(cfg, lib, repo, logger)]
         self.pipeline4_choice_index = 0
 
+    def check_requirements(self):
+        self.repo.refresh_repository(self.logger)
+        result = []
+        result.extend(self.pipeline1[self.pipeline1_choice_index].check_requirements())
+        result.extend(self.pipeline2[self.pipeline2_choice_index].check_requirements())
+        result.extend(self.pipeline3[self.pipeline3_choice_index].check_requirements())
+        result.extend(self.pipeline4[self.pipeline4_choice_index].check_requirements())
+        return result
+
     def run(self, stop_channel: Queue, stop_after_finish=True):
         cnt = 0
         if stop_after_finish:
@@ -511,6 +591,10 @@ class PipelineScheme:
                 self.logger.log("用户终止")
                 return
             self.repo.refresh_repository()
+            result = self.check_requirements()
+            if len(result) > 0:
+                self.logger.log(f"检测到第{cnt}次全自动缺失以下物品：\n" + '\n'.join(result))
+                return
             result = self.pipeline1[self.pipeline1_choice_index].run(stop_channel)
             if stop_channel.qsize() != 0:
                 self.logger.log("用户终止")

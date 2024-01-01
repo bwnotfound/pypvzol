@@ -529,8 +529,19 @@ class AutoCompoundWindow(QMainWindow):
     def refresh_information_text_box(self):
         message = []
         message.append(
-            "复合池植物数量：{}个".format(len(self.auto_compound_man.auto_compound_pool_id))
+            "复合池植物总数量：{}个".format(len(self.auto_compound_man.auto_compound_pool_id))
         )
+        plant_quality_dict = {k: 0 for k in quality_name_list}
+        for plant_id in self.auto_compound_man.auto_compound_pool_id:
+            plant = self.repo.get_plant(plant_id)
+            if plant is None:
+                continue
+            plant_quality_dict[plant.quality_str] += 1
+        for quality_name in reversed(quality_name_list):
+            amount = plant_quality_dict[quality_name]
+            if amount == 0:
+                continue
+            message.append("{}植物数量：{}个".format(quality_name, amount))
         self.information_text_box.setPlainText("\n".join(message))
 
     def refresh_all(self, event: Event = None):

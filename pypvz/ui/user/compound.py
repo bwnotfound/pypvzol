@@ -479,13 +479,16 @@ class AutoCompoundMan:
                 pool_quality_dict.get(plant.quality_index, 0) + 1
             )
         for quality_index, deputy_plant_num_required in quality_dict.items():
-            if quality_index not in pool_quality_dict:
-                result.append("没有{}品质的植物".format(quality_name_list[quality_index]))
-            elif pool_quality_dict[quality_index] < deputy_plant_num_required:
+            if (
+                quality_index not in pool_quality_dict
+                or pool_quality_dict[quality_index] < deputy_plant_num_required
+            ):
                 result.append(
                     "{}品质的植物数量现有{}个，需要{}个".format(
                         quality_name_list[quality_index],
-                        pool_quality_dict[quality_index],
+                        pool_quality_dict[quality_index]
+                        if quality_index in pool_quality_dict
+                        else 0,
                         deputy_plant_num_required,
                     )
                 )
@@ -603,6 +606,7 @@ class AutoCompoundMan:
         self.logger.log("复合完成")
 
     def auto_set_source_plant(self):
+        self.check_data(False)
         attr_plant_dict = {}
         for plant in self.repo.plants:
             if plant.quality_index < quality_name_list.index("魔神"):
