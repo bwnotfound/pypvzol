@@ -10,4 +10,4 @@ from .task import Task
 from .upgrade import UpgradeMan, SynthesisMan, HeritageMan
 from .arena import Arena
 from .serverbattle import Serverbattle
-from .fuben import FubenRequest
+from .fuben import WorldFubenRequest

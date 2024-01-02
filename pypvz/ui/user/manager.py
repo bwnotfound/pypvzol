@@ -13,7 +13,7 @@ from ... import (
     WebRequest,
 )
 from ..message import Logger
-from ... import FubenRequest, Serverbattle, Arena, Command
+from ... import WorldFubenRequest, Serverbattle, Arena, Command
 from ...fuben import FubenCave
 from ...utils.recover import RecoverMan
 from ..wrapped import signal_block_emit
@@ -250,7 +250,7 @@ class FubenMan:
         self.cfg = cfg
         self.repo = repo
         self.logger = logger
-        self.fuben_request = FubenRequest(cfg)
+        self.fuben_request = WorldFubenRequest(cfg)
         self.recover_man = RecoverMan(cfg, repo)
         self.caves: list[SingleFubenCave] = []
         self.team = []
@@ -722,6 +722,7 @@ class ServerBattleMan:
             if stop_channel.qsize() > 0:
                 return
             current_challenge_num = self.rest_challenge_num()
+            has_exception = False
             while True:
                 if current_challenge_num <= self.rest_challenge_num_limit:
                     self.logger.log(
@@ -749,11 +750,16 @@ class ServerBattleMan:
                         break
                     except Exception as e:
                         self.logger.log(
-                            "跨服挑战异常，异常类型：{}。尝试等待1s后重试，最多再试{}次".format(
-                                type(e).__name__, max_retry - cnt
-                            )
+                            "跨服挑战异常，异常类型：{}".format(type(e).__name__, max_retry - cnt)
                         )
-                        time.sleep(1)
+                        has_exception = True
+                        break
+                if has_exception:
+                    self.logger.log("检测到跨服挑战出现异常，重新获取跨服挑战次数")
+                    current_challenge_num = self.rest_challenge_num()
+                    has_exception = False
+                    continue
+
                 if not result["success"]:
                     self.logger.log(result["result"])
                     if "匹配" not in result["result"]:
@@ -840,13 +846,12 @@ class ArenaMan:
 
 
 class CommandMan:
-    
     def __init__(self, cfg: Config, logger: Logger):
         self.cfg = cfg
         self.logger = logger
         self.command = Command(cfg)
         self.command_list = []
-        
+
     def start(self, stop_queue: Queue):
         for command_str in self.command_list:
             while True:
@@ -863,7 +868,7 @@ class CommandMan:
                     elif result['error_type'] == 1:
                         self.logger.log("指令{}执行至道具异常，认定执行完毕".format(command_str))
                     break
-    
+
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "command_man")
         with open(save_path, "wb") as f:

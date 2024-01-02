@@ -29,6 +29,7 @@ from .manager import (
     ArenaMan,
     CommandMan,
 )
+from .open_fuben import OpenFubenMan
 from .compound import AutoCompoundMan
 from . import PipelineMan
 from ...shop import PurchaseItem
@@ -90,6 +91,7 @@ class UserSettings:
         self.pipeline_man = PipelineMan(cfg, lib, repo, user, self.logger)
         self.command_man = CommandMan(cfg, self.logger)
         self.command_enabled = False
+        self.open_fuben_man = OpenFubenMan(cfg, repo, lib, self.logger)
 
     def _start(self, stop_channel: Queue, close_signal):
         self.repo.refresh_repository(self.logger)
@@ -269,6 +271,7 @@ class UserSettings:
         self.pipeline_man.save(self.save_dir)
         self.serverbattle_man.save(self.save_dir)
         self.command_man.save(self.save_dir)
+        self.open_fuben_man.save(self.save_dir)
 
     def load(self):
         self.challenge4Level.load(self.save_dir)
@@ -293,3 +296,4 @@ class UserSettings:
         self.pipeline_man.load(self.save_dir)
         self.serverbattle_man.load(self.save_dir)
         self.command_man.load(self.save_dir)
+        self.open_fuben_man.load(self.save_dir)

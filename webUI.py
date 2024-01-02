@@ -56,6 +56,7 @@ from pypvz.ui.windows import (
     SimulateWindow,
     AutoUseItemSettingWindow,
     CommandSettingWindow,
+    OpenFubenWindow,
     # GameWindow,
     # run_game_window,
 )
@@ -585,12 +586,20 @@ class FunctionPanelWindow(QMainWindow):
         simulate_btn = QPushButton("模拟面板")
         simulate_btn.clicked.connect(self.simulate_btn_clicked)
         menu_layout.addWidget(simulate_btn, 4, 0)
+        
+        open_fuben_btn = QPushButton("自动开副本面板")
+        open_fuben_btn.clicked.connect(self.open_fuben_btn_clicked)
+        menu_layout.addWidget(open_fuben_btn, 5, 0)
 
         menu_widget.setLayout(menu_layout)
         main_layout.addWidget(menu_widget)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+    
+    def open_fuben_btn_clicked(self):
+        self.open_fuben_window = OpenFubenWindow(self.usersettings, parent=self)
+        self.open_fuben_window.show()
 
     def auto_use_item_setting_btn_clicked(self):
         self.auto_use_item_setting_window = AutoUseItemSettingWindow(
@@ -696,6 +705,7 @@ class CustomMainWindow(QMainWindow):
                     init_header="pvzol" in self.usersettings.cfg.host,
                     url_format=False,
                     use_cache=True,
+                    except_retry=True,
                 )
             )
         )

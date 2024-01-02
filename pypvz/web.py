@@ -1,4 +1,5 @@
 import requests
+import concurrent.futures
 import os
 from time import sleep
 from random import sample
@@ -308,10 +309,6 @@ class WebRequest:
         while cnt < max_retry:
             cnt += 1
             try:
-                # import random
-
-                # if random.random() < 0.3:
-                #     raise requests.ConnectionError("test")
                 self.cfg.freq_event.wait()
                 response = self.get(
                     url,
@@ -320,6 +317,12 @@ class WebRequest:
                     url_format=url_format,
                     **kwargs,
                 )
+                
+                # import random
+                # if random.random() < 0.2:
+                    
+                #     raise requests.ConnectionError("test")
+                
                 if len(response) == 0:
                     return None
                 try:
@@ -430,16 +433,18 @@ class WebRequest:
             cnt += 1
             try:
                 self.cfg.freq_event.wait()
-                # import random
-
-                # if random.random() < 0.3:
-                #     raise requests.ConnectionError("test")
                 response = self.amf_post(
                     body,
                     target,
                     url,
                     exit_response=exit_response,
                 )
+                
+                # import random
+
+                # if random.random() < 0.2:
+                #     raise requests.ConnectionError("test")
+                
                 if exit_response:
                     return
                 if response.status != 0:
@@ -508,3 +513,37 @@ class WebRequest:
                 logging.warning(warning_msg)
             raise RuntimeError(warning_msg)
         return response
+
+    def amf_post_retry_async(
+        self,
+        body,
+        target,
+        url,
+        msg,
+        retry_times=1,
+        max_pool_size=16,
+        max_retry=20,
+        logger=None,
+        exit_response=False,
+        allow_empty=False,
+        except_retry=False,
+    ):
+        def run():
+            return self.amf_post_retry(
+                body,
+                target,
+                url,
+                msg,
+                max_retry=max_retry,
+                logger=logger,
+                exit_response=exit_response,
+                allow_empty=allow_empty,
+                except_retry=except_retry,
+            )
+        result = []
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(max_pool_size, retry_times)
+        ) as executor:
+            for _ in range(retry_times):
+                result.append(executor.submit(run))
+        return result

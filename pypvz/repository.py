@@ -150,11 +150,14 @@ class Repository:
         plant = self.id2plant.get(id, None)
         return plant
 
-    def get_tool(self, id):
+    def get_tool(self, id, return_amount=False):
         if isinstance(id, str):
             id = int(id)
         tool = self.id2tool.get(id, None)
-        return tool
+        if not return_amount:
+            return tool
+        else:
+            return tool['amount'] if tool is not None else 0
 
     def remove_plant(self, id):
         if isinstance(id, str):
@@ -166,15 +169,37 @@ class Repository:
         self.id2plant.pop(id)
         return True
 
-    def remove_tool(self, id):
+    def remove_tool(self, id, amount: int = None):
         if isinstance(id, str):
             id = int(id)
         tool = self.id2tool.get(id, None)
         if tool is None:
-            return False
-        self.tools.remove(tool)
-        self.id2tool.pop(id)
-        return True
+            return
+        if amount is None:
+            self.tools.remove(tool)
+            self.id2tool.pop(id)
+        else:
+            assert isinstance(amount, int)
+            tool['amount'] -= amount
+            if tool['amount'] <= 0:
+                self.tools.remove(tool)
+                self.id2tool.pop(id)
+
+    def add_tool(self, id, amount):
+        if isinstance(id, str):
+            id = int(id)
+        if isinstance(amount, str):
+            amount = int(amount)
+        tool = self.id2tool.get(id, None)
+        if tool is None:
+            tool = {
+                "id": id,
+                "amount": amount,
+            }
+            self.tools.append(tool)
+            self.id2tool[id] = tool
+        else:
+            tool['amount'] += amount
 
     def use_item(self, tool_id, amount, lib: Library):
         if isinstance(amount, str):

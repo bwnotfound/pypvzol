@@ -7,7 +7,7 @@ class Good:
     def __init__(self, root, shop_type):
         self.id = int(root['id'])
         self.p_id = int(root['p_id'])
-        self.type = root['type']
+        self.type = root['type']  # tool or organisms
         self.num = int(root['num'])
         self.price = int(root['price'])
         self.shop_type = shop_type
@@ -48,6 +48,7 @@ class Shop:
 
         self.good_id2good: dict[int, Good] = {}
         self.shop_goods_list = []
+        self.tool_id2good: dict[int, Good] = {}
         for shop_type, future in zip(self.type_list, futures):
             try:
                 response = future.result()
@@ -64,13 +65,24 @@ class Shop:
             self.good_id2good.update(
                 {int(good.id): Good(good, shop_type) for good in goods}
             )
+            self.tool_id2good.update(
+                {
+                    int(good.p_id): Good(good, shop_type)
+                    for good in goods
+                    if good['type'] == 'tool'
+                }
+            )
 
     def buy(self, item_id: int, amount: int):
         body = [float(item_id), float(amount)]
         response = self.wr.amf_post_retry(body, "api.shop.buy", "/pvz/amf/", "购买物品")
         if response.status == 0:
             if response.body['status'] == 'success':
-                return {"success": True, "result": response.body}
+                return {
+                    "success": True,
+                    "amount": int(response.body['tool']['amount']),
+                    "tool_id": int(response.body['tool']['id']),
+                }
             return {"success": False, "result": response.body['status']}
         else:
             return {"success": False, "result": response.body.description}
