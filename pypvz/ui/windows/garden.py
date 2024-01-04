@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt
 
 from ..wrapped import QLabel
 from ..user import UserSettings
+from ...utils.common import format_plant_info
 
 
 class GardenChallengeSettingWindow(QMainWindow):
@@ -67,28 +68,14 @@ class GardenChallengeSettingWindow(QMainWindow):
 
         self.setCentralWidget(main_widget)
 
-    def format_plant_info(self, plant):
-        if isinstance(plant, str):
-            plant = int(plant)
-        if isinstance(plant, int):
-            plant = self.usersettings.repo.get_plant(plant)
-        msg = "{}({})[{}]".format(
-            plant.name(self.usersettings.lib),
-            plant.grade,
-            plant.quality_str,
-            self.usersettings.lib.get_spec_skill(plant.special_skill_id),
-        )
-        if plant.special_skill_id is not None:
-            spec_skill = self.usersettings.lib.get_spec_skill(plant.special_skill_id)
-            msg += " 专属:{}({}级)".format(spec_skill["name"], spec_skill['grade'])
-        return msg
-
     def refresh_plant_list(self):
         self.plant_list.clear()
         for plant in self.usersettings.repo.plants:
             if plant.id in self.usersettings.garden_man.team:
                 continue
-            item = QListWidgetItem(self.format_plant_info(plant))
+            item = QListWidgetItem(
+                format_plant_info(plant, self.usersettings.lib, spec_skill=True)
+            )
             item.setData(Qt.ItemDataRole.UserRole, plant.id)
             self.plant_list.addItem(item)
 
@@ -98,7 +85,9 @@ class GardenChallengeSettingWindow(QMainWindow):
             plant = self.usersettings.repo.get_plant(plant_id)
             if plant is None:
                 continue
-            item = QListWidgetItem(self.format_plant_info(plant))
+            item = QListWidgetItem(
+                format_plant_info(plant, self.usersettings.lib, spec_skill=True)
+            )
             item.setData(Qt.ItemDataRole.UserRole, plant.id)
             self.team_list_widget.addItem(item)
 

@@ -19,6 +19,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from ..wrapped import QLabel, WaitEventThread
 from ...utils.common import format_number
 from ...repository import Plant
+from ...library import attribute_list, attribute2plant_attribute
 from .common import ImageWindow, require_permission
 from ... import Config, Repository, Library
 from ..message import Logger
@@ -341,7 +342,7 @@ class AutoCompoundWindow(QMainWindow):
                 format_number(
                     getattr(
                         plant,
-                        self.auto_compound_man.attribute2plant_attribute[
+                        attribute2plant_attribute[
                             chosen_attribute
                         ],
                     )
@@ -366,7 +367,7 @@ class AutoCompoundWindow(QMainWindow):
                     format_number(
                         getattr(
                             plant,
-                            self.auto_compound_man.attribute2plant_attribute[attr_name],
+                            attribute2plant_attribute[attr_name],
                         )
                     ),
                 )
@@ -376,13 +377,13 @@ class AutoCompoundWindow(QMainWindow):
         result = None
         if (
             chosen_attr_name is not None
-            and chosen_attr_name in self.auto_compound_man.attribute2plant_attribute
+            and chosen_attr_name in attribute2plant_attribute
         ):
-            chosen_attr_name = self.auto_compound_man.attribute2plant_attribute[
+            chosen_attr_name = attribute2plant_attribute[
                 chosen_attr_name
             ]
-        for attr_dict_name in self.auto_compound_man.attribute2plant_attribute.keys():
-            attr_name = self.auto_compound_man.attribute2plant_attribute[attr_dict_name]
+        for attr_dict_name in attribute2plant_attribute.keys():
+            attr_name = attribute2plant_attribute[attr_dict_name]
             if chosen_attr_name is not None and attr_name == chosen_attr_name:
                 continue
             attr = getattr(plant, attr_name)
@@ -773,10 +774,10 @@ class CompoundSchemeWidget(QWidget):
 
         setting_panel_layout.addWidget(QLabel("选择复合属性"))
         self.auto_compound_attribute_choice = QComboBox()
-        for name in self.scheme.attribute_list:
+        for name in attribute_list:
             self.auto_compound_attribute_choice.addItem(name)
         self.auto_compound_attribute_choice.setCurrentIndex(
-            self.scheme.attribute_list.index(self.scheme.chosen_attribute)
+            attribute_list.index(self.scheme.chosen_attribute)
         )
         self.auto_compound_attribute_choice.currentIndexChanged.connect(
             self.auto_compound_attribute_choice_changed

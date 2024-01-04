@@ -20,6 +20,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from ..wrapped import QLabel, signal_block_emit, WaitEventThread
 from ..user import UserSettings
+from ...utils.common import format_plant_info
 from ... import Repository, UpgradeMan, Library
 
 
@@ -95,7 +96,6 @@ class UpgradeQualityWindow(QMainWindow):
         pool_layout.addWidget(self.pool_size_combobox)
         right_layout.addLayout(pool_layout)
 
-
         self.show_all_info = QCheckBox("显示所有信息")
         self.show_all_info.setChecked(False)
         right_layout.addWidget(self.show_all_info)
@@ -111,13 +111,10 @@ class UpgradeQualityWindow(QMainWindow):
     def pool_size_combobox_current_index_changed(self):
         self.pool_size = self.pool_size_combobox.currentIndex() + 1
 
-
     def refresh_plant_list(self, event: Event = None):
         self.plant_list.clear()
         for plant in self.usersettings.repo.plants:
-            item = QListWidgetItem(
-                f"{plant.name(self.usersettings.lib)}({plant.grade})[{plant.quality_str}]"
-            )
+            item = QListWidgetItem(format_plant_info(plant, self.usersettings.lib))
             item.setData(Qt.ItemDataRole.UserRole, plant.id)
             self.plant_list.addItem(item)
         if event is not None:

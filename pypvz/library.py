@@ -5,6 +5,20 @@ from .web import WebRequest
 from .config import Config
 
 
+attribute_list = ["HP特", "攻击特", "命中", "闪避", "穿透", "护甲", "HP", "攻击"]
+attribute2plant_attribute = {
+    "HP": "hp_max",
+    "攻击": "attack",
+    "命中": "precision",
+    "闪避": "miss",
+    "穿透": "piercing",
+    "护甲": "armor",
+    "HP特": "hp_max",
+    "攻击特": "attack",
+    "战力": "fight",
+}
+
+
 class Tool:
     def __init__(self, root: Element):
         self.id = int(root.get("id"))

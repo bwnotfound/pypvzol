@@ -11,6 +11,8 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QComboBox,
     QApplication,
+    QCheckBox,
+    QSpinBox,
 )
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -88,7 +90,7 @@ class OpenFubenWindow(QMainWindow):
         widget = QWidget()
         layout = QVBoxLayout()
         widget.setLayout(layout)
-        widget.setFixedHeight(int(self.height() * 0.7))
+        widget.setFixedHeight(int(self.height() * 0.6))
         world_fuben_layout.addWidget(widget)
         layout1 = QHBoxLayout()
         layout.addWidget(QLabel("需要忽略的副本"))
@@ -149,6 +151,43 @@ class OpenFubenWindow(QMainWindow):
         layout.addWidget(self.world_fuben_min_challenge_amount)
         world_fuben_layout.addLayout(layout)
 
+        layout = QHBoxLayout()
+        world_fuben_layout.addLayout(layout)
+        self.need_recover_checkbox = QCheckBox("需要回复")
+        self.need_recover_checkbox.setChecked(
+            self.usersettings.open_fuben_man.need_recover
+        )
+        self.need_recover_checkbox.stateChanged.connect(
+            self.need_recover_checkbox_stateChanged
+        )
+        layout.addWidget(self.need_recover_checkbox)
+        layout1 = QHBoxLayout()
+        layout1.addStretch(1)
+        # 创建正浮点数输入框，要求值在0~100之间
+        self.recover_threshold_input = QSpinBox()
+        self.recover_threshold_input.setMinimum(0)
+        self.recover_threshold_input.setMaximum(99)
+        self.recover_threshold_input.setValue(
+            int(self.usersettings.open_fuben_man.recover_threshold * 100)
+        )
+        self.recover_threshold_input.valueChanged.connect(
+            self.recover_threshold_input_valueChanged
+        )
+        layout1.addWidget(self.recover_threshold_input)
+        layout1.addWidget(QLabel("%"))
+        layout1.addStretch(1)
+        layout.addLayout(layout1)
+        self.recover_choice_box = QComboBox()
+        recover_choice_list = ["低级血瓶", "中级血瓶", "高级血瓶"]
+        self.recover_choice_box.addItems(recover_choice_list)
+        self.recover_choice_box.setCurrentIndex(
+            recover_choice_list.index(self.usersettings.open_fuben_man.recover_choice)
+        )
+        self.recover_choice_box.currentIndexChanged.connect(
+            self.recover_choice_box_currentIndexChanged
+        )
+        layout.addWidget(self.recover_choice_box)
+
         self.world_fuben_start_btn = QPushButton("开始")
         self.world_fuben_start_btn.clicked.connect(self.wrold_fuben_start_btn_clicked)
         world_fuben_layout.addWidget(self.world_fuben_start_btn)
@@ -176,6 +215,16 @@ class OpenFubenWindow(QMainWindow):
             spec_skill = self.usersettings.lib.get_spec_skill(plant.special_skill_id)
             msg += " 专属:{}({}级)".format(spec_skill["name"], spec_skill['grade'])
         return msg
+    
+    def need_recover_checkbox_stateChanged(self):
+        self.usersettings.open_fuben_man.need_recover = self.need_recover_checkbox.isChecked()
+    
+    def recover_threshold_input_valueChanged(self, value):
+        self.usersettings.open_fuben_man.recover_threshold = value / 100
+    
+    def recover_choice_box_currentIndexChanged(self):
+        text = self.recover_choice_box.currentText()
+        self.usersettings.open_fuben_man.recover_choice = text
 
     def team_list_widget_item_pressed(self):
         self.current_widget = self.team_list_widget
@@ -204,6 +253,9 @@ class OpenFubenWindow(QMainWindow):
 
     def add_to_ignored_level_btn_clicked(self):
         cave = self.world_fuben_level_choice_box.currentData()
+        if cave is None:
+            self.usersettings.logger.log("未选择副本")
+            return
         for c in self.usersettings.open_fuben_man.ignored_cave_list:
             if c.cave_id == cave.cave_id:
                 break
@@ -260,7 +312,7 @@ class OpenFubenWindow(QMainWindow):
         self.run_thread = None
         self.interrupt_event.clear()
         self.world_fuben_start_btn.setText("开始")
-    
+
     def open_fuben_stopped(self):
         self.world_fuben_start_btn.setText("开始")
         self.world_fuben_start_btn.setEnabled(True)
@@ -272,7 +324,7 @@ class OpenFubenWindow(QMainWindow):
             try:
                 if len(self.usersettings.open_fuben_man.team) == 0:
                     self.usersettings.logger.log("未设置出战植物")
-                    return   
+                    return
                 self.world_fuben_start_btn.setText("暂停")
                 self.run_thread = OpenFubenThread(
                     self.usersettings,

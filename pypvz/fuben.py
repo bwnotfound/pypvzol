@@ -43,8 +43,15 @@ class WorldFubenRequest:
     def challenge(self, cave_id, team, logger):
         body = [float(cave_id), [int(plant_id) for plant_id in team]]
         response = self.wr.amf_post_retry(
-            body, "api.fuben.challenge", '/pvz/amf/', '挑战副本洞口', logger=logger
+            body,
+            "api.fuben.challenge",
+            '/pvz/amf/',
+            '挑战副本洞口',
+            logger=logger,
+            allow_empty=True,
         )
+        if response is None:
+            return None
         if response.status != 0:
             return {
                 "success": False,

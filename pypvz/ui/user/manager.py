@@ -17,6 +17,7 @@ from ... import WorldFubenRequest, Serverbattle, Arena, Command
 from ...fuben import FubenCave
 from ...utils.recover import RecoverMan
 from ..wrapped import signal_block_emit
+from ...library import attribute2plant_attribute
 
 
 class AutoSynthesisMan:
@@ -29,7 +30,6 @@ class AutoSynthesisMan:
         self.chosen_attribute = "HP"
         self.reinforce_number = 10
         self.auto_synthesis_pool_id = set()
-        self.attribute_list = ["HP", "攻击", "命中", "闪避", "穿透", "护甲", "HP特", "攻击特"]
         self.attribute_book_dict = {
             "HP": lib.name2tool["HP合成书"].id,
             "攻击": lib.name2tool["攻击合成书"].id,
@@ -39,16 +39,6 @@ class AutoSynthesisMan:
             "护甲": lib.name2tool["护甲合成书"].id,
             "HP特": lib.name2tool["特效HP合成书"].id,
             "攻击特": lib.name2tool["特级攻击合成书"].id,
-        }
-        self.attribute2plant_attribute = {
-            "HP": "hp_max",
-            "攻击": "attack",
-            "命中": "precision",
-            "闪避": "miss",
-            "穿透": "piercing",
-            "护甲": "armor",
-            "HP特": "hp_max",
-            "攻击特": "attack",
         }
         self.end_mantissa = 1.0
         self.end_exponent = 0
@@ -75,7 +65,7 @@ class AutoSynthesisMan:
             if plant is None:
                 continue
             attribute_value = getattr(
-                plant, self.attribute2plant_attribute[self.chosen_attribute]
+                plant, attribute2plant_attribute[self.chosen_attribute]
             )
             if attribute_value > max_attribute_value:
                 max_attribute_value = attribute_value
@@ -257,6 +247,8 @@ class FubenMan:
         self.show_lottery = False
         self.need_recovery = False
         self.recover_hp_choice = "中级血瓶"
+        self.pool_size = 3
+        self.challenge_amount = 0
 
     def add_cave(self, cave: FubenCave, layer, number, use_sand=False, enabled=True):
         for sc in self.caves:
@@ -306,46 +298,76 @@ class FubenMan:
         def get_fuben_cave(layer, number) -> FubenCave:
             caves = _cave_map.get(layer, None)
             if caves is None:
-                _cave_map[layer] = caves = self.fuben_request.get_caves(
-                    layer, self.logger
+                data = self.fuben_request.get_caves(
+                    layer, self.logger, return_challenge_amount=True
                 )
+                _cave_map[layer] = caves = data[0]
+                self.challenge_amount = data[1]
             assert number >= 1 and number <= len(caves)
             return caves[number - 1]
 
         for sc in self.caves:
+            if stop_channel.qsize() > 0:
+                return
             if not sc.enabled:
                 continue
-            cave = get_fuben_cave(sc.layer, sc.number)
-            if cave.rest_count == 0:
-                continue
-            challenge_count = cave.rest_count if cave.rest_count > 0 else 1
-            for _ in range(challenge_count):
-                if self.need_recovery:
-                    if not self._recover():
-                        return
-                message = "挑战副本:{}".format(
-                    cave.name,
-                )
-                try:
+            while True:
+                cave = get_fuben_cave(sc.layer, sc.number)
+                if cave.rest_count == 0 or self.challenge_amount == 0:
+                    break
+
+                def run():
+                    if self.need_recovery:
+                        if not self._recover():
+                            return False
+                    message = "挑战副本:{}".format(
+                        cave.name,
+                    )
                     result = self.fuben_request.challenge(
                         sc.cave_id, self.team, logger=self.logger
                     )
-                except Exception as e:
-                    self.logger.log("副本挑战异常，异常类型：{}".format(type(e).__name__))
-                    return
-                success, result = result["success"], result["result"]
-                if not success:
-                    message = message + "失败. 原因: {}.".format(result)
+                    if result is None:
+                        return False
+                    if not result["success"]:
+                        message = message + "失败. 原因: {}.".format(result["result"])
+                        self.logger.log(message)
+                        return False
+                    else:
+                        message = message + "成功. "
+                    message = message + "挑战结果：{}".format(
+                        "胜利" if result["result"]['is_winning'] else "失败"
+                    )
                     self.logger.log(message)
+                    if stop_channel.qsize() > 0:
+                        return False
+                    return True
+
+                challenge_count = cave.rest_count if cave.rest_count >= 0 else 100
+                futures = []
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=self.pool_size
+                ) as executor:
+                    for _ in range(challenge_count):
+                        futures.append(executor.submit(run))
+                    has_failure = False
+                    for future in concurrent.futures.as_completed(futures):
+                        if stop_channel.qsize() > 0:
+                            executor.shutdown(cancel_futures=True, wait=True)
+                            return
+                        try:
+                            if not future.result():
+                                executor.shutdown(cancel_futures=True, wait=True)
+                                return
+                            else:
+                                self.challenge_amount -= 1
+                        except Exception as e:
+                            self.logger.log("挑战副本异常，异常类型：{}".format(type(e).__name__))
+                            has_failure = True
+                if self.challenge_amount == 0:
+                    self.logger.log("副本挑战次数用完了")
                     return
-                else:
-                    message = message + "成功. "
-                message = message + "挑战结果：{}".format(
-                    "胜利" if result['is_winning'] else "失败"
-                )
-                self.logger.log(message)
-                if stop_channel.qsize() > 0:
-                    return
+                if has_failure:
+                    continue
 
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "auto_fuben")
@@ -357,6 +379,7 @@ class FubenMan:
                     "show_lottery": self.show_lottery,
                     "need_recovery": self.need_recovery,
                     "recover_hp_choice": self.recover_hp_choice,
+                    "pool_size": self.pool_size,
                 },
                 f,
             )
@@ -508,6 +531,7 @@ class TerritoryMan:
             for k, v in d.items():
                 if hasattr(self, k):
                     setattr(self, k, v)
+        self.team = self.team[:5]
 
 
 class DailyMan:

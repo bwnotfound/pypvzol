@@ -27,9 +27,13 @@ class OpenFubenMan:
         self.ignored_cave_list = []
         self.wr = WebRequest(cfg)
         self.shop_req = Shop(cfg)
+        self.recover_man = RecoverMan(cfg, repo)
         self.fuben_layer_info_list: list[list[FubenCave]] = [None for _ in range(5)]
         self.max_pool_size = 3
         self.min_challenge_amount = 5
+        self.need_recover = True
+        self.recover_threshold = 0.01
+        self.recover_choice = "高级血瓶"
         self.watch_id = 613  # 时之怀表id
         self.fuben_book_id = 612  # 副本挑战书id
         # self.shop_req.refresh_shop()
@@ -53,6 +57,36 @@ class OpenFubenMan:
         caves = [FubenCave(root) for root in response.body['_caves']]
         self.world_fuben_challenge_amount = int(response.body['_lcc'])
         return caves
+
+    def recover(self):
+        cnt, max_retry = 0, 20
+        success_num_all = 0
+        while cnt < max_retry:
+            recover_list = []
+            for plant_id in self.team:
+                plant = self.repo.get_plant(plant_id)
+                if plant is None:
+                    continue
+                if plant.hp_now / plant.hp_max < self.recover_threshold:
+                    recover_list.append(plant_id)
+            if len(recover_list) == 0:
+                return
+            success_num, fail_num = self.recover_man.recover_list(
+                recover_list, choice=self.recover_choice
+            )
+            success_num_all += success_num
+            if fail_num == 0:
+                break
+            self.logger.log("尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num))
+            self.repo.refresh_repository(logger=self.logger)
+            cnt += 1
+        else:
+            self.logger.log("尝试恢复植物血量失败，退出运行")
+            return False
+        self.repo.refresh_repository()
+        if success_num_all > 0:
+            self.logger.log("成功给{}个植物回复血量".format(success_num_all))
+        return True
 
     def get_cave_open_tools(self, target_cave: FubenCave, interrupt_event: Event):
         for open_tool in target_cave.open_tools:
@@ -330,6 +364,7 @@ class OpenFubenMan:
             [
                 self.refresh_fuben_info,
                 self.shop_req.refresh_shop,
+                self.repo.refresh_repository,
             ]
         ):
             self.logger.log("开副本多线程失败，退出世界副本自动开图")
@@ -337,6 +372,7 @@ class OpenFubenMan:
         while True:
             if interrupt_event.is_set():
                 return
+            self.recover()
             available_fuben_list = self.get_available_world_fuben()
             if len(available_fuben_list) == 0:
                 self.logger.log("没有可开启的世界副本，退出世界副本自动开图")
@@ -423,6 +459,9 @@ class OpenFubenMan:
                     "max_pool_size": self.max_pool_size,
                     "min_challenge_amount": self.min_challenge_amount,
                     "ignored_cave_list": self.ignored_cave_list,
+                    "need_recover": self.need_recover,
+                    "recover_threshold": self.recover_threshold,
+                    "recover_choice": self.recover_choice,
                 },
                 f,
             )

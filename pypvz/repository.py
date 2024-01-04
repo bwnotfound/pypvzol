@@ -7,7 +7,6 @@ from .config import Config
 from .web import WebRequest
 from .library import Plant, Library
 from .upgrade import quality_name_list
-from .utils.common import format_number
 
 
 class Plant:
@@ -219,6 +218,8 @@ class Repository:
             }
 
     def sell_item(self, tool_id, amount, lib: Library):
+        from .utils.common import format_number
+
         body = [float(1), float(tool_id), float(amount)]
         response = self.wr.amf_post_retry(body, "api.shop.sell", "/pvz/amf/", "出售物品")
         if response.status == 0:

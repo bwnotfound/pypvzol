@@ -19,6 +19,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QThread
 
 from ..wrapped import QLabel, signal_block_emit, WaitEventThread
 from ..user import UserSettings
+from ...utils.common import format_plant_info
 
 
 class EvolutionPanelWindow(QMainWindow):
@@ -58,9 +59,7 @@ class EvolutionPanelWindow(QMainWindow):
         self.plant_list = QListWidget()
         self.plant_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         for plant in self.usersettings.repo.plants:
-            item = QListWidgetItem(
-                f"{plant.name(self.usersettings.lib)}({plant.grade})"
-            )
+            item = QListWidgetItem(format_plant_info(plant, self.usersettings.lib))
             item.setData(Qt.ItemDataRole.UserRole, plant.id)
             self.plant_list.addItem(item)
         plant_list_layout.addWidget(self.plant_list)
@@ -204,9 +203,7 @@ class EvolutionPanelWindow(QMainWindow):
     def refresh_plant_list(self, event: Event = None):
         self.plant_list.clear()
         for plant in self.usersettings.repo.plants:
-            item = QListWidgetItem(
-                f"{plant.name(self.usersettings.lib)}({plant.grade})"
-            )
+            item = QListWidgetItem(format_plant_info(plant, self.usersettings.lib))
             item.setData(Qt.ItemDataRole.UserRole, plant.id)
             self.plant_list.addItem(item)
         if event is not None:
@@ -249,6 +246,7 @@ class EvolutionPanelWindow(QMainWindow):
             self.interrupt_event.set()
             # self.rest_event.wait()
         super().closeEvent(event)
+
 
 class EvolutionPanelThread(QThread):
     def __init__(

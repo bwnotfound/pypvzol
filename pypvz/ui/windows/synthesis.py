@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from ...library import attribute_list, attribute2plant_attribute
 from ..wrapped import QLabel, WaitEventThread
 from ..user import UserSettings
 from ...utils.common import format_number
@@ -82,10 +83,10 @@ class AutoSynthesisWindow(QMainWindow):
         widget3_1_layout = QVBoxLayout()
         widget3_1_layout.addWidget(QLabel("选择合成属性"))
         self.auto_synthesis_attribute_choice = QComboBox()
-        for name in self.usersettings.auto_synthesis_man.attribute_list:
+        for name in attribute_list:
             self.auto_synthesis_attribute_choice.addItem(name)
         self.auto_synthesis_attribute_choice.setCurrentIndex(
-            self.usersettings.auto_synthesis_man.attribute_list.index(
+            attribute_list.index(
                 self.usersettings.auto_synthesis_man.chosen_attribute
             )
         )
@@ -235,7 +236,7 @@ class AutoSynthesisWindow(QMainWindow):
                 format_number(
                     getattr(
                         plant,
-                        self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+                        attribute2plant_attribute[
                             self.usersettings.auto_synthesis_man.chosen_attribute
                         ],
                     )
@@ -260,7 +261,7 @@ class AutoSynthesisWindow(QMainWindow):
                     format_number(
                         getattr(
                             plant,
-                            self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+                            attribute2plant_attribute[
                                 attr_name
                             ],
                         )
@@ -278,7 +279,7 @@ class AutoSynthesisWindow(QMainWindow):
             return None
         return getattr(
             plant,
-            self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+            attribute2plant_attribute[
                 self.usersettings.auto_synthesis_man.chosen_attribute
             ],
         )
@@ -433,14 +434,14 @@ class AutoSynthesisWindow(QMainWindow):
     def _check_plant(self, plant, full_check=False, alert=True):
         result = None
         chosen_attr_name = (
-            self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+            attribute2plant_attribute[
                 self.usersettings.auto_synthesis_man.chosen_attribute
             ]
         )
         for (
             attr_dict_name
-        ) in self.usersettings.auto_synthesis_man.attribute2plant_attribute.keys():
-            attr_name = self.usersettings.auto_synthesis_man.attribute2plant_attribute[
+        ) in attribute2plant_attribute.keys():
+            attr_name = attribute2plant_attribute[
                 attr_dict_name
             ]
             if attr_name == chosen_attr_name and not full_check:

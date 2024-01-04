@@ -18,7 +18,7 @@ from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from ...repository import Repository
-from ...library import Library
+from ...library import Library, attribute2plant_attribute
 from ..wrapped import QLabel
 from ..user import UserSettings
 from ...upgrade import SkillStoneMan
@@ -557,16 +557,15 @@ class HeritageWindow(QMainWindow):
                     self.id1, self.id2, book_id, reinforce_number
                 )
             self.usersettings.logger.log(result["result"])
-            self.usersettings.repo.refresh_repository()
-            if result["success"]:
-                self.id1 = None
-                self.heritage_man.id1 = self.id1
-            self.refresh_plant_information()
-            self.refresh_plant_list()
+            if not result["success"]:
+                self.usersettings.logger.log(result["result"])
         except Exception as e:
             self.usersettings.logger.log("传承失败，异常种类：{}".format(type(e).__name__))
             return
         finally:
+            self.usersettings.repo.refresh_repository()
+            self.refresh_plant_information()
+            self.refresh_plant_list()
             self.heritage_btn.setEnabled(True)
 
     def refresh_plant_list(self):
@@ -727,7 +726,7 @@ class PlantRelativeWindow(QMainWindow):
             for (
                 k,
                 v,
-            ) in self.usersettings.auto_synthesis_man.attribute2plant_attribute.items():
+            ) in attribute2plant_attribute.items():
                 message += "{}:{}\n".format(k, format_number(getattr(plant, v)))
             self.plant_attribute_list.setPlainText(message)
 

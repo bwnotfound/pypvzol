@@ -14,6 +14,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from ..wrapped import QLabel
 from ..user import UserSettings
+from ...utils.common import format_plant_info
 
 
 class FubenSelectWindow(QMainWindow):
@@ -148,7 +149,9 @@ class FubenSettingWindow(QMainWindow):
         widget4.setMinimumWidth(int(self.width() * 0.25))
         layout4 = QVBoxLayout()
         self.team_list_widget = QListWidget()
-        self.team_list_widget.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.team_list_widget.setSelectionMode(
+            QListWidget.SelectionMode.ExtendedSelection
+        )
         self.team_list_widget.itemPressed.connect(self.team_list_widget_pressed)
         layout4.addWidget(self.team_list_widget)
         widget4.setLayout(layout4)
@@ -170,8 +173,20 @@ class FubenSettingWindow(QMainWindow):
             self.recovery_combo_index_changed
         )
         layout5.addWidget(self.recovery_combo)
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("并发数:"))
+        self.pool_size_combobox = QComboBox()
+        self.pool_size_combobox.addItems([str(i) for i in range(1, 21)])
+        self.pool_size_combobox.setCurrentIndex(
+            self.usersettings.fuben_man.pool_size - 1
+        )
+        self.pool_size_combobox.currentIndexChanged.connect(
+            self.pool_size_combobox_index_changed
+        )
+        layout.addWidget(self.pool_size_combobox)
+        layout5.addLayout(layout)
         widget5.setLayout(layout5)
-        
+
         main_layout.addWidget(widget1)
         main_layout.addWidget(widget2)
         main_layout.addWidget(widget3)
@@ -180,6 +195,11 @@ class FubenSettingWindow(QMainWindow):
         main_widget.setLayout(main_layout)
 
         self.setCentralWidget(main_widget)
+
+    def pool_size_combobox_index_changed(self):
+        self.usersettings.fuben_man.pool_size = (
+            self.pool_size_combobox.currentIndex() + 1
+        )
 
     def need_recovery_checkbox_state_changed(self):
         self.usersettings.fuben_man.need_recovery = (
@@ -190,17 +210,9 @@ class FubenSettingWindow(QMainWindow):
         self.usersettings.fuben_man.recover_hp_choice = (
             self.recovery_combo.currentText()
         )
-        
+
     def format_plant_info(self, plant):
-        if isinstance(plant, str):
-            plant = int(plant)
-        if isinstance(plant, int):
-            plant = self.usersettings.repo.get_plant(plant)
-        return "{}({})[{}]".format(
-            plant.name(self.usersettings.lib),
-            plant.grade,
-            plant.quality_str,
-        )
+        return format_plant_info(plant, self.usersettings.lib)
 
     def refresh_plant_list(self):
         self.plant_list.clear()
@@ -232,7 +244,9 @@ class FubenSettingWindow(QMainWindow):
         self.last_focus_list_widget = self.fuben_list_widget
 
     def add_fuben_button_clicked(self):
-        self.fuben_select_window = FubenSelectWindow(self.usersettings, self.refresh_signal, self)
+        self.fuben_select_window = FubenSelectWindow(
+            self.usersettings, self.refresh_signal, self
+        )
         self.fuben_select_window.show()
 
     def set_plant_team_btn_clicked(self):
@@ -244,7 +258,7 @@ class FubenSettingWindow(QMainWindow):
         )
         self.refresh_team_list()
         self.refresh_plant_list()
-        
+
     def team_list_widget_pressed(self):
         self.last_focus_list_widget = self.team_list_widget
 

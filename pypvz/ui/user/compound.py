@@ -13,6 +13,7 @@ from ... import (
 from ..message import Logger
 from ..wrapped import signal_block_emit
 from .manager import AutoSynthesisMan
+from ...library import attribute2plant_attribute
 
 
 class CompoundScheme:
@@ -21,7 +22,6 @@ class CompoundScheme:
         self.cfg = cfg
         self.repo = repo
         self.logger = logger
-        self.attribute_list = ["HP特", "攻击特", "命中", "闪避", "穿透", "护甲", "HP", "攻击"]
         self.attribute_compose_book_dict = {
             "HP": lib.name2tool["HP合成书"].id,
             "攻击": lib.name2tool["攻击合成书"].id,
@@ -31,16 +31,6 @@ class CompoundScheme:
             "护甲": lib.name2tool["护甲合成书"].id,
             "HP特": lib.name2tool["特效HP合成书"].id,
             "攻击特": lib.name2tool["特级攻击合成书"].id,
-        }
-        self.attribute2plant_attribute = {
-            "HP": "hp_max",
-            "攻击": "attack",
-            "命中": "precision",
-            "闪避": "miss",
-            "穿透": "piercing",
-            "护甲": "armor",
-            "HP特": "hp_max",
-            "攻击特": "attack",
         }
         self.attribute_inheritage_book_dict = {
             "HP": lib.name2tool["HP传承书"].id,
@@ -115,7 +105,7 @@ class CompoundScheme:
     def need_compound(self, plant):
         now_attr = getattr(
             plant,
-            self.attribute2plant_attribute[self.chosen_attribute],
+            attribute2plant_attribute[self.chosen_attribute],
         )
         target_attr = self.end_mantissa * (10 ** (self.end_exponent + 8))
         if now_attr >= target_attr:
@@ -179,7 +169,7 @@ class CompoundScheme:
                 return False
             self.repo.refresh_repository()
             after_plant1 = self.repo.get_plant(id1)
-            attr_name = self.attribute2plant_attribute[self.chosen_attribute]
+            attr_name = attribute2plant_attribute[self.chosen_attribute]
             if getattr(after_plant1, attr_name) == getattr(plant1, attr_name):
                 self.logger.log("复合异常。检测传出植物前后属性一致，判断为传承失败。尝试重新传承")
                 return self.exchange_one(id1, id2, book_id, num)
@@ -281,7 +271,6 @@ class AutoCompoundMan:
         self.cfg = cfg
         self.repo = repo
         self.logger = logger
-        self.attribute_list = ["HP特", "攻击特", "命中", "闪避", "穿透", "护甲", "HP", "攻击"]
         self.attribute_compose_book_dict = {
             "HP": lib.name2tool["HP合成书"].id,
             "攻击": lib.name2tool["攻击合成书"].id,
@@ -291,16 +280,6 @@ class AutoCompoundMan:
             "护甲": lib.name2tool["护甲合成书"].id,
             "HP特": lib.name2tool["特效HP合成书"].id,
             "攻击特": lib.name2tool["特级攻击合成书"].id,
-        }
-        self.attribute2plant_attribute = {
-            "HP": "hp_max",
-            "攻击": "attack",
-            "命中": "precision",
-            "闪避": "miss",
-            "穿透": "piercing",
-            "护甲": "armor",
-            "HP特": "hp_max",
-            "攻击特": "attack",
         }
         self.attribute_inheritage_book_dict = {
             "HP": lib.name2tool["HP传承书"].id,
@@ -522,7 +501,7 @@ class AutoCompoundMan:
                 return False
             self.repo.refresh_repository()
             after_plant1 = self.repo.get_plant(id1)
-            for attr_name in list(self.attribute2plant_attribute.values())[:6]:
+            for attr_name in list(attribute2plant_attribute.values())[:6]:
                 if getattr(after_plant1, attr_name) != getattr(plant1, attr_name):
                     self.logger.log("全传异常。检测传出植物前后属性不一致，判断为传承成功。")
                     return True
@@ -614,7 +593,7 @@ class AutoCompoundMan:
             if plant.grade < 100 or plant.fight < 1e18:
                 continue
             large_attr_cnt, larget_attr_name = 0, None
-            for attr_name in list(self.attribute2plant_attribute.values())[:6]:
+            for attr_name in list(attribute2plant_attribute.values())[:6]:
                 if getattr(plant, attr_name) >= 1e18:
                     large_attr_cnt += 1
                     larget_attr_name = attr_name
@@ -630,7 +609,7 @@ class AutoCompoundMan:
                 continue
             if scheme.source_plant_id is not None:
                 continue
-            chosen_attribute = self.attribute2plant_attribute[scheme.chosen_attribute]
+            chosen_attribute = attribute2plant_attribute[scheme.chosen_attribute]
             if chosen_attribute not in attr_plant_dict:
                 continue
             plant_list = attr_plant_dict[chosen_attribute]
