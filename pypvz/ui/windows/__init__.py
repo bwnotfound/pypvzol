@@ -14,4 +14,5 @@ from .simulate import SimulateWindow
 from .repository import AutoUseItemSettingWindow
 from .command import CommandSettingWindow
 from .open_fuben import OpenFubenWindow
+from .plant_relative import PlantRelativeWindow
 # from .flash_web import GameWindow, run_game_window

@@ -383,6 +383,8 @@ class AutoCompoundWindow(QMainWindow):
                 chosen_attr_name
             ]
         for attr_dict_name in attribute2plant_attribute.keys():
+            if attr_dict_name == "战力":
+                continue
             attr_name = attribute2plant_attribute[attr_dict_name]
             if chosen_attr_name is not None and attr_name == chosen_attr_name:
                 continue

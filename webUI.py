@@ -37,7 +37,6 @@ from pypvz.ui.message import IOLogger
 from pypvz.ui.wrapped import QLabel, normal_font
 from pypvz.ui.windows.common import (
     HeritageWindow,
-    PlantRelativeWindow,
 )
 from pypvz.ui.user import UserSettings
 from pypvz.ui.windows import (
@@ -57,6 +56,7 @@ from pypvz.ui.windows import (
     AutoUseItemSettingWindow,
     CommandSettingWindow,
     OpenFubenWindow,
+    PlantRelativeWindow,
     # GameWindow,
     # run_game_window,
 )
@@ -962,6 +962,7 @@ class LoginWindow(QMainWindow):
         self.region_input = region_input = QComboBox()
         region_input.addItems([f"官服{i}区" for i in range(12, 46 + 1)])
         region_input.addItems([f"私服{i}区" for i in range(1, 10)])
+        region_input.addItem("测试服")
         region_layout.addWidget(region_input)
         region_widget.setLayout(region_layout)
         main_layout.addWidget(region_widget)
@@ -1024,12 +1025,18 @@ class LoginWindow(QMainWindow):
         # 取出当前选中的用户
         username = self.username_input.text()
         region_text = self.region_input.currentText()
-        region = int(region_text[2:-1])
+        if region_text == "测试服":
+            region = 1
+        else:
+            region = int(region_text[2:-1])
         if region_text.startswith("官服"):
             host = f"s{region}.youkia.pvz.youkia.com"
             server = "官服"
         elif region_text.startswith("私服"):
             host = "pvzol.org"
+            server = "私服"
+        elif region_text == "测试服":
+            host = "test.pvzol.org"
             server = "私服"
         else:
             raise ValueError(f"Unknown region text: {region_text}")

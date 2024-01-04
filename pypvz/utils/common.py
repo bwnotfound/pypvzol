@@ -44,29 +44,42 @@ def format_plant_info(
     repo: Repository = None,
     grade=True,
     quality=True,
+    normal_skill=False,
     spec_skill=False,
     chosen_attribute=None,
     show_normal_attribute=False,
     attribute_list=[],
     need_tab=False,
 ):
+    tab = "    " if need_tab else ""
+    sep = "\n{}".format(tab)
     if repo is not None:
         if isinstance(plant, str):
             plant = int(plant)
         if isinstance(plant, int):
             plant = repo.get_plant(plant)
-        if plant is None:
-            return ""
-        assert isinstance(plant, Plant)
+    if plant is None:
+        return ""
+    assert isinstance(plant, Plant)
     msg = "{}".format(plant.name(lib))
     if grade:
         msg += "({})".format(plant.grade)
     if quality:
         msg += "[{}]".format(plant.quality_str)
+
+    if normal_skill:
+        for skill_id in plant.skill_id_list:
+            skill = lib.get_skill(skill_id)
+            msg += "{}{}({}级)".format(sep, skill["name"], skill["grade"])
+
     if spec_skill:
         if plant.special_skill_id is not None:
             spec_skill = lib.get_spec_skill(plant.special_skill_id)
-            msg += " 专属:{}({}级)".format(spec_skill["name"], spec_skill['grade'])
+            msg += "{}专属:{}({}级)".format(
+                (" " if not normal_skill else sep),
+                spec_skill["name"],
+                spec_skill['grade'],
+            )
 
     if chosen_attribute is not None:
         msg += "-{}:{}".format(
@@ -89,7 +102,7 @@ def format_plant_info(
         ]
     for attr_name in attribute_list:
         msg += "\n{}{}:{}".format(
-            ("    " if need_tab else ""),
+            tab,
             attr_name.replace("特", ""),
             format_number(getattr(plant, attribute2plant_attribute[attr_name])),
         )

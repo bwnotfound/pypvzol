@@ -142,7 +142,7 @@ class WebRequest:
     def get_private_cache(self, url):
         if "pvzol" not in url:
             return None
-        url = url.replace("http://pvzol.org/", "")
+        url = url.replace(f"http://{self.cfg.host}/", "")
         src_path = os.path.join("./data/cache", url)
         if os.path.exists(src_path) and not os.path.isdir(src_path):
             with open(src_path, "rb") as f:
@@ -317,12 +317,12 @@ class WebRequest:
                     url_format=url_format,
                     **kwargs,
                 )
-                
+
                 # import random
                 # if random.random() < 0.2:
-                    
+
                 #     raise requests.ConnectionError("test")
-                
+
                 if len(response) == 0:
                     return None
                 try:
@@ -439,12 +439,12 @@ class WebRequest:
                     url,
                     exit_response=exit_response,
                 )
-                
+
                 # import random
 
                 # if random.random() < 0.2:
                 #     raise requests.ConnectionError("test")
-                
+
                 if exit_response:
                     return
                 if response.status != 0:
@@ -540,6 +540,7 @@ class WebRequest:
                 allow_empty=allow_empty,
                 except_retry=except_retry,
             )
+
         result = []
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=min(max_pool_size, retry_times)

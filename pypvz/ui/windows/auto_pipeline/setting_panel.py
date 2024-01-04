@@ -27,6 +27,13 @@ class OpenBoxWidget(QWidget):
         self.inputbox.setValidator(QtGui.QIntValidator(1, 99999))
         self.inputbox.textChanged.connect(self.inputbox_text_changed)
         self.main_layout.addWidget(self.inputbox)
+        self.box_type_combobox = QComboBox()
+        self.box_type_combobox.addItems(self.pipeline.box_type_str_list)
+        self.box_type_combobox.setCurrentIndex(self.pipeline.current_box_type_index)
+        self.box_type_combobox.currentIndexChanged.connect(
+            self.box_type_combobox_current_index_changed
+        )
+        self.main_layout.addWidget(self.box_type_combobox)
 
         self.setLayout(self.main_layout)
 
@@ -34,6 +41,9 @@ class OpenBoxWidget(QWidget):
         text = self.inputbox.text()
         amount = int(text) if text != "" else 0
         self.pipeline.amount = amount
+    
+    def box_type_combobox_current_index_changed(self, index):
+        self.pipeline.current_box_type_index = index
 
 
 class UpgradeQualityWidget(QWidget):

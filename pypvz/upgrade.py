@@ -231,31 +231,3 @@ class HeritageMan:
             for k, v in d.items():
                 if hasattr(self, k):
                     setattr(self, k, v)
-
-
-class SkillStoneMan:
-    def __init__(self, cfg: Config, lib: Library):
-        self.lib = lib
-        self.cfg = cfg
-        self.wr = WebRequest(cfg)
-
-    def upgrade_skill(self, plant_id, skill_dict):
-        body = [
-            float(plant_id),
-            float(skill_dict["id"]),
-        ]
-        response = self.wr.amf_post_retry(
-            body, 'api.apiorganism.skillUp', "/pvz/amf/", "合成"
-        )
-        if response.status == 1:
-            return {
-                "success": False,
-                "result": response.body.description,
-            }
-        now_id = int(response.body["now_id"])
-        upgrade_success = skill_dict["id"] != now_id
-        skill_dict["id"] = now_id
-        return {
-            "success": True,
-            "upgrade_success": upgrade_success,
-        }

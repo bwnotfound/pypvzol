@@ -43,7 +43,10 @@ class Pipeline:
     def deserialize(self, d):
         for k, v in d.items():
             if hasattr(self, k):
-                setattr(self, k, v)
+                try:
+                    setattr(self, k, v)
+                except:
+                    pass
 
 
 class SkipPipeline(Pipeline):
@@ -137,25 +140,43 @@ class OpenBox(Pipeline):
         self.repo = repo
         self.logger = logger
 
-        self.box_id = 756
         self.amount = 0
 
-    def use_tool(self):
-        return
+        self.box_type_str_list = ["魔神箱", "无极幽冥龙箱"]
+        self.box_type_quality_str_list = ["魔神", "无极"]
+        self.box_type_id_list = [756, 3000]
+        self.current_box_type_index = 0
+
+    @property
+    def box_id(self):
+        return self.box_type_id_list[self.current_box_type_index]
+
+    @property
+    def box_quality(self):
+        return self.box_type_quality_str_list[self.current_box_type_index]
+
+    @property
+    def box_name(self):
+        return self.box_type_str_list[self.current_box_type_index]
 
     def check_requirements(self):
         result = []
         tool = self.repo.get_tool(self.box_id)
         if tool is None or tool['amount'] < self.amount:
             result.append(
-                "使用物品失败，原因：魔神箱需要{}个，实际有{}个".format(
-                    self.amount, (tool['amount'] if tool is not None else 0)
+                "使用{}失败，原因：{}需要{}个，实际有{}个".format(
+                    self.box_name,
+                    self.box_name,
+                    self.amount,
+                    (tool['amount'] if tool is not None else 0),
                 )
             )
         if len(self.repo.plants) + self.amount > self.repo.organism_grid_amount:
             result.append(
-                "使用物品失败，原因：植物数量超过上限，需要开箱{}个，但仓库只有{}个空位".format(
-                    self.amount, self.repo.organism_grid_amount - len(self.repo.plants)
+                "使用{}失败，原因：植物数量超过上限，需要开箱{}个，但仓库只有{}个空位".format(
+                    self.box_name,
+                    self.amount,
+                    self.repo.organism_grid_amount - len(self.repo.plants),
                 )
             )
         return result
@@ -165,17 +186,19 @@ class OpenBox(Pipeline):
         if tool is None:
             return {
                 "success": False,
-                "info": "使用物品失败，原因：魔神箱不存在",
+                "info": "使用{}失败，原因：{}不存在".format(self.box_name, self.box_name),
             }
         if tool['amount'] < self.amount:
             return {
                 "success": False,
-                "info": "使用物品失败，原因：魔神箱需要{}个，实际有{}个".format(self.amount, tool['amount']),
+                "info": "使用{}失败，原因：{}需要{}个，实际有{}个".format(
+                    self.box_name, self.box_name, self.amount, tool['amount']
+                ),
             }
         if len(self.repo.plants) + self.amount > self.repo.organism_grid_amount:
             return {
                 "success": False,
-                "info": "使用物品失败，原因：植物数量超过上限",
+                "info": "使用{}失败，原因：植物数量超过上限".format(self.box_name),
             }
         pre_id2plant = self.repo.id2plant
         while True:
@@ -192,12 +215,16 @@ class OpenBox(Pipeline):
                     current_amount = current_tool['amount']
                 if current_amount == pre_amount:
                     self.logger.log(
-                        "使用魔神箱异常，异常原因: {}。检测到箱子数量没有变化，重新开箱".format(type(e).__name__)
+                        "使用{}异常，异常原因: {}。检测到箱子数量没有变化，重新开箱".format(
+                            self.box_name, type(e).__name__
+                        )
                     )
                     continue
                 else:
                     self.logger.log(
-                        "使用魔神箱异常，异常原因: {}。检测到箱子数量变化，判定为开箱成功".format(type(e).__name__)
+                        "使用{}异常，异常原因: {}。检测到箱子数量变化，判定为开箱成功".format(
+                            self.box_name, type(e).__name__
+                        )
                     )
                     result = {
                         "success": True,
@@ -206,25 +233,28 @@ class OpenBox(Pipeline):
         if not result['success']:
             return {
                 "success": False,
-                "info": "使用物品失败，原因：{}".format(result['result']),
+                "info": "使用{}失败，原因：{}".format(self.box_name, result['result']),
             }
         self.repo.refresh_repository()
         plant_list = []
         for plant in self.repo.plants:
-            if plant.id in pre_id2plant or plant.quality_str != "魔神":
+            if plant.id in pre_id2plant or plant.quality_str != self.box_quality:
                 continue
             plant_list.append(plant)
         if self.amount != len(plant_list):
             return {
                 "success": False,
-                "info": "打开魔神箱失败，原因：预计获得{}个魔神，实际获得{}个魔神".format(
+                "info": "打开{}失败，原因：预计获得{}个{}，实际获得{}个{}".format(
+                    self.box_name,
                     self.amount,
+                    self.box_quality,
                     len(plant_list),
+                    self.box_quality,
                 ),
             }
         return {
             "success": True,
-            "info": "使用物品成功",
+            "info": "使用{}成功".format(self.box_name),
             "result": plant_list,
         }
 
@@ -237,7 +267,15 @@ class OpenBox(Pipeline):
         return True
 
     def serialize(self):
-        return {"amount": self.amount, "box_id": self.box_id}
+        return {
+            "amount": self.amount,
+            "current_box_type_index": self.current_box_type_index,
+        }
+
+    def deserialize(self, d):
+        super().deserialize(d)
+        if self.current_box_type_index >= len(self.box_type_id_list):
+            self.current_box_type_index = 0
 
 
 class AutoChallenge(Pipeline):

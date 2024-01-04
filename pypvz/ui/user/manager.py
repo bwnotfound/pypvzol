@@ -911,3 +911,54 @@ class CommandMan:
             for k, v in d.items():
                 if hasattr(self, k):
                     setattr(self, k, v)
+
+
+class SkillMan:
+    def __init__(self, cfg: Config, lib: Library, logger: Logger):
+        self.lib = lib
+        self.cfg = cfg
+        self.logger = logger
+        self.wr = WebRequest(cfg)
+        self.pool_size = 3
+
+    def upgrade_skill(self, plant_id, skill_dict, is_spec):
+        url = 'api.apiorganism.specSkillUp' if is_spec else 'api.apiorganism.skillUp'
+        body = [
+            float(plant_id),
+            float(skill_dict["id"]),
+        ]
+        response = self.wr.amf_post_retry(
+            body, url, "/pvz/amf/", "合成", allow_empty=True
+        )
+        if response is None:
+            return response
+        if response.status == 1:
+            return {
+                "success": False,
+                "result": response.body.description,
+            }
+        now_id = int(response.body["now_id"])
+        upgrade_success = skill_dict["id"] != now_id
+        return {
+            "success": True,
+            "upgrade_success": upgrade_success,
+        }
+
+    def save(self, save_dir):
+        save_path = os.path.join(save_dir, "skill_man")
+        with open(save_path, "wb") as f:
+            pickle.dump(
+                {
+                    "pool_size": self.pool_size,
+                },
+                f,
+            )
+
+    def load(self, load_dir):
+        load_path = os.path.join(load_dir, "skill_man")
+        if os.path.exists(load_path):
+            with open(load_path, "rb") as f:
+                d = pickle.load(f)
+            for k, v in d.items():
+                if hasattr(self, k):
+                    setattr(self, k, v)
