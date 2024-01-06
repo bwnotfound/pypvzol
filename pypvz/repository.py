@@ -39,6 +39,10 @@ class Plant:
         item = root.find("ssk").find("item")
         if item is not None:
             self.special_skill_id = int(item.get("id"))
+        self.stone_level_list = []
+        for item in root.find("tals").findall("tal"):
+            self.stone_level_list.append(int(item.get("level")))
+        self.soul_level = int(root.find("soul").text)
 
     def width(self, lib: Library):
         assert hasattr(self, "_width") or lib is not None
@@ -73,7 +77,19 @@ class Repository:
     def refresh_repository(self, logger=None):
         try:
             self._lock.acquire()
-            self._refresh_repository(logger=logger)
+            cnt, max_retry = 0, 20
+            while cnt < max_retry:
+                cnt += 1
+                try:
+                    self._refresh_repository(logger=logger)
+                    break
+                except Exception as e:
+                    msg = "刷新仓库出现异常，异常类型：{}".format(type(e).__name__)
+                    if logger is not None:
+                        logger.log(msg)
+                    else:
+                        logging.warning(msg)
+                    continue
         finally:
             self._lock.release()
 

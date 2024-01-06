@@ -28,7 +28,7 @@ from .manager import (
     ServerBattleMan,
     ArenaMan,
     CommandMan,
-    SkillMan,
+    SkillStoneMan,
 )
 from .open_fuben import OpenFubenMan
 from .compound import AutoCompoundMan
@@ -93,7 +93,7 @@ class UserSettings:
         self.command_man = CommandMan(cfg, self.logger)
         self.command_enabled = False
         self.open_fuben_man = OpenFubenMan(cfg, repo, lib, self.logger)
-        self.skill_man = SkillMan(cfg, lib, self.logger)
+        self.skill_stone_man = SkillStoneMan(cfg, lib, self.logger)
 
     def _start(self, stop_channel: Queue, close_signal):
         self.repo.refresh_repository(self.logger)

@@ -913,7 +913,7 @@ class CommandMan:
                     setattr(self, k, v)
 
 
-class SkillMan:
+class SkillStoneMan:
     def __init__(self, cfg: Config, lib: Library, logger: Logger):
         self.lib = lib
         self.cfg = cfg
@@ -928,7 +928,7 @@ class SkillMan:
             float(skill_dict["id"]),
         ]
         response = self.wr.amf_post_retry(
-            body, url, "/pvz/amf/", "合成", allow_empty=True
+            body, url, "/pvz/amf/", "升级技能", allow_empty=True
         )
         if response is None:
             return response
@@ -942,6 +942,30 @@ class SkillMan:
         return {
             "success": True,
             "upgrade_success": upgrade_success,
+        }
+
+    def upgrade_stone(self, plant_id, stone_index):
+        '''
+        stone_index: [0,9)
+        return: None代表升到10级了，道具异常表示没道具了
+        '''
+        body = [
+            float(plant_id),
+            "talent_" + str(stone_index + 1),
+        ]
+        response = self.wr.amf_post_retry(
+            body, 'api.apiorganism.upgradeTalent', "/pvz/amf/", "升级宝石", allow_empty=True
+        )
+        if response is None:
+            return response
+        if response.status == 1:
+            return {
+                "success": False,
+                "result": response.body.description,
+            }
+        return {
+            "success": True,
+            "result": response.body
         }
 
     def save(self, save_dir):

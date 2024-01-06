@@ -17,6 +17,7 @@ attribute2plant_attribute = {
     "攻击特": "attack",
     "战力": "fight",
 }
+talent_name_list = ["猛攻", "强壮", "破甲", "坚韧", "疾风", "光盾", "破击", "毒雾", "净化"]
 
 
 class Tool:
