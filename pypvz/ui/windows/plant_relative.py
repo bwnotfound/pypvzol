@@ -424,8 +424,14 @@ class UpgradeSkillThread(Thread):
             if plant is None:
                 continue
             for skill_id in plant.skill_id_list:
+                skill = self.usersettings.lib.get_skill(skill_id)
+                if int(skill['next_grade_id']) == 0:
+                    continue
                 upgrade_list.append((plant, self.usersettings.lib.get_skill(skill_id)))
             if plant.special_skill_id is not None:
+                skill = self.usersettings.lib.get_spec_skill(plant.special_skill_id)
+                if int(skill['next_grade_id']) == 0:
+                    continue
                 upgrade_list.append(
                     (
                         plant,
