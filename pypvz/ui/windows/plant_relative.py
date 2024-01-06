@@ -297,8 +297,6 @@ class UpgradeStoneWidget(QWidget):
         message = format_plant_info(
             plant,
             self.usersettings.lib,
-            normal_skill=True,
-            spec_skill=True,
             show_normal_attribute=True,
             need_tab=True,
         )
@@ -477,7 +475,7 @@ class UpgradeSkillThread(Thread):
                 if plant.special_skill_id is not None:
                     if plant.special_skill_id == int(
                         skill["next_grade_id"]
-                    ) or skill_id == int(skill["id"]):
+                    ) or plant.special_skill_id == int(skill["id"]):
                         new_skill = self.usersettings.lib.get_spec_skill(
                             plant.special_skill_id
                         )
