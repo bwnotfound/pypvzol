@@ -486,6 +486,11 @@ class AutoComponent(Pipeline):
 
     def run(self, plant_list, stop_channel: Queue):
         self.auto_component_man.auto_compound_pool_id.clear()
+        for scheme in self.auto_component_man.scheme_list:
+            if not scheme.enabled:
+                continue
+            scheme.auto_compound_pool_id.clear()
+            scheme.auto_synthesis_man.auto_synthesis_pool_id.clear()
         for plant in plant_list:
             self.auto_component_man.auto_compound_pool_id.add(plant.id)
         from ..windows.compound import CompoundThread

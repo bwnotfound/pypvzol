@@ -95,7 +95,7 @@ class UserSettings:
         self.open_fuben_man = OpenFubenMan(cfg, repo, lib, self.logger)
         self.skill_stone_man = SkillStoneMan(cfg, lib, self.logger)
 
-    def _start(self, stop_channel: Queue, close_signal):
+    def _start(self, stop_channel: Queue, close_signal, finish_signal):
         self.repo.refresh_repository(self.logger)
         while stop_channel.qsize() == 0:
             need_continue = False
@@ -203,7 +203,9 @@ class UserSettings:
                 try:
                     while True:
                         self.challenge4Level.has_challenged = False
-                        self.challenge4Level.auto_challenge(stop_channel)
+                        if not self.challenge4Level.auto_challenge(stop_channel):
+                            finish_signal.emit()
+                            return
                         if (
                             not self.challenge4Level.has_challenged
                             or stop_channel.qsize() > 0
@@ -214,6 +216,7 @@ class UserSettings:
             if self.exit_if_nothing_todo and not need_continue:
                 self.logger.log("没有可以做的事情了，退出用户")
                 close_signal.emit()
+                finish_signal.emit()
                 return
             self.logger.log("工作完成，等待{}".format(second2str(self.rest_time)))
             if self.rest_time == 0:
@@ -224,12 +227,13 @@ class UserSettings:
                     break
                 time.sleep(1)
         self.logger.log("停止工作")
+        finish_signal.emit()
 
-    def start(self, close_signal):
+    def start(self, close_signal, finish_signal):
         if self.start_thread is None or not self.start_thread.is_alive():
             self.start_thread = threading.Thread(
                 target=self._start,
-                args=(self.stop_channel, close_signal),
+                args=(self.stop_channel, close_signal, finish_signal),
             )
             self.start_thread.start()
 

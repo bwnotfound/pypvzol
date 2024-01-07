@@ -62,8 +62,8 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         # 将窗口居中显示，宽度为显示器宽度的40%，高度为显示器高度的60%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.4), int(screen_size.height() * 0.8))
-        self.move(int(screen_size.width() * 0.3), int(screen_size.height() * 0.05))
+        self.resize(int(screen_size.width() * 0.4), int(screen_size.height() * 0.85))
+        self.move(int(screen_size.width() * 0.3), int(screen_size.height() * 0.03))
 
         main_widget = QWidget()
         main_layout = QHBoxLayout()
@@ -250,6 +250,30 @@ class Challenge4levelSettingWindow(QMainWindow):
         exit_no_trash_plant_layout.addWidget(self.exit_no_trash_plant_checkbox)
         right_panel_layout.addLayout(exit_no_trash_plant_layout)
 
+        show_series_success_layout = QHBoxLayout()
+        show_series_success_layout.addWidget(QLabel("显示连胜:"))
+        self.show_series_success_checkbox = QCheckBox()
+        self.show_series_success_checkbox.setChecked(
+            self.challenge4Level.show_series_success
+        )
+        self.show_series_success_checkbox.stateChanged.connect(
+            self.show_series_success_checkbox_stateChanged
+        )
+        show_series_success_layout.addWidget(self.show_series_success_checkbox)
+        right_panel_layout.addLayout(show_series_success_layout)
+        
+        series_success_exit_layout = QHBoxLayout()
+        series_success_exit_layout.addWidget(QLabel("连胜20次停止:"))
+        self.series_success_exit_checkbox = QCheckBox()
+        self.series_success_exit_checkbox.setChecked(
+            self.challenge4Level.series_success_exit
+        )
+        self.series_success_exit_checkbox.stateChanged.connect(
+            self.series_success_exit_checkbox_stateChanged
+        )
+        series_success_exit_layout.addWidget(self.series_success_exit_checkbox)
+        right_panel_layout.addLayout(series_success_exit_layout)
+
         widget2 = QWidget()
         widget2_layout = QHBoxLayout()
         widget2_layout.addWidget(QLabel("自动使用挑战书(优先高挑):"))
@@ -391,6 +415,16 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def show_series_success_checkbox_stateChanged(self):
+        self.challenge4Level.show_series_success = (
+            self.show_series_success_checkbox.isChecked()
+        )
+            
+    def series_success_exit_checkbox_stateChanged(self):
+        self.challenge4Level.series_success_exit = (
+            self.series_success_exit_checkbox.isChecked()
+        )
 
     def exit_no_trash_plant_checkbox_stateChanged(self):
         self.challenge4Level.exit_no_trash_plant = (

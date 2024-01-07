@@ -116,7 +116,7 @@ class CompoundScheme:
 
     def one_cycle_consume(self):
         inherit_book_num_required = self.m
-        inherit_reinforce_num_required = (10 - self.k) * self.m
+        inherit_reinforce_num_required = self.k * self.m
         synthesis_book_num_required = self.deputy_plant_num_required
         synthesis_reinforce_num_required = synthesis_book_num_required * 10
         deputy_plant_num_required = synthesis_book_num_required
@@ -184,7 +184,7 @@ class CompoundScheme:
             self.source_plant_id,
             copy_plant_id,
             self.inherit_book['id'],
-            10 - self.k,
+            self.k,
         )
         signal_block_emit(refresh_signal)
         if not success:

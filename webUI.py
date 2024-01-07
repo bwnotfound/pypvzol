@@ -666,11 +666,13 @@ class FunctionPanelWindow(QMainWindow):
 class CustomMainWindow(QMainWindow):
     logger_signal = pyqtSignal()
     close_signal = pyqtSignal()
+    finish_signal = pyqtSignal()
 
     def __init__(self, usersettings: UserSettings, cache_dir):
         super().__init__()
         self.usersettings = usersettings
         self.close_signal.connect(self.close)
+        self.finish_signal.connect(self.stop_prcess)
 
         self.wr_cache = WebRequest(self.usersettings.cfg, cache_dir=cache_dir)
         self.line_cnt = 0
@@ -858,7 +860,7 @@ class CustomMainWindow(QMainWindow):
         while self.usersettings.stop_channel.qsize() > 0:
             self.usersettings.stop_channel.get()
         self.usersettings.logger.log("开始运行")
-        self.usersettings.start(self.close_signal)
+        self.usersettings.start(self.close_signal, self.finish_signal)
 
     def stop_prcess(self):
         self.process_button.setText("开始")

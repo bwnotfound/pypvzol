@@ -61,6 +61,8 @@ class Challenge4Level:
         self.enable_stone = True
         self.enable_large_plant_team = False
         self.exit_no_trash_plant = False
+        self.show_series_success = False
+        self.series_success_exit = False
 
         self.disable_cave_info_fetch = False
         self.challenge_sand_cave_only_in_disable_mode = False
@@ -71,7 +73,7 @@ class Challenge4Level:
 
         self.main_plant_recover = False
         self.main_plant_recover_rate = 0.1
-        
+
         self.has_challenged = False
 
     def add_cave(
@@ -376,7 +378,7 @@ class Challenge4Level:
         for friend_id, caves in self.friend_id2cave.items():
             for id, name in caves:
                 if self.exit_no_trash_plant and len(self.trash_plant_list) == 0:
-                    return
+                    return False
                 for sc in self.caves:
                     if sc.cave.id == id and sc.cave.name == name:
                         break
@@ -401,9 +403,7 @@ class Challenge4Level:
                         sand_result = self.caveMan.use_sand(cave_id)
                         if sand_result["success"]:
                             self.logger.log(
-                                "成功对{}使用时之沙".format(
-                                    sc.cave.format_name(sc.difficulty)
-                                )
+                                "成功对{}使用时之沙".format(sc.cave.format_name(sc.difficulty))
                             )
                         else:
                             self.logger.log(sand_result["result"])
@@ -438,7 +438,7 @@ class Challenge4Level:
                 ):
                     success = self._recover()
                     if not success:
-                        return
+                        return True
                 difficulty = sc.difficulty
                 friend = self.friendMan.id2friend[friend_id]
 
@@ -483,7 +483,7 @@ class Challenge4Level:
                                 break
                             message = message + "失败. 原因: {}.".format(result)
                             self.logger.log(message)
-                            return
+                            return True
                         else:
                             message = message + "成功. "
                             self.has_challenged = True
@@ -505,22 +505,35 @@ class Challenge4Level:
                 else:
                     message = message + "失败. 原因: 重试次数超过{}次.".format(max_retry)
                     self.logger.log(message)
-                    return
+                    return False
 
                 if need_skip:
                     if stop_channel.qsize() > 0:
-                        return
+                        return False
                     continue
 
                 message = message + "挑战结果：{}".format(
                     "胜利" if result['is_winning'] else "失败"
                 )
+                if self.show_series_success or self.series_success_exit:
+                    if not hasattr(sc, 'series_success_count'):
+                        sc.series_success_count = 0
+                    if result['is_winning']:
+                        sc.series_success_count += 1
+                    else:
+                        sc.series_success_count = 0
+                    if self.show_series_success:
+                        message = message + "，连胜次数：{}".format(sc.series_success_count)
                 message = message + self.format_upgrade_message(team, result)
                 self.logger.log(message)
                 if self.pop_after_100:
                     self.pop_trash_plant()
                 if stop_channel.qsize() > 0:
-                    return
+                    return False
+                if self.series_success_exit and sc.series_success_count >= 20:
+                    self.logger.log("连胜次数达到20，终止运行")
+                    return False
+        return True
 
     def challenge_stone_fuben(self, stop_channel: Queue):
         _cave_map = {}
@@ -674,10 +687,13 @@ class Challenge4Level:
                             if not self.switch_garden_layer(garden_layer):
                                 continue
                     try:
-                        self.challenge_cave(stop_channel)
+                        if not self.challenge_cave(stop_channel):
+                            return False
                     except Exception as e:
                         self.logger.log(
-                            "挑战第{}层洞口异常，异常种类:{}。跳过该层".format(garden_layer, type(e).__name__)
+                            "挑战第{}层洞口异常，异常种类:{}。跳过该层".format(
+                                garden_layer, type(e).__name__
+                            )
                         )
                 time.sleep(max(0, 0.2 - (time.perf_counter() - enter_time)))
                 if stop_channel.qsize() > 0:
@@ -686,6 +702,7 @@ class Challenge4Level:
                     continue
                 break
         self.logger.log("挑战完成")
+        return True
 
     def save(self, save_dir):
         d = {
@@ -711,6 +728,8 @@ class Challenge4Level:
             "main_plant_recover": self.main_plant_recover,
             "main_plant_recover_rate": self.main_plant_recover_rate,
             "exit_no_trash_plant": self.exit_no_trash_plant,
+            "show_series_success": self.show_series_success,
+            "series_success_exit": self.series_success_exit,
         }
         if save_dir is not None:
             save_path = os.path.join(save_dir, "user_challenge4level")
