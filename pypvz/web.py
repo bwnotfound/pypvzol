@@ -352,8 +352,8 @@ class WebRequest:
                 break
             except Exception as e:
                 if "429" in str(e):
-                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试。最多再等待{}次。异常类型: {}".format(
-                        msg, max_retry - cnt, type(e).__name__
+                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试。最多再等待{}次。".format(
+                        msg, max_retry - cnt
                     )
                     if logger is not None:
                         logger.log(warning_msg)
@@ -471,8 +471,8 @@ class WebRequest:
                 break
             except RuntimeError as e:
                 if "429" in str(e):
-                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试。最多再等待{}次。异常类型: {}".format(
-                        msg, max_retry - cnt, type(e).__name__
+                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试。最多再等待{}次".format(
+                        msg, max_retry - cnt
                     )
                     if logger is not None:
                         logger.log(warning_msg)

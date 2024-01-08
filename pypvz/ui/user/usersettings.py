@@ -194,7 +194,9 @@ class UserSettings:
                     break
             if self.fuben_enabled:
                 try:
-                    self.fuben_man.auto_challenge(stop_channel)
+                    while True:
+                        if not self.fuben_man.auto_challenge(stop_channel):
+                            break
                 except Exception as e:
                     self.logger.log(f"自动副本挑战失败，异常种类:{type(e).__name__}。跳过自动副本挑战")
                 if stop_channel.qsize() > 0:

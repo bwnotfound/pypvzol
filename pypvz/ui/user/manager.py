@@ -306,14 +306,18 @@ class FubenMan:
             assert number >= 1 and number <= len(caves)
             return caves[number - 1]
 
+        has_challenged = False
+
         for sc in self.caves:
             if stop_channel.qsize() > 0:
-                return
+                return False
             if not sc.enabled:
                 continue
             while True:
                 cave = get_fuben_cave(sc.layer, sc.number)
-                if cave.rest_count == 0 or self.challenge_amount == 0:
+                if self.challenge_amount == 0:
+                    return False
+                if cave.rest_count == 0:
                     break
 
                 def run():
@@ -344,6 +348,7 @@ class FubenMan:
 
                 challenge_count = cave.rest_count if cave.rest_count >= 0 else 100
                 futures = []
+                need_exit = False
                 with concurrent.futures.ThreadPoolExecutor(
                     max_workers=self.pool_size
                 ) as executor:
@@ -353,21 +358,29 @@ class FubenMan:
                     for future in concurrent.futures.as_completed(futures):
                         if stop_channel.qsize() > 0:
                             executor.shutdown(cancel_futures=True, wait=True)
-                            return
+                            return False
                         try:
                             if not future.result():
                                 executor.shutdown(cancel_futures=True, wait=True)
-                                return
+                                need_exit = True
+                                break
                             else:
                                 self.challenge_amount -= 1
+                                has_challenged = True
                         except Exception as e:
                             self.logger.log("挑战副本异常，异常类型：{}".format(type(e).__name__))
                             has_failure = True
                 if self.challenge_amount == 0:
                     self.logger.log("副本挑战次数用完了")
-                    return
+                    return False
+                if need_exit:
+                    break
                 if has_failure:
                     continue
+        if has_challenged:
+            return True
+        else:
+            return False
 
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "auto_fuben")
@@ -963,10 +976,7 @@ class SkillStoneMan:
                 "success": False,
                 "result": response.body.description,
             }
-        return {
-            "success": True,
-            "result": response.body
-        }
+        return {"success": True, "result": response.body}
 
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "skill_man")
