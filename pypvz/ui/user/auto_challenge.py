@@ -41,7 +41,7 @@ class Challenge4Level:
         self.repo = repo
         self.lib = lib
         self.caveMan = CaveMan(cfg, lib)
-        self.recoverMan = RecoverMan(cfg, repo)
+        self.recoverMan = RecoverMan(cfg)
         self.logger = logger
 
         self.caves: list[SingleCave] = []

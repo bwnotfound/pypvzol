@@ -225,14 +225,33 @@ class AutoSynthesisMan:
 
 
 class SingleFubenCave:
-    def __init__(self, cave: FubenCave, layer, number, use_sand=False, enabled=True):
-        self.name = cave.name
-        self.cave_id = cave.cave_id
-        self.rest_count = cave.rest_count
+    def __init__(
+        self,
+        cave: FubenCave,
+        layer,
+        number,
+        use_sand=False,
+        enabled=True,
+        global_layer=1,
+    ):
+        self.cave = cave
         self.layer = layer
         self.number = number
         self.use_sand = use_sand
         self.enabled = enabled
+        self.global_layer = global_layer
+
+    @property
+    def name(self):
+        return self.cave.name
+
+    @property
+    def cave_id(self):
+        return self.cave.cave_id
+
+    @property
+    def rest_count(self):
+        return self.cave.rest_count
 
 
 class FubenMan:
@@ -241,7 +260,7 @@ class FubenMan:
         self.repo = repo
         self.logger = logger
         self.fuben_request = WorldFubenRequest(cfg)
-        self.recover_man = RecoverMan(cfg, repo)
+        self.recover_man = RecoverMan(cfg)
         self.caves: list[SingleFubenCave] = []
         self.team = []
         self.show_lottery = False
@@ -249,16 +268,33 @@ class FubenMan:
         self.recover_hp_choice = "中级血瓶"
         self.pool_size = 3
         self.challenge_amount = 0
+        self.current_fuben_layer = None
+        self.has_challenged = False
 
-    def add_cave(self, cave: FubenCave, layer, number, use_sand=False, enabled=True):
+    def add_cave(
+        self,
+        cave: FubenCave,
+        layer,
+        number,
+        use_sand=False,
+        enabled=True,
+        global_layer=1,
+    ):
         for sc in self.caves:
-            if cave.cave_id == sc.cave_id:
+            if cave.cave_id == sc.cave_id and global_layer == sc.global_layer:
                 return
-        sc = SingleFubenCave(cave, layer, number, use_sand, enabled)
+        sc = SingleFubenCave(cave, layer, number, use_sand, enabled, global_layer)
         self.caves.append(sc)
 
-    def delete_cave(self, cave_id):
-        self.caves = list(filter(lambda x: x.cave_id != cave_id, self.caves))
+    def delete_cave(self, sc: SingleFubenCave):
+        self.caves = list(
+            filter(
+                lambda x: not (
+                    x.cave_id == sc.cave_id and x.global_layer == sc.global_layer
+                ),
+                self.caves,
+            )
+        )
 
     def get_caves(self, layer):
         return self.fuben_request.get_caves(layer, self.logger)
@@ -292,7 +328,34 @@ class FubenMan:
             self.logger.log("成功给{}个植物回复血量".format(success_num_all))
         return True
 
-    def auto_challenge(self, stop_channel: Queue):
+    def switch_fuben_layer(self, target_layer):
+        if (
+            self.current_fuben_layer is not None
+            and target_layer == self.current_fuben_layer
+        ):
+            return True
+
+        cnt, max_retry = 0, 20
+        while cnt < max_retry:
+            cnt += 1
+            try:
+                self.fuben_request.switch_layer(target_layer, self.logger)
+                break
+            except Exception as e:
+                self.logger.log(
+                    "切换到{}层失败，暂停1秒，最多再尝试{}次切换。异常种类:{}".format(
+                        target_layer, max_retry - cnt, type(e).__name__
+                    )
+                )
+                time.sleep(1)
+                continue
+        else:
+            self.logger.log("切换到{}层失败，跳过该层".format(target_layer))
+            return False
+        self.current_fuben_layer = target_layer
+        return True
+
+    def challenge(self, sc_list: list[SingleFubenCave], stop_channel: Queue):
         _cave_map = {}
 
         def get_fuben_cave(layer, number) -> FubenCave:
@@ -306,9 +369,7 @@ class FubenMan:
             assert number >= 1 and number <= len(caves)
             return caves[number - 1]
 
-        has_challenged = False
-
-        for sc in self.caves:
+        for sc in sc_list:
             if stop_channel.qsize() > 0:
                 return False
             if not sc.enabled:
@@ -366,7 +427,7 @@ class FubenMan:
                                 break
                             else:
                                 self.challenge_amount -= 1
-                                has_challenged = True
+                                self.has_challenged = True
                         except Exception as e:
                             self.logger.log("挑战副本异常，异常类型：{}".format(type(e).__name__))
                             has_failure = True
@@ -377,7 +438,26 @@ class FubenMan:
                     break
                 if has_failure:
                     continue
-        if has_challenged:
+        return True
+
+    def auto_challenge(self, stop_channel: Queue):
+        self.has_challenged = False
+
+        layer_sc_dict = {}
+        for sc in self.caves:
+            layer_sc_dict.setdefault(sc.global_layer, []).append(sc)
+
+        for layer, sc_list in layer_sc_dict.items():
+            if len(sc_list) == 0:
+                continue
+            if not self.switch_fuben_layer(layer):
+                self.logger.log("切换到{}层失败，退出自动副本".format(layer))
+                return False
+            if not self.challenge(sc_list, stop_channel):
+                self.logger.log("自动副本出现问题，退出自动副本")
+                return False
+
+        if self.has_challenged:
             return True
         else:
             return False
@@ -405,6 +485,10 @@ class FubenMan:
             for k, v in d.items():
                 if hasattr(self, k):
                     setattr(self, k, v)
+            if len(self.caves) > 0:
+                sc = self.caves[0]
+                if not hasattr(sc, "global_layer") or not hasattr(sc, "cave"):
+                    self.caves = []
 
 
 class TerritoryMan:

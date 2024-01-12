@@ -1,7 +1,8 @@
-from time import sleep
+import logging
 
 from .web import WebRequest
 from .config import Config
+from .library import Library
 
 
 class FubenCave:
@@ -17,6 +18,20 @@ class FubenCave:
         self.reward = (
             int(root['reward']) if root['reward'] != "" else None
         )  # 外显奖励的tool_id。None表示没有
+
+    def reward_info(self, lib: Library):
+        if self.reward is None:
+            return ""
+        tool = lib.get_tool_by_id(self.reward)
+        return tool.name
+
+    def format_info(self, lib: Library = None, show_reward=False):
+        result = self.name
+        if show_reward:
+            assert lib is not None and isinstance(lib, Library)
+            if self.reward is not None:
+                result += " (掉落：{})".format(self.reward_info(lib))
+        return result
 
 
 class WorldFubenRequest:
@@ -61,3 +76,27 @@ class WorldFubenRequest:
             "success": True,
             "result": response.body,
         }
+
+    def switch_layer(self, target_layer, logger=None):
+        '''target_layer: [1,2]'''
+        layer_chinese_list = ["一", "二"]
+        while True:
+            body = [float(1), float(1), float(0), []]
+            response = self.wr.amf_post_retry(
+                body,
+                "api.garden.challenge",
+                "/pvz/amf/",
+                "切换副本层数",
+                logger=logger,
+                except_retry=True,
+            )
+            if response.status != 1:
+                raise RuntimeError("切换副本层数失败，异常信息：" + str(response.body))
+            text = response.body.description
+            current_layer = layer_chinese_list.index(text[-2]) + 1
+            if logger is not None:
+                logger.log(text)
+            else:
+                logging.info(text)
+            if current_layer == target_layer:
+                break

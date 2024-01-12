@@ -962,7 +962,7 @@ class LoginWindow(QMainWindow):
         region_layout = QHBoxLayout()
         region_layout.addWidget(QLabel("区服:"))
         self.region_input = region_input = QComboBox()
-        region_input.addItems([f"官服{i}区" for i in range(12, 46 + 1)])
+        # region_input.addItems([f"官服{i}区" for i in range(12, 46 + 1)])
         region_input.addItems([f"私服{i}区" for i in range(1, 10)])
         region_input.addItem("测试服")
         region_layout.addWidget(region_input)

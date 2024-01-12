@@ -25,6 +25,7 @@ class FubenSelectWindow(QMainWindow):
         self.usersettings = usersettings
         self.refresh_signal = refresh_signal
         self.fuben_layer_cache = {}
+        self.usersettings.fuben_man.switch_fuben_layer(1)
         self.init_ui()
 
     def init_ui(self):
@@ -32,8 +33,8 @@ class FubenSelectWindow(QMainWindow):
 
         # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.3), int(screen_size.height() * 0.5))
-        self.move(int(screen_size.width() * 0.35), int(screen_size.height() * 0.25))
+        self.resize(int(screen_size.width() * 0.4), int(screen_size.height() * 0.5))
+        self.move(int(screen_size.width() * 0.3), int(screen_size.height() * 0.25))
 
         main_widget = QWidget()
         main_layout = QHBoxLayout()
@@ -64,25 +65,60 @@ class FubenSelectWindow(QMainWindow):
         cave_widget.setLayout(cave_layout)
         main_layout.addWidget(cave_widget)
 
+        switch_fuben_layer_widget = QWidget()
+        switch_fuben_layer_widget.setFixedWidth(int(self.width() * 0.2))
+        switch_fuben_layer_layout = QVBoxLayout()
+        switch_fuben_layer_layout.addStretch(1)
+        switch_fuben_layer_layout.addWidget(QLabel("切换副本层级"))
+        self.switch_fuben_layer_combobox = QComboBox()
+        self.switch_fuben_layer_combobox.addItems(["第一层", "第二层"])
+        self.switch_fuben_layer_combobox.setCurrentIndex(
+            self.usersettings.fuben_man.current_fuben_layer - 1
+        )
+        self.switch_fuben_layer_combobox.currentIndexChanged.connect(
+            self.switch_fuben_layer_combobox_index_changed
+        )
+        switch_fuben_layer_layout.addWidget(self.switch_fuben_layer_combobox)
+        switch_fuben_layer_layout.addStretch(1)
+        switch_fuben_layer_widget.setLayout(switch_fuben_layer_layout)
+        main_layout.addWidget(switch_fuben_layer_widget)
+
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
-    def cave_type_list_widget_clicked(self, item):
-        self.cave_list_widget.clear()
-        layer = item.data(Qt.ItemDataRole.UserRole)
-        if self.fuben_layer_cache.get(layer, None) is None:
+    def switch_fuben_layer_combobox_index_changed(self):
+        layer = self.switch_fuben_layer_combobox.currentIndex() + 1
+        self.usersettings.fuben_man.switch_fuben_layer(layer)
+        self.refresh_cave_list()
+
+    def refresh_cave_list(self):
+        layer = self.cave_type_list_widget.currentItem().data(Qt.ItemDataRole.UserRole)
+        global_layer = self.usersettings.fuben_man.current_fuben_layer
+        fuben_layer_cache = self.fuben_layer_cache.get(global_layer, None)
+        if fuben_layer_cache is None:
+            self.fuben_layer_cache[global_layer] = {}
+            fuben_layer_cache = self.fuben_layer_cache[global_layer]
+        if fuben_layer_cache.get(layer, None) is None:
             caves = self.usersettings.fuben_man.get_caves(layer)
-            self.fuben_layer_cache[layer] = caves
+            fuben_layer_cache[layer] = caves
         else:
-            caves = self.fuben_layer_cache[layer]
+            caves = fuben_layer_cache[layer]
+        self.cave_list_widget.clear()
         for i, cave in enumerate(caves):
-            item = QListWidgetItem(cave.name)
-            item.setData(Qt.ItemDataRole.UserRole, (cave, layer, i + 1))
+            item = QListWidgetItem(
+                cave.format_info(lib=self.usersettings.lib, show_reward=True)
+            )
+            item.setData(Qt.ItemDataRole.UserRole, (global_layer, cave, layer, i + 1))
             self.cave_list_widget.addItem(item)
 
+    def cave_type_list_widget_clicked(self):
+        self.refresh_cave_list()
+
     def cave_list_widget_clicked(self, item):
-        cave, layer, number = item.data(Qt.ItemDataRole.UserRole)
-        self.usersettings.fuben_man.add_cave(cave, layer, number)
+        global_layer, cave, layer, number = item.data(Qt.ItemDataRole.UserRole)
+        self.usersettings.fuben_man.add_cave(
+            cave, layer, number, global_layer=global_layer
+        )
         self.refresh_signal.emit()
 
 
@@ -104,15 +140,15 @@ class FubenSettingWindow(QMainWindow):
 
         # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.6), int(screen_size.height() * 0.5))
-        self.move(int(screen_size.width() * 0.2), int(screen_size.height() * 0.25))
+        self.resize(int(screen_size.width() * 0.7), int(screen_size.height() * 0.5))
+        self.move(int(screen_size.width() * 0.15), int(screen_size.height() * 0.25))
 
         main_widget = QWidget()
         main_layout = QHBoxLayout()
         main_layout.setSpacing(3)
 
         widget1 = QWidget()
-        widget1.setMinimumWidth(int(self.width() * 0.15))
+        widget1.setMinimumWidth(int(self.width() * 0.2))
         layout1 = QVBoxLayout()
         layout1_1 = QHBoxLayout()
         layout1_1.addWidget(QLabel("副本洞口"))
@@ -157,8 +193,9 @@ class FubenSettingWindow(QMainWindow):
         widget4.setLayout(layout4)
 
         widget5 = QWidget()
-        widget5.setMinimumWidth(int(self.width() * 0.25))
+        widget5.setMinimumWidth(int(self.width() * 0.2))
         layout5 = QVBoxLayout()
+        layout5.addStretch(1)
         self.need_recovery_checkbox = QCheckBox("是否需要恢复:")
         self.need_recovery_checkbox.stateChanged.connect(
             self.need_recovery_checkbox_state_changed
@@ -185,6 +222,7 @@ class FubenSettingWindow(QMainWindow):
         )
         layout.addWidget(self.pool_size_combobox)
         layout5.addLayout(layout)
+        layout5.addStretch(1)
         widget5.setLayout(layout5)
 
         main_layout.addWidget(widget1)
@@ -226,8 +264,10 @@ class FubenSettingWindow(QMainWindow):
     def refresh_cave_list(self):
         self.fuben_list_widget.clear()
         for sc in self.usersettings.fuben_man.caves:
-            item = QListWidgetItem(sc.name)
-            item.setData(Qt.ItemDataRole.UserRole, sc.cave_id)
+            item = QListWidgetItem(
+                sc.cave.format_info(lib=self.usersettings.lib, show_reward=True)
+            )
+            item.setData(Qt.ItemDataRole.UserRole, sc)
             self.fuben_list_widget.addItem(item)
 
     def refresh_team_list(self):
@@ -270,11 +310,11 @@ class FubenSettingWindow(QMainWindow):
                 item.data(Qt.ItemDataRole.UserRole)
                 for item in self.last_focus_list_widget.selectedItems()
             ]
-            if self.last_focus_list_widget == self.fuben_list_widget:
-                for cave_id in items:
-                    self.usersettings.fuben_man.delete_cave(cave_id)
+            if self.last_focus_list_widget is self.fuben_list_widget:
+                for sc in items:
+                    self.usersettings.fuben_man.delete_cave(sc)
                 self.refresh_cave_list()
-            elif self.last_focus_list_widget == self.team_list_widget:
+            elif self.last_focus_list_widget is self.team_list_widget:
                 self.usersettings.fuben_man.team = [
                     plant_id
                     for plant_id in self.usersettings.fuben_man.team

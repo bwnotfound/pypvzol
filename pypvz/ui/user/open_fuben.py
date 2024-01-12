@@ -27,7 +27,7 @@ class OpenFubenMan:
         self.ignored_cave_list = []
         self.wr = WebRequest(cfg)
         self.shop_req = Shop(cfg)
-        self.recover_man = RecoverMan(cfg, repo)
+        self.recover_man = RecoverMan(cfg)
         self.fuben_layer_info_list: list[list[FubenCave]] = [None for _ in range(5)]
         self.max_pool_size = 3
         self.min_challenge_amount = 5

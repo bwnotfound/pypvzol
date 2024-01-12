@@ -12,10 +12,9 @@ from .. import Config, WebRequest, Repository
 
 
 class RecoverMan:
-    def __init__(self, cfg: Config, repo: Repository):
+    def __init__(self, cfg: Config):
         self.wr = WebRequest(cfg)
         self.cfg = cfg
-        self.repo = repo
         self.heal_dict = {
             "低级血瓶": 13,
             "中级血瓶": 14,
@@ -62,10 +61,10 @@ class RecoverMan:
                 fail_num += 1
         return success_num, fail_num
 
-    def recover_zero(self, need_refresh=True, choice='中级血瓶'):
+    def recover_zero(self, repo: Repository, need_refresh=True, choice='中级血瓶'):
         if need_refresh:
-            self.repo.refresh_repository()
-        hp_zeros = self.repo.hp_below(0, id_only=True)
+            repo.refresh_repository()
+        hp_zeros = repo.hp_below(0, id_only=True)
         return self.recover_list(hp_zeros, choice)
 
     # def recover_zero_loop(self, time_gap=2, log=False):

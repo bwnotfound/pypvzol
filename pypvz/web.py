@@ -381,12 +381,13 @@ class WebRequest:
             raise Exception(warning_msg)
         return response
 
-    def _amf_post_decode(self, url, data, exit_response=False):
+    def _amf_post_decode(self, url, data, exit_response=False, **kwargs):
         resp = self.post(
             url,
             data=data,
             exit_response=exit_response,
             headers={"Content-Type": "application/x-amf"},
+            **kwargs,
         )
         if exit_response:
             return
@@ -402,6 +403,7 @@ class WebRequest:
         target,
         url,
         exit_response=False,
+        **kwargs,
     ):
         req = remoting.Request(target=target, body=body)
         ev = remoting.Envelope(AMF3)
@@ -411,6 +413,7 @@ class WebRequest:
             url,
             bin_msg.getvalue(),
             exit_response=exit_response,
+            **kwargs,
         )
         if exit_response:
             return
@@ -427,6 +430,7 @@ class WebRequest:
         exit_response=False,
         allow_empty=False,
         except_retry=False,
+        **kwargs,
     ):
         cnt = 0
         while cnt < max_retry:
@@ -438,6 +442,7 @@ class WebRequest:
                     target,
                     url,
                     exit_response=exit_response,
+                    **kwargs,
                 )
 
                 # import random
