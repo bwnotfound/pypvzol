@@ -38,6 +38,8 @@ class Library:
         self.cfg = cfg
         self.wr = WebRequest(cfg)
         self.refresh_library()
+        self.watch_id = 613  # 时之怀表id
+        self.fuben_book_id = 612  # 副本挑战书id
 
     def refresh_library(self):
         results = self.wr.get_async_gather(

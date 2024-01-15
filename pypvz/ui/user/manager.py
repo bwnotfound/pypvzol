@@ -255,9 +255,10 @@ class SingleFubenCave:
 
 
 class FubenMan:
-    def __init__(self, cfg: Config, repo: Repository, logger: Logger):
+    def __init__(self, cfg: Config, repo: Repository, lib: Library, logger: Logger):
         self.cfg = cfg
         self.repo = repo
+        self.lib = lib
         self.logger = logger
         self.fuben_request = WorldFubenRequest(cfg)
         self.recover_man = RecoverMan(cfg)
@@ -270,6 +271,8 @@ class FubenMan:
         self.challenge_amount = 0
         self.current_fuben_layer = None
         self.has_challenged = False
+        self.use_fuben_book_enabled = False
+        self.infinit_cave_min_challenge_amount = 10
 
     def add_cave(
         self,
@@ -355,12 +358,69 @@ class FubenMan:
         self.current_fuben_layer = target_layer
         return True
 
+    def use_fuben_book(self, amount, stop_channel: Queue):
+        if amount == 0:
+            self.logger.log("使用0本副本挑战书，跳过使用")
+            return True
+        repo_tool_amount = self.repo.get_tool(
+            self.lib.fuben_book_id, return_amount=True
+        )
+        if repo_tool_amount < amount:
+            self.logger.log("挑战世界副本失败，原因：副本挑战书数量不足，终止挑战")
+            return False
+        cnt, max_retry = 0, 20
+        while cnt < max_retry:
+            if stop_channel.qsize() > 0:
+                return False
+            try:
+                use_result = self.repo.use_tool(
+                    self.lib.fuben_book_id, amount, self.lib
+                )
+                if not use_result["success"]:
+                    self.logger.log(
+                        "使用{}本副本挑战书失败，原因：{}".format(amount, use_result['result'])
+                    )
+                    return False
+                if use_result["effect"] != amount:
+                    self.logger.log(
+                        "使用副本挑战书失败，预计使用{}本，实际使用{}本，终止挑战".format(
+                            amount, use_result["effect"]
+                        )
+                    )
+                    return False
+                self.logger.log(
+                    "使用{}本副本挑战书成功，剩余{}本".format(amount, repo_tool_amount - amount)
+                )
+                self.repo.remove_tool(self.lib.fuben_book_id, amount)
+                break
+            except Exception as e:
+                self.logger.log(
+                    "使用{}本副本挑战书出现异常，异常种类：{}，尝试刷新仓库".format(amount, type(e).__name__)
+                )
+                self.repo.refresh_repository()
+                if (
+                    self.repo.get_tool(self.lib.fuben_book_id, return_amount=True)
+                    == repo_tool_amount - amount
+                ):
+                    self.logger.log("仓库副本挑战书数量减少符合预期值，判定使用副本挑战书成功")
+                    break
+                cnt += 1
+                self.logger.log(
+                    "仓库副本挑战书数量不符合预期值{}，暂停1s继续，最多再尝试{}次".format(
+                        repo_tool_amount - amount, max_retry - cnt
+                    )
+                )
+                time.sleep(1)
+                continue
+        self.challenge_amount += amount
+        return True
+
     def challenge(self, sc_list: list[SingleFubenCave], stop_channel: Queue):
         _cave_map = {}
 
-        def get_fuben_cave(layer, number) -> FubenCave:
+        def get_fuben_cave(layer, number, use_cache=True) -> FubenCave:
             caves = _cave_map.get(layer, None)
-            if caves is None:
+            if caves is None or not use_cache:
                 data = self.fuben_request.get_caves(
                     layer, self.logger, return_challenge_amount=True
                 )
@@ -376,10 +436,22 @@ class FubenMan:
                 continue
             while True:
                 cave = get_fuben_cave(sc.layer, sc.number)
-                if self.challenge_amount == 0:
-                    return False
                 if cave.rest_count == 0:
                     break
+                if not self.use_fuben_book_enabled:
+                    if self.challenge_amount == 0:
+                        return False
+                else:
+                    use_amount = (
+                        cave.rest_count
+                        if cave.rest_count >= 0
+                        else self.infinit_cave_min_challenge_amount
+                    )
+                    use_amount -= self.challenge_amount
+                    if use_amount > 0:
+                        result = self.use_fuben_book(use_amount, stop_channel)
+                        if not result:
+                            return False
 
                 def run():
                     if self.need_recovery:
@@ -407,7 +479,11 @@ class FubenMan:
                         return False
                     return True
 
-                challenge_count = cave.rest_count if cave.rest_count >= 0 else 100
+                challenge_count = (
+                    cave.rest_count
+                    if cave.rest_count >= 0
+                    else self.infinit_cave_min_challenge_amount
+                )
                 futures = []
                 need_exit = False
                 with concurrent.futures.ThreadPoolExecutor(
@@ -427,22 +503,26 @@ class FubenMan:
                                 break
                             else:
                                 self.challenge_amount -= 1
+                                if cave.rest_count >= 0:
+                                    cave.rest_count = max(cave.rest_count - 1, 0)
                                 self.has_challenged = True
                         except Exception as e:
                             self.logger.log("挑战副本异常，异常类型：{}".format(type(e).__name__))
                             has_failure = True
-                if self.challenge_amount == 0:
+                if self.challenge_amount == 0 and not self.use_fuben_book_enabled:
                     self.logger.log("副本挑战次数用完了")
                     return False
                 if need_exit:
                     break
                 if has_failure:
+                    self.repo.refresh_repository()
+                    get_fuben_cave(1, 1, use_cache=False)
                     continue
         return True
 
     def auto_challenge(self, stop_channel: Queue):
         self.has_challenged = False
-
+        self.repo.refresh_repository()
         layer_sc_dict = {}
         for sc in self.caves:
             layer_sc_dict.setdefault(sc.global_layer, []).append(sc)
@@ -473,6 +553,7 @@ class FubenMan:
                     "need_recovery": self.need_recovery,
                     "recover_hp_choice": self.recover_hp_choice,
                     "pool_size": self.pool_size,
+                    "use_fuben_book_enabled": self.use_fuben_book_enabled,
                 },
                 f,
             )

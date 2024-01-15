@@ -209,7 +209,18 @@ class FubenSettingWindow(QMainWindow):
         self.recovery_combo.currentIndexChanged.connect(
             self.recovery_combo_index_changed
         )
+        self.recovery_combo.setCurrentText(
+            self.usersettings.fuben_man.recover_hp_choice
+        )
         layout5.addWidget(self.recovery_combo)
+        self.use_fuben_book_enabled_checkbox = QCheckBox("是否自动使用副本书:")
+        self.use_fuben_book_enabled_checkbox.setChecked(
+            self.usersettings.fuben_man.use_fuben_book_enabled
+        )
+        self.use_fuben_book_enabled_checkbox.stateChanged.connect(
+            self.use_fuben_book_enabled_checkbox_state_changed
+        )
+        layout5.addWidget(self.use_fuben_book_enabled_checkbox)
         layout = QHBoxLayout()
         layout.addWidget(QLabel("并发数:"))
         self.pool_size_combobox = QComboBox()
@@ -233,6 +244,11 @@ class FubenSettingWindow(QMainWindow):
         main_widget.setLayout(main_layout)
 
         self.setCentralWidget(main_widget)
+
+    def use_fuben_book_enabled_checkbox_state_changed(self):
+        self.usersettings.fuben_man.use_fuben_book_enabled = (
+            self.use_fuben_book_enabled_checkbox.isChecked()
+        )
 
     def pool_size_combobox_index_changed(self):
         self.usersettings.fuben_man.pool_size = (

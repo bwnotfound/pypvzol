@@ -76,7 +76,7 @@ class UserSettings:
         self.serverbattle_man = ServerBattleMan(self.cfg, logger=self.logger)
         self.serverbattle_enabled = False
         self.auto_compound_man = AutoCompoundMan(cfg, lib, repo, self.logger)
-        self.fuben_man = FubenMan(cfg, repo, self.logger)
+        self.fuben_man = FubenMan(cfg, repo, lib, self.logger)
         self.fuben_enabled = False
         self.territory_man = TerritoryMan(cfg, repo, self.logger)
         self.territory_enabled = False

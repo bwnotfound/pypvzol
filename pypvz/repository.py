@@ -223,10 +223,16 @@ class Repository:
         body = [float(tool_id), float(amount)]
         response = self.wr.amf_post_retry(body, "api.tool.useOf", "/pvz/amf/", "使用物品")
         if response.status == 0:
-            return {
+            result = {
                 "success": True,
                 "result": "使用了{}个{}".format(amount, lib.get_tool_by_id(tool_id).name),
             }
+            try:
+                effect = int(response.body['effect'])
+                result['effect'] = effect
+            except:
+                pass
+            return result
         else:
             return {
                 "success": False,
