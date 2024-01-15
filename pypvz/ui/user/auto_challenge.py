@@ -483,7 +483,7 @@ class Challenge4Level:
                                 break
                             message = message + "失败. 原因: {}.".format(result)
                             self.logger.log(message)
-                            return True
+                            return False
                         else:
                             message = message + "成功. "
                             self.has_challenged = True

@@ -168,7 +168,12 @@ class CaveMan:
             [int(i) for i in plant_list],
             float(difficulty),
         ]
-        response = self.wr.amf_post_retry(body, target_amf, '/pvz/amf/', '洞口挑战')
+        response = self.wr.amf_post_retry(body, target_amf, '/pvz/amf/', '洞口挑战', allow_empty=True)
+        if response is None:
+            return {
+                "success": False,
+                "result": "可能是植物没血了",
+            }
         if response.status == 0:
             return {"success": True, "result": response.body}
         else:
