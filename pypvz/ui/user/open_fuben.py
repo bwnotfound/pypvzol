@@ -1,6 +1,5 @@
 import pickle
 import concurrent.futures
-from queue import Queue
 import os
 from threading import Event
 import time
@@ -14,7 +13,6 @@ from ..message import Logger
 from ...shop import Shop
 from ...fuben import FubenCave
 from ...utils.recover import RecoverMan
-from ..wrapped import signal_block_emit
 
 
 class OpenFubenMan:

@@ -4,6 +4,7 @@ import time
 from queue import Queue
 import threading
 from time import perf_counter
+import concurrent.futures
 
 from ...shop import Shop
 
@@ -240,6 +241,8 @@ class UserSettings:
             self.start_thread.start()
 
     def save(self):
+        if self.save_dir is None:
+            return
         self.challenge4Level.save(self.save_dir)
         save_path = os.path.join(self.save_dir, "usersettings_state")
         with open(save_path, "wb") as f:
@@ -305,3 +308,60 @@ class UserSettings:
         self.serverbattle_man.load(self.save_dir)
         self.command_man.load(self.save_dir)
         self.open_fuben_man.load(self.save_dir)
+
+
+class GetUsersettings(threading.Thread):
+    def __init__(self, cfg: Config, root_dir, finish_trigger):
+        super().__init__()
+        self.cfg = cfg
+        self.root_dir = root_dir
+        self.finish_trigger = finish_trigger
+
+    def run(self):
+        data_dir = os.path.join(
+            self.root_dir,
+            f"data/user/{self.cfg.username}/{self.cfg.region}/{self.cfg.host}",
+        )
+        os.makedirs(data_dir, exist_ok=True)
+        cache_dir = os.path.join(data_dir, "cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        log_dir = os.path.join(data_dir, "log")
+        os.makedirs(log_dir, exist_ok=True)
+        setting_dir = os.path.join(data_dir, "usersettings")
+        os.makedirs(setting_dir, exist_ok=True)
+
+        max_info_capacity = 500
+        # TODO: 从配置文件中读取
+        logger = IOLogger(log_dir, max_info_capacity=max_info_capacity)
+        usersettings = get_usersettings(self.cfg, logger, setting_dir)
+        self.finish_trigger.emit((usersettings, cache_dir))
+
+
+def get_usersettings(cfg: Config, logger: IOLogger, setting_dir):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        futures = []
+        futures.append(executor.submit(User, cfg))
+        futures.append(executor.submit(Library, cfg))
+        futures.append(executor.submit(Repository, cfg))
+
+    concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
+
+    user: User = futures[0].result()
+    lib: Library = futures[1].result()
+    repo: Repository = futures[2].result()
+
+    usersettings = UserSettings(
+        cfg,
+        repo,
+        lib,
+        user,
+        logger,
+        setting_dir,
+    )
+    if not os.path.exists(setting_dir):
+        os.mkdir(setting_dir)
+        usersettings.save()
+    else:
+        usersettings.load()
+
+    return usersettings

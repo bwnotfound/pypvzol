@@ -1,9 +1,4 @@
 requests
 setuptools
-# sip
-pyqt6
-PyQt6-tools
 py3amf
-pillow
-# PyQtWebEngine
-pyinstaller
+py4j
