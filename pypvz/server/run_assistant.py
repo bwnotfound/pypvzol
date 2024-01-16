@@ -28,6 +28,8 @@ class AssistantManager:
         user_dir = self.file_man.format_usersettings_save_dir(cfg)
         log_dir = os.path.join(user_dir, 'logs')
         setting_dir = os.path.join(user_dir, 'settings')
+        os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(setting_dir, exist_ok=True)
         io_logger = IOLogger(log_dir)
         usersettings = get_usersettings(cfg, io_logger, setting_dir)
         return usersettings

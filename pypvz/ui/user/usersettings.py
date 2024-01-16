@@ -418,10 +418,4 @@ def get_usersettings(cfg: Config, logger: IOLogger, setting_dir) -> UserSettings
         logger,
         setting_dir,
     )
-    if not os.path.exists(setting_dir):
-        os.mkdir(setting_dir)
-        usersettings.save()
-    else:
-        usersettings.load()
-
     return usersettings
