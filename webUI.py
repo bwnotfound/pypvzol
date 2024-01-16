@@ -7,6 +7,7 @@ import concurrent.futures
 import threading
 import shutil
 import warnings
+import pickle
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -382,7 +383,7 @@ class SettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-    
+
     def command_enable_checkbox_stateChanged(self):
         self.usersettings.command_enabled = self.command_enable_checkbox.isChecked()
 
@@ -400,9 +401,11 @@ class SettingWindow(QMainWindow):
         self.usersettings.serverbattle_man.rest_challenge_num_limit = int(
             self.serverbattle_rest_num_inputbox.text()
         )
-    
+
     def command_setting_btn_clicked(self):
-        self.command_setting_window = CommandSettingWindow(self.usersettings, parent=self)
+        self.command_setting_window = CommandSettingWindow(
+            self.usersettings, parent=self
+        )
         self.command_setting_window.show()
 
     def daily_setting_btn_clicked(self):
@@ -586,7 +589,7 @@ class FunctionPanelWindow(QMainWindow):
         simulate_btn = QPushButton("模拟面板")
         simulate_btn.clicked.connect(self.simulate_btn_clicked)
         menu_layout.addWidget(simulate_btn, 4, 0)
-        
+
         open_fuben_btn = QPushButton("自动开副本面板")
         open_fuben_btn.clicked.connect(self.open_fuben_btn_clicked)
         menu_layout.addWidget(open_fuben_btn, 5, 0)
@@ -596,7 +599,7 @@ class FunctionPanelWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-    
+
     def open_fuben_btn_clicked(self):
         self.open_fuben_window = OpenFubenWindow(self.usersettings, parent=self)
         self.open_fuben_window.show()
@@ -895,6 +898,8 @@ class CustomMainWindow(QMainWindow):
 
 class LoginWindow(QMainWindow):
     get_usersettings_finish_signal = pyqtSignal(tuple)
+    get_usersettings_finish_export_signal = pyqtSignal(tuple)
+    get_usersettings_finish_import_signal = pyqtSignal(tuple)
 
     def __init__(self):
         super().__init__()
@@ -904,7 +909,15 @@ class LoginWindow(QMainWindow):
             with open(self.cfg_path, "r", encoding="utf-8") as f:
                 self.configs = json.load(f)
         self.init_ui()
+        self.refresh_login_user_list()
         self.get_usersettings_finish_signal.connect(self.get_usersettings_finished)
+        self.get_usersettings_finish_export_signal.connect(
+            self.get_usersettings_finished_export
+        )
+        self.get_usersettings_finish_import_signal.connect(
+            self.get_usersettings_finished_import
+        )
+        self.export_save_dir = os.path.join(root_dir, "导出的用户数据")
         self.main_window_thread = []
         self.game_queue = None
 
@@ -925,7 +938,6 @@ class LoginWindow(QMainWindow):
         self.login_user_list = login_user_list = QListWidget()
         login_user_list.itemDoubleClicked.connect(self.login_list_item_double_clicked)
         login_user_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        self.refresh_login_user_list()
         login_user_layout.addWidget(login_user_list)
         login_user_widget.setLayout(login_user_layout)
         main_layout.addWidget(login_user_widget)
@@ -983,8 +995,129 @@ class LoginWindow(QMainWindow):
 
         main_layout.addStretch(1)
 
+        server_layout = QVBoxLayout()
+        server_layout.setSpacing(1)
+        server_layout.addWidget(
+            QLabel("----------------------------------------------")
+        )
+        server_layout.addWidget(QLabel("浏览器访问bwnotfound.com即可配置云端助手一键挂机"))
+        server_layout.addWidget(QLabel('导出的用户配置文件在点击导出后存放在助手文件夹下的"导出的用户数据"中'))
+        server_layout.addWidget(QLabel("注意：载入用户配置不会覆盖已有用户配置"))
+
+        server_op_btn_layout = QHBoxLayout()
+        self.export_usersettings_config_btn = QPushButton("导出选中用户配置")
+        self.export_usersettings_config_btn.clicked.connect(
+            self.export_usersettings_config_btn_clicked
+        )
+        server_op_btn_layout.addWidget(self.export_usersettings_config_btn)
+        self.import_usersettings_config_btn = QPushButton("载入用户配置")
+        self.import_usersettings_config_btn.clicked.connect(
+            self.import_usersettings_config_btn_clicked
+        )
+        server_op_btn_layout.addWidget(self.import_usersettings_config_btn)
+        server_op_btn_layout.addStretch(1)
+        server_layout.addLayout(server_op_btn_layout)
+        main_layout.addLayout(server_layout)
+
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def export_usersettings_config_btn_clicked(self):
+        cfg_indices = [
+            item.data(Qt.ItemDataRole.UserRole)
+            for item in self.login_user_list.selectedItems()
+        ]
+        if len(cfg_indices) == 0:
+            logging.warning("未选中任何用户")
+            return
+        self.export_usersettings_config_btn.setDisabled(True)
+        QApplication.processEvents()
+        self.export_rest_count = len(cfg_indices)
+        self._export_rest_count_lock = threading.Lock()
+        for cfg_index in cfg_indices:
+            cfg = Config(self.configs[cfg_index])
+            GetUsersettings(
+                cfg, root_dir, self.get_usersettings_finish_export_signal
+            ).start()
+
+    def get_usersettings_finished_export(self, args):
+        usersettings, cache_dir = args
+        assert isinstance(usersettings, UserSettings)
+        os.makedirs(self.export_save_dir, exist_ok=True)
+        save_info = "{}_{}{}区".format(
+            usersettings.cfg.username,
+            usersettings.cfg.server,
+            usersettings.cfg.region,
+        )
+        save_path = os.path.join(self.export_save_dir, f"{save_info}.bin")
+        usersettings.export_data(save_path)
+        logging.info(f"导出用户配置: {save_info}")
+        with self._export_rest_count_lock:
+            self.export_rest_count -= 1
+            if self.export_rest_count == 0:
+                self.export_rest_count = None
+                self._export_rest_count_lock = None
+                logging.info("用户配置已导出完毕")
+                self.export_usersettings_config_btn.setEnabled(True)
+                QApplication.processEvents()
+
+    def import_usersettings_config_btn_clicked(self):
+        if not os.path.exists(self.export_save_dir):
+            logging.warning('请将需要导入的用户配置文件放在"导出的用户数据"文件夹中')
+            return
+        file_list = os.listdir(self.export_save_dir)
+        if len(file_list) == 0:
+            logging.warning('"导出的用户数据"文件夹中没有可导入的用户配置文件')
+            return
+        self.import_usersettings_config_btn.setDisabled(True)
+        QApplication.processEvents()
+        self._import_rest_count_lock = threading.Lock()
+        self.import_rest_count = len(file_list)
+        for file_name in file_list:
+            file_path = os.path.join(self.export_save_dir, file_name)
+            if not os.path.isfile(file_path):
+                continue
+            with open(file_path, "rb") as f:
+                data_bin = f.read()
+            data = pickle.loads(data_bin)
+            config, data = data["config"], data["data"]
+            cfg = Config(config)
+            GetUsersettings(
+                cfg, root_dir, self.get_usersettings_finish_import_signal, data
+            ).start()
+
+    def get_usersettings_finished_import(self, args):
+        usersettings, cache_dir, data = args
+        assert isinstance(usersettings, UserSettings)
+        usersettings.import_data(data)
+        usersettings.save()
+        user_info = "{}_{}{}区".format(
+            usersettings.cfg.username,
+            usersettings.cfg.server,
+            usersettings.cfg.region,
+        )
+        for cfg in self.configs:
+            if (
+                cfg["username"] == usersettings.cfg.username
+                and cfg["host"] == usersettings.cfg.host
+                and cfg["region"] == usersettings.cfg.region
+                and cfg["server"] == usersettings.cfg.server
+            ):
+                logging.info(f"已有用户配置，选择跳过: {user_info}")
+                break
+        else:
+            self.configs.append(usersettings.cfg.config)
+            logging.info(f"导入用户配置: {user_info}")
+        with self._import_rest_count_lock:
+            self.import_rest_count -= 1
+            if self.import_rest_count == 0:
+                self.import_rest_count = None
+                self._import_rest_count_lock = None
+                logging.info("用户配置已导入完毕")
+                self.save_config()
+                self.refresh_login_user_list()
+                self.import_usersettings_config_btn.setEnabled(True)
+                QApplication.processEvents()
 
     # def start_game_window(self, index):
     #     cfg = Config(self.configs[index])
@@ -1004,7 +1137,7 @@ class LoginWindow(QMainWindow):
 
     def login_all_btn_clicked(self):
         selected_index = [
-            self.login_user_list.indexFromItem(item).row()
+            item.data(Qt.ItemDataRole.UserRole)
             for item in self.login_user_list.selectedItems()
         ]
         for index in selected_index:
@@ -1086,6 +1219,7 @@ class LoginWindow(QMainWindow):
         main_window = CustomMainWindow(*args)
         main_window_list.append(main_window)
         main_window.show()
+        QApplication.processEvents()
 
     def refresh_login_user_list(self):
         self.login_user_list.clear()
@@ -1115,29 +1249,18 @@ class LoginWindow(QMainWindow):
                     new_configs.append(self.configs[i])
                 else:
                     logging.info(f"删除用户: {self.configs[i]['username']}")
-                    shutil.rmtree(
-                        os.path.join(
-                            root_dir,
-                            f"data/user/{self.configs[i]['username']}/{self.configs[i]['region']}",
-                        )
+                    user_path = os.path.join(
+                        root_dir,
+                        f"data/user/{self.configs[i]['username']}",
                     )
-                    if (
-                        len(
-                            os.listdir(
-                                os.path.join(
-                                    root_dir,
-                                    f"data/user/{self.configs[i]['username']}",
-                                )
-                            )
-                        )
-                        == 0
-                    ):
+                    try:
                         shutil.rmtree(
-                            os.path.join(
-                                root_dir,
-                                f"data/user/{self.configs[i]['username']}",
-                            )
+                            os.path.join(user_path, f"{self.configs[i]['region']}")
                         )
+                        if len(os.listdir(user_path)) == 0:
+                            shutil.rmtree(user_path)
+                    except:
+                        pass
             self.configs = new_configs
             self.save_config()
             self.refresh_login_user_list()
@@ -1149,11 +1272,12 @@ class LoginWindow(QMainWindow):
 
 
 class GetUsersettings(threading.Thread):
-    def __init__(self, cfg: Config, root_dir, finish_trigger):
+    def __init__(self, cfg: Config, root_dir, finish_trigger, *args):
         super().__init__()
         self.cfg = cfg
         self.root_dir = root_dir
         self.finish_trigger = finish_trigger
+        self.args = args
 
     def run(self):
         data_dir = os.path.join(
@@ -1173,7 +1297,7 @@ class GetUsersettings(threading.Thread):
         logger = IOLogger(log_dir, max_info_capacity=max_info_capacity)
         logger_list.append(logger)
         usersettings = get_usersettings(self.cfg, logger, setting_dir)
-        self.finish_trigger.emit((usersettings, cache_dir))
+        self.finish_trigger.emit((usersettings, cache_dir, *self.args))
 
 
 def get_usersettings(cfg: Config, logger: IOLogger, setting_dir):

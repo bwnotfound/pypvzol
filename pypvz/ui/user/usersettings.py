@@ -240,7 +240,6 @@ class UserSettings:
             self.start_thread.start()
 
     def save(self):
-        self.challenge4Level.save(self.save_dir)
         save_path = os.path.join(self.save_dir, "usersettings_state")
         with open(save_path, "wb") as f:
             pickle.dump(
@@ -269,6 +268,7 @@ class UserSettings:
                 },
                 f,
             )
+        self.challenge4Level.save(self.save_dir)
         self.plant_evolution.save(self.save_dir)
         self.auto_synthesis_man.save(self.save_dir)
         self.heritage_man.save(self.save_dir)
@@ -281,8 +281,63 @@ class UserSettings:
         self.command_man.save(self.save_dir)
         self.open_fuben_man.save(self.save_dir)
 
+    def export_data(self, save_path=None):
+        data = {
+            "attrs": {
+                "challenge4Level_enabled": self.challenge4Level_enabled,
+                "shop_enabled": self.shop_enabled,
+                "shop_auto_buy_dict": self.shop_auto_buy_dict,
+                "garden_cave_list": self.garden_cave_list,
+                "enable_list": self.enable_list,
+                "rest_time": self.rest_time,
+                "arena_enabled": self.arena_enabled,
+                "task_enabled": self.task_enabled,
+                "serverbattle_enabled": self.serverbattle_enabled,
+                "record_repository_tool_dict": self.record_repository_tool_dict,
+                "record_ignore_tool_id_set": self.record_ignore_tool_id_set,
+                "fuben_enabled": self.fuben_enabled,
+                "territory_enabled": self.territory_enabled,
+                "daily_enabled": self.daily_enabled,
+                "garden_enabled": self.garden_enabled,
+                "exit_if_nothing_todo": self.exit_if_nothing_todo,
+                "arena_challenge_mode": self.arena_challenge_mode,
+                "daily_settings": self.daily_settings,
+                "command_enabled": self.command_enabled,
+            },
+            "mans": {
+                "cfg": self.cfg.save(),
+                "challenge4Level": self.challenge4Level.save(),
+                "fuben_man": self.fuben_man.save(),
+                "territory_man": self.territory_man.save(),
+                "garden_man": self.garden_man.save(),
+                "serverbattle_man": self.serverbattle_man.save(),
+                "command_man": self.command_man.save(),
+            },
+        }
+        data_bin = pickle.dumps(data)
+        data_bin = pickle.dumps(
+            {
+                "data": data_bin,
+                "config": self.cfg.config,
+            }
+        )
+        if save_path is not None:
+            with open(save_path, "wb") as f:
+                f.write(data_bin)
+        return data_bin
+
+    def import_data(self, data_bin):
+        data = pickle.loads(data_bin)
+        if "config" in data:
+            data = pickle.loads(data["data"])
+        for k, v in data['attrs'].items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+        for k, v in data['mans'].items():
+            if hasattr(self, k):
+                getattr(self, k).load(v)
+
     def load(self):
-        self.challenge4Level.load(self.save_dir)
         load_path = os.path.join(self.save_dir, "usersettings_state")
         if os.path.exists(load_path):
             with open(load_path, "rb") as f:
@@ -294,6 +349,7 @@ class UserSettings:
                 self.cfg.timeout = d["timeout"]
             if "millsecond_delay" in d:
                 self.cfg.millsecond_delay = d["millsecond_delay"]
+        self.challenge4Level.load(self.save_dir)
         self.plant_evolution.load(self.save_dir)
         self.auto_synthesis_man.load(self.save_dir)
         self.heritage_man.load(self.save_dir)
