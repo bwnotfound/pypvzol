@@ -96,7 +96,7 @@ class UserSettings:
         self.open_fuben_man = OpenFubenMan(cfg, repo, lib, self.logger)
         self.skill_stone_man = SkillStoneMan(cfg, lib, self.logger)
 
-    def _start(self, stop_channel: Queue, close_signal, finish_signal):
+    def _start(self, stop_channel: Queue, close_signal=None, finish_signal=None):
         self.repo.refresh_repository(self.logger)
         while stop_channel.qsize() == 0:
             need_continue = False
@@ -218,8 +218,10 @@ class UserSettings:
                     self.logger.log(f"自动挑战失败，异常种类:{type(e).__name__}。跳过自动挑战")
             if self.exit_if_nothing_todo and not need_continue:
                 self.logger.log("没有可以做的事情了，退出用户")
-                close_signal.emit()
-                finish_signal.emit()
+                if close_signal is not None:
+                    close_signal.emit()
+                if finish_signal is not None:
+                    finish_signal.emit()
                 return
             self.logger.log("工作完成，等待{}".format(second2str(self.rest_time)))
             if self.rest_time == 0:
@@ -230,7 +232,8 @@ class UserSettings:
                     break
                 time.sleep(1)
         self.logger.log("停止工作")
-        finish_signal.emit()
+        if finish_signal is not None:
+            finish_signal.emit()
 
     def start(self, close_signal, finish_signal):
         if self.start_thread is None or not self.start_thread.is_alive():
@@ -394,7 +397,7 @@ class GetUsersettings(threading.Thread):
         self.finish_trigger.emit((usersettings, cache_dir))
 
 
-def get_usersettings(cfg: Config, logger: IOLogger, setting_dir):
+def get_usersettings(cfg: Config, logger: IOLogger, setting_dir) -> UserSettings:
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
         futures.append(executor.submit(User, cfg))

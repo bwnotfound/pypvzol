@@ -14,8 +14,10 @@ def get_logger(log_type, log_name=None):
     if log_name is None:
         log_name = "log.txt"
     log_now_dir = os.path.join(log_root_dir, log_type, time.strftime("%Y-%m-%d"))
-    logger_handler = logging.FileHandler(os.path.join(log_now_dir, log_name))
-    logger = logging.Logger()
+    os.makedirs(log_now_dir, exist_ok=True)
+    log_path = os.path.join(log_now_dir, log_name)
+    logger_handler = logging.FileHandler(log_path)
+    logger = logging.Logger(log_name, level=logging.INFO)
     logger.addHandler(logger_handler)
     return logger
 
@@ -37,3 +39,7 @@ if __name__ == "__main__":
     assistant_man = AssistantManager(file_man, assistant_logger)
     # start_communicator(assistant_man, communicator_logger)
     # terminate_communicator()
+    with open("./dev/test.bin", "rb") as f:
+        data = f.read()
+    assistant_man.run_user_queue.put(data)
+    assistant_man.start().join()
