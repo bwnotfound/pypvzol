@@ -18,6 +18,7 @@ from ...fuben import FubenCave
 from ...utils.recover import RecoverMan
 from ..wrapped import signal_block_emit
 from ...library import attribute2plant_attribute
+from . import load_data, save_data
 
 
 class AutoSynthesisMan:
@@ -198,20 +199,16 @@ class AutoSynthesisMan:
             return False
         return True
 
-    def save(self, save_dir):
-        save_path = os.path.join(save_dir, "user_autosynthesisman")
-        with open(save_path, "wb") as f:
-            pickle.dump(
-                {
-                    "main_plant_id": self.main_plant_id,
-                    "chosen_attribute": self.chosen_attribute,
-                    "auto_synthesis_pool_id": self.auto_synthesis_pool_id,
-                    "reinforce_number": self.reinforce_number,
-                    "end_mantissa": self.end_mantissa,
-                    "end_exponent": self.end_exponent,
-                },
-                f,
-            )
+    def save(self, save_dir=None):
+        data = {
+            "main_plant_id": self.main_plant_id,
+            "chosen_attribute": self.chosen_attribute,
+            "auto_synthesis_pool_id": self.auto_synthesis_pool_id,
+            "reinforce_number": self.reinforce_number,
+            "end_mantissa": self.end_mantissa,
+            "end_exponent": self.end_exponent,
+        }
+        return save_data(data, save_dir, "user_autosynthesisman")
 
     def load(self, load_dir):
         load_path = os.path.join(load_dir, "user_autosynthesisman")
@@ -542,34 +539,24 @@ class FubenMan:
         else:
             return False
 
-    def save(self, save_dir):
-        save_path = os.path.join(save_dir, "auto_fuben")
-        with open(save_path, "wb") as f:
-            pickle.dump(
-                {
-                    "caves": self.caves,
-                    "team": self.team,
-                    "show_lottery": self.show_lottery,
-                    "need_recovery": self.need_recovery,
-                    "recover_hp_choice": self.recover_hp_choice,
-                    "pool_size": self.pool_size,
-                    "use_fuben_book_enabled": self.use_fuben_book_enabled,
-                },
-                f,
-            )
+    def save(self, save_dir=None):
+        data = {
+            "caves": self.caves,
+            "team": self.team,
+            "show_lottery": self.show_lottery,
+            "need_recovery": self.need_recovery,
+            "recover_hp_choice": self.recover_hp_choice,
+            "pool_size": self.pool_size,
+            "use_fuben_book_enabled": self.use_fuben_book_enabled,
+        }
+        return save_data(data, save_dir, "auto_fuben")
 
     def load(self, load_dir):
-        load_path = os.path.join(load_dir, "auto_fuben")
-        if os.path.exists(load_path):
-            with open(load_path, "rb") as f:
-                d = pickle.load(f)
-            for k, v in d.items():
-                if hasattr(self, k):
-                    setattr(self, k, v)
-            if len(self.caves) > 0:
-                sc = self.caves[0]
-                if not hasattr(sc, "global_layer") or not hasattr(sc, "cave"):
-                    self.caves = []
+        load_data(load_dir, "auto_fuben", self)
+        if len(self.caves) > 0:
+            sc = self.caves[0]
+            if not hasattr(sc, "global_layer") or not hasattr(sc, "cave"):
+                self.caves = []
 
 
 class TerritoryMan:
@@ -690,25 +677,15 @@ class TerritoryMan:
                 return {"success": False, "result": "上领地植物时有的植物不存在"}
         return {"success": True, "result": "共上场{}个植物".format(len(self.team))}
 
-    def save(self, save_dir):
-        save_path = os.path.join(save_dir, "auto_territory")
-        with open(save_path, "wb") as f:
-            pickle.dump(
-                {
-                    "difficulty_choice": self.difficulty_choice,
-                    "team": self.team,
-                },
-                f,
-            )
+    def save(self, save_dir=None):
+        data = {
+            "difficulty_choice": self.difficulty_choice,
+            "team": self.team,
+        }
+        return save_data(data, save_dir, "auto_territory")
 
     def load(self, load_dir):
-        load_path = os.path.join(load_dir, "auto_territory")
-        if os.path.exists(load_path):
-            with open(load_path, "rb") as f:
-                d = pickle.load(f)
-            for k, v in d.items():
-                if hasattr(self, k):
-                    setattr(self, k, v)
+        load_data(load_dir, "auto_territory", self)
         self.team = self.team[:5]
 
 
@@ -892,24 +869,14 @@ class GardenMan:
             if stop_channel.qsize() > 0 or failure:
                 return False
 
-    def save(self, save_dir):
-        save_path = os.path.join(save_dir, "auto_garden")
-        with open(save_path, "wb") as f:
-            pickle.dump(
-                {
-                    "team": self.team,
-                },
-                f,
-            )
+    def save(self, save_dir=None):
+        data = {
+            "team": self.team,
+        }
+        return save_data(data, save_dir, "auto_garden")
 
     def load(self, load_dir):
-        load_path = os.path.join(load_dir, "auto_garden")
-        if os.path.exists(load_path):
-            with open(load_path, "rb") as f:
-                d = pickle.load(f)
-            for k, v in d.items():
-                if hasattr(self, k):
-                    setattr(self, k, v)
+        load_data(load_dir, "auto_garden", self)
 
 
 class ServerBattleMan:
@@ -977,24 +944,14 @@ class ServerBattleMan:
         response = self.serverbattle.get_info()
         return int(response.body["remaining_challenges"])
 
-    def save(self, save_dir):
-        save_path = os.path.join(save_dir, "serverbattle_man")
-        with open(save_path, "wb") as f:
-            pickle.dump(
-                {
-                    "rest_challenge_num_limit": self.rest_challenge_num_limit,
-                },
-                f,
-            )
+    def save(self, save_dir=None):
+        data = {
+            "rest_challenge_num_limit": self.rest_challenge_num_limit,
+        }
+        return save_data(data, save_dir, "serverbattle_man")
 
     def load(self, load_dir):
-        load_path = os.path.join(load_dir, "serverbattle_man")
-        if os.path.exists(load_path):
-            with open(load_path, "rb") as f:
-                d = pickle.load(f)
-            for k, v in d.items():
-                if hasattr(self, k):
-                    setattr(self, k, v)
+        load_data(load_dir, "serverbattle_man", self)
 
 
 class ArenaMan:
@@ -1071,24 +1028,14 @@ class CommandMan:
                         self.logger.log("指令{}执行至道具异常，认定执行完毕".format(command_str))
                     break
 
-    def save(self, save_dir):
-        save_path = os.path.join(save_dir, "command_man")
-        with open(save_path, "wb") as f:
-            pickle.dump(
-                {
-                    "command_list": self.command_list,
-                },
-                f,
-            )
+    def save(self, save_dir=None):
+        data = {
+            "command_list": self.command_list,
+        }
+        return save_data(data, save_dir, "command_man")
 
     def load(self, load_dir):
-        load_path = os.path.join(load_dir, "command_man")
-        if os.path.exists(load_path):
-            with open(load_path, "rb") as f:
-                d = pickle.load(f)
-            for k, v in d.items():
-                if hasattr(self, k):
-                    setattr(self, k, v)
+        load_data(load_dir, "command_man", self)
 
 
 class SkillStoneMan:
@@ -1143,21 +1090,11 @@ class SkillStoneMan:
             }
         return {"success": True, "result": response.body}
 
-    def save(self, save_dir):
-        save_path = os.path.join(save_dir, "skill_man")
-        with open(save_path, "wb") as f:
-            pickle.dump(
-                {
-                    "pool_size": self.pool_size,
-                },
-                f,
-            )
+    def save(self, save_dir=None):
+        data = {
+            "pool_size": self.pool_size,
+        }
+        return save_data(data, save_dir, "skill_man")
 
     def load(self, load_dir):
-        load_path = os.path.join(load_dir, "skill_man")
-        if os.path.exists(load_path):
-            with open(load_path, "rb") as f:
-                d = pickle.load(f)
-            for k, v in d.items():
-                if hasattr(self, k):
-                    setattr(self, k, v)
+        load_data(load_dir, "skill_man", self)

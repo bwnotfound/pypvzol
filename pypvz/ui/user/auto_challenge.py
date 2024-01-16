@@ -13,6 +13,7 @@ from ... import (
 )
 from ...utils.recover import RecoverMan
 from ..message import Logger
+from . import load_data, save_data
 
 
 class SingleCave:
@@ -483,7 +484,7 @@ class Challenge4Level:
                                 break
                             message = message + "失败. 原因: {}.".format(result)
                             self.logger.log(message)
-                            return True
+                            return False
                         else:
                             message = message + "成功. "
                             self.has_challenged = True
@@ -704,8 +705,8 @@ class Challenge4Level:
         self.logger.log("挑战完成")
         return True
 
-    def save(self, save_dir):
-        d = {
+    def save(self, save_dir=None):
+        data = {
             "caves": self.caves,
             "main_plant_list": self.main_plant_list,
             "trash_plant_list": self.trash_plant_list,
@@ -731,28 +732,10 @@ class Challenge4Level:
             "show_series_success": self.show_series_success,
             "series_success_exit": self.series_success_exit,
         }
-        if save_dir is not None:
-            save_path = os.path.join(save_dir, "user_challenge4level")
-            with open(save_path, "wb") as f:
-                pickle.dump(
-                    d,
-                    f,
-                )
-        return d
+        return save_data(data, save_dir, "user_challenge4level")
 
     def load(self, load_dir):
-        if isinstance(load_dir, dict):
-            d = load_dir
-        else:
-            load_path = os.path.join(load_dir, "user_challenge4level")
-            if os.path.exists(load_path):
-                with open(load_path, "rb") as f:
-                    d = pickle.load(f)
-            else:
-                d = {}
-        for k, v in d.items():
-            if hasattr(self, k):
-                setattr(self, k, v)
+        load_data(load_dir, "user_challenge4level", self)
         if self.advanced_challenge_book_amount > 5:
             self.advanced_challenge_book_amount = 5
         main_plant_list = list(
