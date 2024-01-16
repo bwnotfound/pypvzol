@@ -164,10 +164,15 @@ cython_debug/
 /data/*
 /data/cache/*
 /data/cache/pvz/*
+/data/cache/pvz/php_xml/*
 !/data/cache
 !/data/cache/pvz/
 !/data/cache/pvz/skills.json
 !/data/cache/pvz/spec_skills.json
+!/data/cache/pvz/php_xml/
+!/data/cache/pvz/php_xml/tool.xml
+!/data/cache/pvz/php_xml/organism.xml
+
 /config/*
 !/config/config_file_here
 /dev/
