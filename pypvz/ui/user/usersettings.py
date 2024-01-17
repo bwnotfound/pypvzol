@@ -54,7 +54,7 @@ class UserSettings:
         self.user = user
         self.save_dir = save_dir
         self.io_logger = logger
-        self.logger = logger.new_logger()
+        self.logger = logger.get_logger()
         self.stop_channel = Queue()
         self.start_thread = None
 

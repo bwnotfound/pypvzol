@@ -7,7 +7,8 @@ import os
 
 
 class Logger:
-    def __init__(self, info_channel: Queue):
+    def __init__(self, logger: logging.Logger, info_channel: Queue):
+        self.logger = logger
         self._info_channel = info_channel
 
     def _log_str_format(self, msg):
@@ -21,11 +22,11 @@ class Logger:
         message = self._log_str_format(msg)
         self._info_channel.put(message)
         if log_info:
-            logging.info(message)
+            self.logger.info(message)
 
     def reverse_log(self, msg: str, log_info=True):
         message = self._log_str_format(msg)
-        logging.info(message)
+        self.logger.info(message)
         if log_info:
             self._info_channel.put(message)
 
@@ -74,10 +75,14 @@ class _IOLoggerThread(threading.Thread):
 
 
 class IOLogger:
-    def __init__(self, save_dir, signal=None, max_info_capacity=100):
+    def __init__(self, save_dir, signal=None, max_info_capacity=100, max_file_num=2):
         self.save_dir = save_dir
+        self.max_file_num = max_file_num
         self.signal = signal
-        self.save_path = os.path.join(save_dir, "log.txt")
+        self.save_path = os.path.join(
+            save_dir, "日志_起始时间{}.txt".format(strftime("%Y-%m-%d_%H-%M-%S", localtime()))
+        )
+        self._check_file_num()
         self.max_info_capacity = max_info_capacity
         self.info_channel = Queue()
         self._stop_channel = Queue()
@@ -93,10 +98,29 @@ class IOLogger:
             max_info_capacity,
             self.trigger,
         )
+        _logger = logging.Logger("IOLogger", level=logging.INFO)
+        file_handler = logging.FileHandler(self.save_path, encoding="utf-8")
+        formatter = logging.Formatter(
+            "%(asctime)s - %(levelname)s - %(message)s"
+        )
+        file_handler.setFormatter(formatter)
+        _logger.addHandler(file_handler)
+        self.logger = Logger(_logger, self.info_channel)
         self._thread_logger.start()
 
-    def new_logger(self):
-        return Logger(self.info_channel)
+    # 确保save_dir下最多有max_file_num个文件
+    def _check_file_num(self):
+        file_list = os.listdir(self.save_dir)
+        file_list = [
+            os.path.join(self.save_dir, file) for file in file_list if file.endswith(".txt")
+        ]
+        file_list.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        if len(file_list) > self.max_file_num:
+            for file in file_list[self.max_file_num:]:
+                os.remove(file)
+
+    def get_logger(self):
+        return self.logger
 
     def trigger(self):
         if self.signal is not None:

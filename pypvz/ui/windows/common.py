@@ -651,8 +651,8 @@ class RequirePermissionWindow(QMainWindow):
 
         # 将窗口居中显示，宽度为显示器宽度的35%，高度为显示器高度的25%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.35), int(screen_size.height() * 0.25))
-        self.move(int(screen_size.width() * 0.325), int(screen_size.height() * 0.375))
+        self.resize(int(screen_size.width() * 0.35), int(screen_size.height() * 0.35))
+        self.move(int(screen_size.width() * 0.325), int(screen_size.height() * 0.325))
 
         main_widget = QWidget()
         main_layout = QVBoxLayout()
