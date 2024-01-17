@@ -17,7 +17,7 @@ from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from ..wrapped import QLabel, WaitEventThread
-from ...utils.common import format_number
+from ...utils.common import format_number, format_plant_info
 from ...repository import Plant
 from ...library import attribute_list, attribute2plant_attribute
 from .common import ImageWindow, require_permission
@@ -327,51 +327,28 @@ class AutoCompoundWindow(QMainWindow):
     def illustration_btn_clicked(self):
         ImageWindow("data/image/复合通用方案.png", self).show()
 
-    def format_plant_info(self, plant, chosen_attribute=None):
+    def format_plant_info(self, plant, chosen_attribute=None, show_skill=False):
         if isinstance(plant, str):
             plant = int(plant)
         if isinstance(plant, int):
             plant = self.repo.get_plant(plant)
         assert isinstance(plant, Plant), type(plant).__name__
         if chosen_attribute is not None:
-            return "{}({})[{}]-{}:{}".format(
-                plant.name(self.lib),
-                plant.grade,
-                plant.quality_str,
-                chosen_attribute.replace("特", ""),
-                format_number(
-                    getattr(
-                        plant,
-                        attribute2plant_attribute[
-                            chosen_attribute
-                        ],
-                    )
-                ),
+            return format_plant_info(
+                plant,
+                self.lib,
+                normal_skill=show_skill,
+                spec_skill=show_skill,
+                chosen_attribute=chosen_attribute,
             )
         else:
-            message = "{}({})[{}]\n".format(
-                plant.name(self.lib),
-                plant.grade,
-                plant.quality_str,
+            return format_plant_info(
+                plant,
+                self.lib,
+                normal_skill=show_skill,
+                spec_skill=show_skill,
+                show_normal_attribute=True,
             )
-            for attr_name in [
-                "HP",
-                "攻击",
-                "命中",
-                "闪避",
-                "穿透",
-                "护甲",
-            ]:
-                message += "{}:{}\n".format(
-                    attr_name,
-                    format_number(
-                        getattr(
-                            plant,
-                            attribute2plant_attribute[attr_name],
-                        )
-                    ),
-                )
-            return message
 
     def _check_plant(self, plant, chosen_attr_name=None, alert=True):
         result = None
@@ -379,9 +356,7 @@ class AutoCompoundWindow(QMainWindow):
             chosen_attr_name is not None
             and chosen_attr_name in attribute2plant_attribute
         ):
-            chosen_attr_name = attribute2plant_attribute[
-                chosen_attr_name
-            ]
+            chosen_attr_name = attribute2plant_attribute[chosen_attr_name]
         for attr_dict_name in attribute2plant_attribute.keys():
             if attr_dict_name == "战力":
                 continue
@@ -392,13 +367,16 @@ class AutoCompoundWindow(QMainWindow):
             if attr > 500000000:
                 result = False
                 break
+
         else:
             result = True
         if alert:
             need_continue = None
             if not result:
                 need_continue = require_permission(
-                    "植物{}部分数据超过设定，请确认是否继续：".format(self.format_plant_info(plant))
+                    "植物{}\n部分数据超过设定，请确认是否继续：".format(
+                        self.format_plant_info(plant, show_skill=True)
+                    )
                 )
             else:
                 need_continue = True
@@ -413,13 +391,13 @@ class AutoCompoundWindow(QMainWindow):
             source_plant = self.repo.get_plant(scheme.source_plant_id)
             if source_plant is not None:
                 if not self._check_plant(source_plant, scheme.chosen_attribute):
-                    self.logger.log("合成数据检查出异常，停止合成")
+                    self.logger.log("合成植物检查出异常，停止合成")
                     return False
         for deputy_plant_id in list(self.auto_compound_man.auto_compound_pool_id):
             deputy_plant = self.repo.get_plant(deputy_plant_id)
             if deputy_plant is not None:
                 if not self._check_plant(deputy_plant):
-                    self.logger.log("合成数据检查出异常，停止合成")
+                    self.logger.log("合成植物检查出异常，停止合成")
                     return False
         return True
 
