@@ -21,10 +21,7 @@ class AssistantManager:
         self.run_user_queue = Queue()
         self.usersettings_stop_channel = Queue()
 
-    def get_next_user(self):
-        pass
-
-    def get_usersettings(self, cfg: Config):
+    def get_usersettings_from_cfg(self, cfg: Config):
         user_dir = self.file_man.format_usersettings_save_dir(cfg)
         log_dir = os.path.join(user_dir, 'logs')
         setting_dir = os.path.join(user_dir, 'settings')
@@ -34,11 +31,15 @@ class AssistantManager:
         usersettings = get_usersettings(cfg, io_logger, setting_dir)
         return usersettings
 
-    def run_user(self, data: Config):
+    def get_usersettings_from_bytes(self, data: bytes):
         data = pickle.loads(data)
         cfg, data = data["config"], data["data"]
-        usersettings = self.get_usersettings(Config(cfg))
+        usersettings = self.get_usersettings_from_cfg(Config(cfg))
         usersettings.import_data(data)
+        return usersettings
+
+    def run_user(self, data: bytes):
+        usersettings = self.get_usersettings_from_bytes(data)
         usersettings._start(self.usersettings_stop_channel)
 
     def _start(self):
@@ -64,11 +65,18 @@ class AssistantManager:
                         break
                     future_list.remove(future)
 
-    def add_user_thread(self):
-        pass
+    def add_user(self, data):
+        self.run_user_queue.put(data)
+
+    def get_user_extra_data(self, data: bytes):
+        assert isinstance(data, bytes)
+        usersettings = self.get_usersettings_from_bytes(data)
+        return {
+            "name": usersettings.user.name,
+            "cookie": usersettings.cfg.cookie,
+        }
 
     def start(self):
-        # Thread(target=self.add_user_thread).start()
         thread = Thread(target=self._start)
         thread.start()
         return thread

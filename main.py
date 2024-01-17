@@ -3,6 +3,8 @@ import logging
 import warnings
 import time
 
+from py4j.java_gateway import JavaGateway
+
 from pypvz.server.file_man import FileManager
 from pypvz.server.communicate import start_communicator, terminate_communicator
 from pypvz.server.run_assistant import AssistantManager
@@ -37,9 +39,8 @@ if __name__ == "__main__":
     communicator_logger = get_logger("communicator")
     file_man = FileManager(data_dir, file_logger)
     assistant_man = AssistantManager(file_man, assistant_logger)
-    # start_communicator(assistant_man, communicator_logger)
+    start_communicator(assistant_man, communicator_logger)
     # terminate_communicator()
-    with open("./dev/test.bin", "rb") as f:
-        data = f.read()
-    assistant_man.run_user_queue.put(data)
+    # with open("./dev/test.bin", "rb") as f:
+    #     data = f.read()
     assistant_man.start().join()
