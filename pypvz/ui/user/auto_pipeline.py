@@ -412,6 +412,7 @@ class UpgradeQuality(Pipeline):
             self.rest_event,
             self.pool_size,
         )
+        self.interrupt_event.clear()
         self.quality_thread.start()
         while stop_channel.qsize() == 0 and not self.rest_event.is_set():
             sleep(0.1)
@@ -505,6 +506,7 @@ class AutoComponent(Pipeline):
             self.rest_event,
             reach_target_event=reach_target_event,
         )
+        self.interrupt_event.clear()
         self.component_theard.start()
         while stop_channel.qsize() == 0 and not self.rest_event.is_set():
             sleep(0.1)
