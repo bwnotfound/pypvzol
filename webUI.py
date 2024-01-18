@@ -720,12 +720,14 @@ class CustomMainWindow(QMainWindow):
         )
         user_show_layout.addWidget(QLabel().setPixmap(QPixmap.fromImage(user_face_img)))
         self.user_info_1 = QVBoxLayout()
+        self.user_info_1.setSpacing(2)
         user_show_layout.addLayout(self.user_info_1)
         left_layout.addLayout(user_show_layout)
 
         # Left Panel
 
         self.user_info_2 = QVBoxLayout()
+        self.user_info_2.setSpacing(3)
         # self.user_info_2.setSpacing(5)
         left_layout.addLayout(self.user_info_2)
 
@@ -801,6 +803,9 @@ class CustomMainWindow(QMainWindow):
             futures.append(
                 executor.submit(self.usersettings.arena_man.get_challenge_num)
             )
+            futures.append(
+                executor.submit(self.usersettings.user.get_vip_rest_time)
+            )
             if refresh_all:
                 futures.append(
                     executor.submit(self.usersettings.repo.refresh_repository)
@@ -819,6 +824,7 @@ class CustomMainWindow(QMainWindow):
         )
         self.user_info_2.addWidget(QLabel("领地次数: {}".format(futures[0].result())))
         self.user_info_2.addWidget(QLabel("竞技场次数: {}".format(futures[1].result())))
+        self.user_info_2.addWidget(QLabel("vip剩余天数: {}".format(futures[2].result())))
         QApplication.processEvents()
 
     def refresh_user_info_btn_clicked(self):
