@@ -23,10 +23,12 @@ class Logger:
         self._info_channel.put(message)
         if log_info:
             self.logger.info(message)
+            logging.info(message)
 
     def reverse_log(self, msg: str, log_info=True):
         message = self._log_str_format(msg)
         self.logger.info(message)
+        logging.info(message)
         if log_info:
             self._info_channel.put(message)
 
@@ -75,7 +77,7 @@ class _IOLoggerThread(threading.Thread):
 
 
 class IOLogger:
-    def __init__(self, save_dir, signal=None, max_info_capacity=100, max_file_num=2):
+    def __init__(self, save_dir, signal=None, max_info_capacity=100, max_file_num=4):
         self.save_dir = save_dir
         self.max_file_num = max_file_num
         self.signal = signal
