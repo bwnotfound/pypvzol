@@ -33,18 +33,22 @@ class Config:
         self._lock = Lock()
         self.last_time = 0
         self.wait_requests_over = False
-        self.freq_event = Event()
-        self.freq_event.set()
+        self.free_event = Event()
+        self.free_event.set()
         self._freq_lock = Lock()
 
     def sleep_freq(self, t):
+        # 避免多线程一直睡睡睡
+        if not self.free_event.is_set():
+            self.free_event.wait()
+            return
         try:
             self._freq_lock.acquire()
-            self.freq_event.clear()
+            self.free_event.clear()
             sleep(t)
         finally:
             self._freq_lock.release()
-            self.freq_event.set()
+            self.free_event.set()
 
     def acquire(self):
         self._lock.acquire()

@@ -300,7 +300,7 @@ class WebRequest:
         use_cache=False,
         init_header=True,
         url_format=True,
-        max_retry=15,
+        max_retry=50,
         logger=None,
         except_retry=False,
         **kwargs,
@@ -309,7 +309,7 @@ class WebRequest:
         while cnt < max_retry:
             cnt += 1
             try:
-                self.cfg.freq_event.wait()
+                self.cfg.free_event.wait()
                 response = self.get(
                     url,
                     use_cache=use_cache,
@@ -328,9 +328,8 @@ class WebRequest:
                 try:
                     text = response.decode("utf-8")
                     if "请求过于频繁" in text:
-                        warning_msg = "请求{}过于频繁，选择等待3秒后重试。最多再等待{}次".format(
-                            msg, max_retry - cnt
-                        )
+                        warning_msg = "请求{}过于频繁，选择等待3秒后重试".format(msg)
+                        cnt -= 1
                         if logger is not None:
                             logger.log(warning_msg)
                         else:
@@ -338,9 +337,8 @@ class WebRequest:
                         self.cfg.sleep_freq(3)
                         continue
                     if "服务器更新" in text:
-                        warning_msg = "请求{}的时候服务器更新，选择等待10秒后重试。最多再等待{}次".format(
-                            msg, max_retry - cnt
-                        )
+                        warning_msg = "请求{}的时候服务器更新，选择等待10秒后重试".format(msg)
+                        cnt -= 1
                         if logger is not None:
                             logger.log(warning_msg)
                         else:
@@ -352,9 +350,8 @@ class WebRequest:
                 break
             except Exception as e:
                 if "429" in str(e):
-                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试。最多再等待{}次。".format(
-                        msg, max_retry - cnt
-                    )
+                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试".format(msg)
+                    cnt -= 1
                     if logger is not None:
                         logger.log(warning_msg)
                     else:
@@ -425,7 +422,7 @@ class WebRequest:
         target,
         url,
         msg,
-        max_retry=20,
+        max_retry=50,
         logger=None,
         exit_response=False,
         allow_empty=False,
@@ -436,7 +433,7 @@ class WebRequest:
         while cnt < max_retry:
             cnt += 1
             try:
-                self.cfg.freq_event.wait()
+                self.cfg.free_event.wait()
                 response = self.amf_post(
                     body,
                     target,
@@ -454,9 +451,8 @@ class WebRequest:
                     return
                 if response.status != 0:
                     if "频繁" in response.body.description:
-                        warning_msg = "{}过于频繁，选择等待3秒后重试。最多再等待{}次".format(
-                            msg, max_retry - cnt
-                        )
+                        warning_msg = "{}过于频繁，选择等待3秒后重试".format(msg)
+                        cnt -= 1
                         if logger is not None:
                             logger.log(warning_msg)
                         else:
@@ -464,9 +460,8 @@ class WebRequest:
                         self.cfg.sleep_freq(3)
                         continue
                     if "更新" in response.body.description:
-                        warning_msg = "{}的时候服务器更新，选择等待10秒后重试。最多再等待{}次".format(
-                            msg, max_retry - cnt
-                        )
+                        warning_msg = "{}的时候服务器更新，选择等待10秒后重试".format(msg)
+                        cnt -= 1
                         if logger is not None:
                             logger.log(warning_msg)
                         else:
@@ -476,9 +471,8 @@ class WebRequest:
                 break
             except RuntimeError as e:
                 if "429" in str(e):
-                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试。最多再等待{}次".format(
-                        msg, max_retry - cnt
-                    )
+                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试".format(msg)
+                    cnt -= 1
                     if logger is not None:
                         logger.log(warning_msg)
                     else:
