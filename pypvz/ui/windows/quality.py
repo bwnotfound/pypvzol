@@ -155,6 +155,7 @@ class UpgradeQualityWindow(QMainWindow):
                     self.rest_event,
                     pool_size=self.pool_size,
                 )
+                self.interrupt_event.clear()
                 self.rest_event.clear()
                 self.run_thread.start()
             finally:

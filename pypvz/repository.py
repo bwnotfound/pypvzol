@@ -140,81 +140,87 @@ class Repository:
         self.organism_grid_amount = int(warehouse.get("organism_grid_amount"))
 
     def hp_below(self, high, id_only=False):
-        result = []
-        if isinstance(high, float):
-            for plant in self.plants:
-                if plant.hp_now / plant.hp_max <= high:
-                    if id_only:
-                        result.append(plant.id)
-                    else:
-                        result.append(plant)
-        elif isinstance(high, int):
-            for plant in self.plants:
-                if plant.hp_now <= high:
-                    if id_only:
-                        result.append(plant.id)
-                    else:
-                        result.append(plant)
-        else:
-            raise TypeError("high must be float or int")
-        return result
+        with self._lock:
+            result = []
+            if isinstance(high, float):
+                for plant in self.plants:
+                    if plant.hp_now / plant.hp_max <= high:
+                        if id_only:
+                            result.append(plant.id)
+                        else:
+                            result.append(plant)
+            elif isinstance(high, int):
+                for plant in self.plants:
+                    if plant.hp_now <= high:
+                        if id_only:
+                            result.append(plant.id)
+                        else:
+                            result.append(plant)
+            else:
+                raise TypeError("high must be float or int")
+            return result
 
     def get_plant(self, id):
-        if isinstance(id, str):
-            id = int(id)
-        plant = self.id2plant.get(id, None)
-        return plant
+        with self._lock:
+            if isinstance(id, str):
+                id = int(id)
+            plant = self.id2plant.get(id, None)
+            return plant
 
     def get_tool(self, id, return_amount=False):
-        if isinstance(id, str):
-            id = int(id)
-        tool = self.id2tool.get(id, None)
-        if not return_amount:
-            return tool
-        else:
-            return tool['amount'] if tool is not None else 0
+        with self._lock:
+            if isinstance(id, str):
+                id = int(id)
+            tool = self.id2tool.get(id, None)
+            if not return_amount:
+                return tool
+            else:
+                return tool['amount'] if tool is not None else 0
 
     def remove_plant(self, id):
-        if isinstance(id, str):
-            id = int(id)
-        plant = self.id2plant.get(id, None)
-        if plant is None:
-            return False
-        self.plants.remove(plant)
-        self.id2plant.pop(id)
-        return True
+        with self._lock:
+            if isinstance(id, str):
+                id = int(id)
+            plant = self.id2plant.get(id, None)
+            if plant is None:
+                return False
+            self.plants.remove(plant)
+            self.id2plant.pop(id)
+            return True
 
     def remove_tool(self, id, amount: int = None):
-        if isinstance(id, str):
-            id = int(id)
-        tool = self.id2tool.get(id, None)
-        if tool is None:
-            return
-        if amount is None:
-            self.tools.remove(tool)
-            self.id2tool.pop(id)
-        else:
-            assert isinstance(amount, int)
-            tool['amount'] -= amount
-            if tool['amount'] <= 0:
+        with self._lock:
+            if isinstance(id, str):
+                id = int(id)
+            tool = self.id2tool.get(id, None)
+            if tool is None:
+                return
+            if amount is None:
                 self.tools.remove(tool)
                 self.id2tool.pop(id)
+            else:
+                assert isinstance(amount, int)
+                tool['amount'] -= amount
+                if tool['amount'] <= 0:
+                    self.tools.remove(tool)
+                    self.id2tool.pop(id)
 
     def add_tool(self, id, amount):
-        if isinstance(id, str):
-            id = int(id)
-        if isinstance(amount, str):
-            amount = int(amount)
-        tool = self.id2tool.get(id, None)
-        if tool is None:
-            tool = {
-                "id": id,
-                "amount": amount,
-            }
-            self.tools.append(tool)
-            self.id2tool[id] = tool
-        else:
-            tool['amount'] += amount
+        with self._lock:
+            if isinstance(id, str):
+                id = int(id)
+            if isinstance(amount, str):
+                amount = int(amount)
+            tool = self.id2tool.get(id, None)
+            if tool is None:
+                tool = {
+                    "id": id,
+                    "amount": amount,
+                }
+                self.tools.append(tool)
+                self.id2tool[id] = tool
+            else:
+                tool['amount'] += amount
 
     def use_item(self, tool_id, amount, lib: Library):
         if isinstance(amount, str):

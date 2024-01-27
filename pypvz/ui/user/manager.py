@@ -188,10 +188,15 @@ class AutoSynthesisMan:
                 length -= 1
             logger.log("合成完成")
         except Exception as e:
-            if isinstance(e, RuntimeError):
-                logger.log("合成异常。异常信息：{}".format(str(e)))
+            if (
+                isinstance(e, RuntimeError)
+                or isinstance(e, ConnectionError)
+                or isinstance(e, TimeoutError)
+            ):
+                logger.log("合成异常。异常信息：{}".format(type(e).__name__))
             else:
                 logger.log("合成异常。异常种类：{}".format(type(e).__name__))
+                logging.exception(e)
             if refresh_signal is not None:
                 self.check_data()
                 signal_block_emit(refresh_signal)

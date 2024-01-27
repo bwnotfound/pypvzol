@@ -1,6 +1,6 @@
 from xml.etree.ElementTree import Element, fromstring
 import logging
-from time import sleep
+from time import sleep, time
 
 from .web import WebRequest
 from .config import Config
@@ -104,6 +104,39 @@ class User:
         self.today_exp = int(grade.get("today_exp"))
         self.today_exp_max = int(grade.get("today_exp_max"))
         self.grade = int(grade.get("id"))
+        self.vip_expire_time = int(user.get("vip_etime"))
+        self.vip_level = int(user.get("vip_grade"))
+
+    def switch_user_vip_level(self, level: int, logger=None):
+        # level: [0,4]
+        body = [float(1), float(3), float(1), []]
+        while True:
+            response = self.wr.amf_post_retry(
+                body, "api.garden.challenge", '/pvz/amf/', '切换VIP外显', except_retry=True
+            )
+            assert response.status == 1, "切换VIP外显失败，返回内容：{}".format(response.body)
+            resp_text = response.body.description
+            if logger is not None:
+                logger.log(resp_text)
+            else:
+                logging.info(resp_text)
+            if "关闭" in resp_text:
+                cur_level = 0
+            else:
+                cur_level = int(resp_text[-1])
+            self.vip_level = cur_level
+            if cur_level == level:
+                return {
+                    "success": True,
+                    "result": resp_text,
+                }
+
+    def get_vip_rest_time(self):
+        if self.vip_level == 0:
+            self.switch_user_vip_level(1)
+            self.refresh()
+        rest_day = max(0, int((self.vip_expire_time - time()) / 86400))
+        return rest_day
 
     # def refresh_garden(self):
     #     resp = self.wr.get(

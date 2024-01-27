@@ -234,6 +234,8 @@ class Challenge4Level:
                     plant = self.repo.get_plant(plant_id)
                     if plant is None:
                         continue
+                    if plant_id in recover_list:
+                        continue
                     if plant.hp_now / plant.hp_max < self.main_plant_recover_rate:
                         recover_list.append(plant_id)
             success_num, fail_num = self.recoverMan.recover_list(

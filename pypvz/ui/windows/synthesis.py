@@ -541,6 +541,7 @@ class AutoSynthesisWindow(QMainWindow):
                     self.need_synthesis,
                     self.rest_event,
                 )
+                self.interrupt_event.clear()
                 self.rest_event.clear()
                 self.run_thread.start()
             finally:

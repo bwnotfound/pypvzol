@@ -230,14 +230,14 @@ class CompoundScheme:
         for i in range(self.m):
             copy_plant_id = self.copy_source_plant(refresh_signal)
             if copy_plant_id is None:
-                self.logger.log(f'方案"{self.name}"复制第{i+1}个植物失败，中止复合')
+                self.logger.log(f'方案"{self.name}"复制第{i+1}个植物失败，退出当前方案复合')
                 return False
             result = self._synthesis(
                 self.liezhi_plant_id, copy_plant_id, self.synthesis_book['id'], 10
             )
             if not result["success"]:
                 self.logger.log(result['result'])
-                self.logger.log("自动复合中把复制出来的植物给劣质双格吃时发生合成异常，中止复合")
+                self.logger.log("自动复合中把复制出来的植物给劣质双格吃时发生合成异常，退出当前方案复合")
                 return False
             self.logger.log("复制第{}个植物成功".format(i + 1))
         return True
