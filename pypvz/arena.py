@@ -20,6 +20,7 @@ class Arena:
         )
         self.opponent_list = [ArenaOpponent(root) for root in response.body['opponent']]
         self.challenge_num = int(response.body['owner']["num"])
+        self.rank = int(response.body['owner']["rank"])
 
     def challenge_first(self):
         response = self.wr.amf_post_retry(
