@@ -44,7 +44,7 @@ class UserSettings:
         repo: Repository,
         lib: Library,
         user: User,
-        logger: IOLogger,
+        logger: Logger,
         save_dir=None,
     ):
         self.cfg = cfg
@@ -53,8 +53,7 @@ class UserSettings:
         self.lib = lib
         self.user = user
         self.save_dir = save_dir
-        self.io_logger = logger
-        self.logger = logger.get_logger()
+        self.logger = logger
         self.stop_channel = Queue()
         self.start_thread = None
 
@@ -384,27 +383,19 @@ class UserSettings:
 #         self.finish_trigger.emit(usersettings)
 
 
-def get_usersettings(cfg, root_dir, extra_logger=None, need_save=True) -> UserSettings:
+def get_usersettings(cfg, root_dir, extra_logger=None, need_logs=True) -> UserSettings:
     config = Config(cfg)
 
-    if need_save and isinstance(root_dir, str):
+    setting_dir = None
+    if need_logs and isinstance(root_dir, str):
         data_dir = os.path.join(
             root_dir,
             f"data/user/{config.username}/{config.region}/{config.host}",
         )
-        cache_dir = os.path.join(data_dir, "cache")
         log_dir = os.path.join(data_dir, "log")
-        setting_dir = os.path.join(data_dir, "usersettings")
-        os.makedirs(data_dir, exist_ok=True)
-        os.makedirs(cache_dir, exist_ok=True)
         os.makedirs(log_dir, exist_ok=True)
-        os.makedirs(setting_dir, exist_ok=True)
         logger = IOLogger(log_dir, extra_logger=extra_logger)
-    elif not need_save and root_dir is not None and isinstance(root_dir, Logger):
-        setting_dir = None
-        logger = IOLogger(root_dir, extra_logger=extra_logger)
-    elif not need_save:
-        setting_dir = root_dir
+    elif not need_logs:
         logger = IOLogger(root_dir, extra_logger=extra_logger)
     else:
         raise NotImplementedError

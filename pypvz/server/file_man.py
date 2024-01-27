@@ -1,9 +1,8 @@
-from threading import Event
 import logging
 import os
+import hashlib
 
 from .. import Config
-from .util import RunProcess
 
 
 class FileManager:
@@ -16,5 +15,7 @@ class FileManager:
         config = Config(cfg)
         return os.path.join(
             self.usersettings_root_dir,
-            "{}_{}".format(config.username, hash(config.cookie)),
+            "{}_{}".format(
+                config.username, hashlib.md5(config.cookie.encode()).hexdigest()
+            ),
         )

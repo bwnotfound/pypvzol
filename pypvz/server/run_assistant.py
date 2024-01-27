@@ -135,7 +135,7 @@ class AssistantManager:
     ) -> UserSettings:
         user_dir = self.file_man.format_usersettings_save_dir(cfg)
         usersettings = get_usersettings(
-            cfg, user_dir, extra_logger=self.logger, need_save=need_save
+            cfg, user_dir, extra_logger=self.logger, need_logs=need_save
         )
         usersettings.import_data(data)
         return usersettings
