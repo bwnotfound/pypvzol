@@ -3,6 +3,7 @@ import logging
 import os
 
 from .. import Config
+from .util import RunProcess
 
 
 class FileManager:
@@ -11,7 +12,9 @@ class FileManager:
         self.logger = logger
         self.usersettings_root_dir = os.path.join(data_dir, 'usersettings')
 
-    def format_usersettings_save_dir(self, cfg: Config):
+    def format_usersettings_save_dir(self, cfg):
+        config = Config(cfg)
         return os.path.join(
-            self.usersettings_root_dir, "{}_{}".format(cfg.username, hash(cfg.cookie))
+            self.usersettings_root_dir,
+            "{}_{}".format(config.username, hash(config.cookie)),
         )

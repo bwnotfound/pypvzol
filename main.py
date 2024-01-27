@@ -1,9 +1,8 @@
 import os
 import logging
+from logging.handlers import RotatingFileHandler
 import warnings
 import time
-
-from py4j.java_gateway import JavaGateway
 
 from pypvz.server.file_man import FileManager
 from pypvz.server.communicate import start_communicator, terminate_communicator
@@ -18,7 +17,9 @@ def get_logger(log_type, log_name=None):
     log_now_dir = os.path.join(log_root_dir, log_type, time.strftime("%Y-%m-%d"))
     os.makedirs(log_now_dir, exist_ok=True)
     log_path = os.path.join(log_now_dir, log_name)
-    logger_handler = logging.FileHandler(log_path)
+    logger_handler = RotatingFileHandler(
+        log_path, maxBytes=1024 * 1024 * 10, backupCount=5, encoding="utf-8"
+    )
     logger = logging.Logger(log_name, level=logging.INFO)
     logger.addHandler(logger_handler)
     return logger
@@ -39,8 +40,15 @@ if __name__ == "__main__":
     communicator_logger = get_logger("communicator")
     file_man = FileManager(data_dir, file_logger)
     assistant_man = AssistantManager(file_man, assistant_logger)
-    start_communicator(assistant_man, communicator_logger)
+
+    # with open("../../Atri_私服2区.bin", "rb") as f:
+    #     data = f.read()
+    # print(assistant_man.get_user_extra_data(data))
+    # exit(0)
+    t = start_communicator(assistant_man, communicator_logger)
+    t.join()
+    print("run over")
     # terminate_communicator()
     # with open("./dev/test.bin", "rb") as f:
     #     data = f.read()
-    assistant_man.start().join()
+    # assistant_man.start().join()

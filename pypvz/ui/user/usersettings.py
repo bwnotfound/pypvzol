@@ -16,7 +16,7 @@ from ... import (
     Task,
     HeritageMan,
 )
-from ..message import IOLogger
+from ..message import IOLogger, Logger
 from ...utils.evolution import PlantEvolution
 from ...utils.common import second2str
 from .auto_challenge import Challenge4Level
@@ -345,6 +345,8 @@ class UserSettings:
                 getattr(self, k).load(v)
 
     def load(self):
+        if self.save_dir is None:
+            return
         load_path = os.path.join(self.save_dir, "usersettings_state")
         if os.path.exists(load_path):
             with open(load_path, "rb") as f:
@@ -370,52 +372,61 @@ class UserSettings:
         self.open_fuben_man.load(self.save_dir)
 
 
-class GetUsersettings(threading.Thread):
-    def __init__(self, cfg: Config, root_dir, finish_trigger):
-        super().__init__()
-        self.cfg = cfg
-        self.root_dir = root_dir
-        self.finish_trigger = finish_trigger
+# class GetUsersettings(threading.Thread):
+#     def __init__(self, cfg: Config, root_dir, finish_trigger):
+#         super().__init__()
+#         self.cfg = cfg
+#         self.root_dir = root_dir
+#         self.finish_trigger = finish_trigger
 
-    def run(self):
+#     def run(self):
+#         usersettings = get_usersettings(self.cfg, self.root_dir)
+#         self.finish_trigger.emit(usersettings)
+
+
+def get_usersettings(cfg, root_dir, extra_logger=None, need_save=True) -> UserSettings:
+    config = Config(cfg)
+
+    if need_save and isinstance(root_dir, str):
         data_dir = os.path.join(
-            self.root_dir,
-            f"data/user/{self.cfg.username}/{self.cfg.region}/{self.cfg.host}",
+            root_dir,
+            f"data/user/{config.username}/{config.region}/{config.host}",
         )
-        os.makedirs(data_dir, exist_ok=True)
         cache_dir = os.path.join(data_dir, "cache")
-        os.makedirs(cache_dir, exist_ok=True)
         log_dir = os.path.join(data_dir, "log")
-        os.makedirs(log_dir, exist_ok=True)
         setting_dir = os.path.join(data_dir, "usersettings")
+        os.makedirs(data_dir, exist_ok=True)
+        os.makedirs(cache_dir, exist_ok=True)
+        os.makedirs(log_dir, exist_ok=True)
         os.makedirs(setting_dir, exist_ok=True)
+        logger = IOLogger(log_dir, extra_logger=extra_logger)
+    elif not need_save and root_dir is not None and isinstance(root_dir, Logger):
+        setting_dir = None
+        logger = IOLogger(root_dir, extra_logger=extra_logger)
+    elif not need_save:
+        setting_dir = root_dir
+        logger = IOLogger(root_dir, extra_logger=extra_logger)
+    else:
+        raise NotImplementedError
 
-        max_info_capacity = 500
-        # TODO: 从配置文件中读取
-        logger = IOLogger(log_dir, max_info_capacity=max_info_capacity)
-        usersettings = get_usersettings(self.cfg, logger, setting_dir)
-        self.finish_trigger.emit((usersettings, cache_dir))
-
-
-def get_usersettings(cfg: Config, logger: IOLogger, setting_dir) -> UserSettings:
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
-        futures.append(executor.submit(User, cfg))
-        futures.append(executor.submit(Library, cfg))
-        futures.append(executor.submit(Repository, cfg))
+        futures.append(executor.submit(User, config))
+        futures.append(executor.submit(Library, config))
+        futures.append(executor.submit(Repository, config))
 
-    concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
+        concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
 
-    user: User = futures[0].result()
-    lib: Library = futures[1].result()
-    repo: Repository = futures[2].result()
+        user: User = futures[0].result()
+        lib: Library = futures[1].result()
+        repo: Repository = futures[2].result()
 
     usersettings = UserSettings(
-        cfg,
+        config,
         repo,
         lib,
         user,
         logger,
-        setting_dir,
+        save_dir=setting_dir,
     )
     return usersettings

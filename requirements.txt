@@ -2,3 +2,4 @@ requests
 setuptools
 py3amf
 py4j
+dill
