@@ -7,6 +7,8 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QComboBox,
+    QCheckBox,
+    QLineEdit,
 )
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt
@@ -65,6 +67,7 @@ class TerritorySettingWindow(QMainWindow):
         widget5 = QWidget()
         widget5.setMinimumWidth(int(self.width() * 0.2))
         layout5 = QVBoxLayout()
+        layout5.addStretch(1)
 
         difficulty_choice_widget = QWidget()
         difficulty_choice_layout = QHBoxLayout()
@@ -81,10 +84,66 @@ class TerritorySettingWindow(QMainWindow):
         difficulty_choice_widget.setLayout(difficulty_choice_layout)
         layout5.addWidget(difficulty_choice_widget)
 
-        warn_label = QLabel("----注意----\n每次挑战前会自动上植物\n打完领地后会自动下植物")
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("智能领地四:"))
+        self.smart_mode_checkbox = QCheckBox()
+        self.smart_mode_checkbox.setChecked(
+            self.usersettings.territory_man.smart_enabled
+        )
+        self.smart_mode_checkbox.stateChanged.connect(
+            self.smart_mode_checkbox_state_changed
+        )
+        layout.addWidget(self.smart_mode_checkbox)
+        layout5.addLayout(layout)
+
+        layout5.addWidget(QLabel("智能领地四可容忍最高战力:"))
+        layout = QHBoxLayout()
+        self.mantissa_fight_line_edit = QLineEdit()
+        self.mantissa_fight_line_edit.setValidator(QtGui.QDoubleValidator())
+        self.mantissa_fight_line_edit.setText(
+            str(self.usersettings.territory_man.max_fight_mantissa)
+        )
+        self.mantissa_fight_line_edit.textChanged.connect(
+            self.mantissa_fight_line_edit_textChanged
+        )
+        layout.addWidget(self.mantissa_fight_line_edit)
+        layout.addWidget(QLabel("x10的"))
+        self.exponent_fight_line_edit = QLineEdit()
+        self.exponent_fight_line_edit.setValidator(QtGui.QIntValidator())
+        self.exponent_fight_line_edit.setText(
+            str(self.usersettings.territory_man.max_fight_exponent)
+        )
+        self.exponent_fight_line_edit.textChanged.connect(
+            self.exponent_fight_line_edit_textChanged
+        )
+        layout.addWidget(self.exponent_fight_line_edit)
+        layout.addWidget(QLabel("次方亿"))
+        layout5.addLayout(layout)
+
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("并发数:"))
+        self.pool_size_combobox = QComboBox()
+        self.pool_size_combobox.addItems([str(i) for i in range(1, 21)])
+        self.pool_size_combobox.setCurrentText(
+            str(self.usersettings.territory_man.pool_size)
+        )
+        self.pool_size_combobox.currentIndexChanged.connect(
+            self.pool_size_combobox_currentIndexChanged
+        )
+        layout.addWidget(self.pool_size_combobox)
+        layout5.addLayout(layout)
+
+        warn_label = QLabel(
+            "----注意----\n"
+            "每次挑战前会自动上植物\n"
+            "打完领地后会自动下植物\n"
+            "智能领地只对难度四有效\n"
+            "选择智能领地后将无法多并发"
+        )
         warn_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout5.addWidget(warn_label)
 
+        layout5.addStretch(1)
         widget5.setLayout(layout5)
 
         main_layout.addWidget(widget2)
@@ -94,6 +153,26 @@ class TerritorySettingWindow(QMainWindow):
         main_widget.setLayout(main_layout)
 
         self.setCentralWidget(main_widget)
+
+    def pool_size_combobox_currentIndexChanged(self):
+        self.usersettings.territory_man.pool_size = int(
+            self.pool_size_combobox.currentText()
+        )
+
+    def mantissa_fight_line_edit_textChanged(self):
+        self.usersettings.territory_man.max_fight_mantissa = float(
+            self.mantissa_fight_line_edit.text()
+        )
+
+    def exponent_fight_line_edit_textChanged(self):
+        self.usersettings.territory_man.max_fight_exponent = int(
+            self.exponent_fight_line_edit.text()
+        )
+
+    def smart_mode_checkbox_state_changed(self):
+        self.usersettings.territory_man.smart_enabled = (
+            self.smart_mode_checkbox.isChecked()
+        )
 
     def difficulty_choice_box_currentIndexChanged(self, index):
         self.usersettings.territory_man.difficulty_choice = index + 1
