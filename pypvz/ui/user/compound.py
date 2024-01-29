@@ -53,6 +53,9 @@ class CompoundScheme:
         self.end_exponent = 1
         self.chosen_attribute = "HP特"
 
+        self.n1_post_quailty_index = []
+        self.n2_post_quailty_index = []
+
         self.need_quality_index = quality_name_list.index("魔神")
         self.auto_synthesis_man = AutoSynthesisMan(cfg, lib, repo)
         self.heritage_man = HeritageMan(cfg, lib)
@@ -86,7 +89,13 @@ class CompoundScheme:
 
     @property
     def deputy_plant_num_required(self):
-        return (self.n1 + self.n2 + 1) * self.m
+        return (
+            self.n1
+            + len(self.n1_post_quailty_index)
+            + self.n2
+            + len(self.n2_post_quailty_index)
+            + 1
+        ) * self.m
 
     def set_chosen_attribute(self, chosen_attribute):
         self.chosen_attribute = chosen_attribute
@@ -114,12 +123,24 @@ class CompoundScheme:
         else:
             return True
 
+    def plant_comsume_calc(self):
+        quality_dict = {}
+        quality_dict[self.need_quality_index] = (
+            quality_dict.get(self.need_quality_index, 0)
+            + (self.n1 + self.n2 + 1) * self.m
+        )
+        for quality_index in self.n1_post_quailty_index:
+            quality_dict[quality_index] = quality_dict.get(quality_index, 0) + self.m
+        for quality_index in self.n2_post_quailty_index:
+            quality_dict[quality_index] = quality_dict.get(quality_index, 0) + self.m
+        return quality_dict
+
     def one_cycle_consume(self):
         inherit_book_num_required = self.m
         inherit_reinforce_num_required = self.k * self.m
         synthesis_book_num_required = self.deputy_plant_num_required
         synthesis_reinforce_num_required = synthesis_book_num_required * 10
-        deputy_plant_num_required = synthesis_book_num_required
+        quality_dict = self.plant_comsume_calc()
 
         return (
             self.chosen_attribute,
@@ -127,30 +148,51 @@ class CompoundScheme:
             inherit_reinforce_num_required,
             synthesis_book_num_required,
             synthesis_reinforce_num_required,
-            deputy_plant_num_required,
+            quality_dict,
         )
 
     def import_deputy_plant(self, plant_id_list):
         for plant_id in plant_id_list:
             self.auto_compound_pool_id.add(plant_id)
 
-    def export_deputy_plant_to_synthesis(self, num):
+    def export_deputy_plant_to_synthesis(self, num, quality_index):
         auto_compound_pool_id = list(self.auto_compound_pool_id)
-        for plant_id in auto_compound_pool_id[:num]:
+        cnt = 0
+        for plant_id in auto_compound_pool_id:
+            plant = self.repo.get_plant(plant_id)
+            if plant.quality_index != quality_index:
+                continue
             self.auto_compound_pool_id.remove(plant_id)
             self.auto_synthesis_man.auto_synthesis_pool_id.add(plant_id)
+            cnt += 1
+            if cnt == num:
+                return True
+        return False
 
     def get_deputy_plant(self):
         auto_compound_pool_id = list(self.auto_compound_pool_id)
-        plant_id = auto_compound_pool_id[-1]
-        self.auto_compound_pool_id.remove(plant_id)
-        return plant_id
+        for plant_id in auto_compound_pool_id:
+            plant = self.repo.get_plant(plant_id)
+            if plant is None:
+                continue
+            if plant.quality_index != self.need_quality_index:
+                continue
+            self.auto_compound_pool_id.remove(plant_id)
+            return plant_id
 
-    def synthesis_plant(self, plant_id, num, refresh_signal):
-        self.export_deputy_plant_to_synthesis(num)
+    def synthesis_plant(self, plant_id, num, refresh_signal, quality_index=None):
+        if quality_index is None:
+            quality_index = self.need_quality_index
         self.auto_synthesis_man.main_plant_id = plant_id
+        if not self.export_deputy_plant_to_synthesis(num, quality_index):
+            self.logger.log(
+                f'方案"{self.name}"复合所需的{quality_name_list[quality_index]}植物数量不足，中止复合'
+            )
+            return None
         success = self.auto_synthesis_man.synthesis_all(
-            self.logger, refresh_signal=refresh_signal
+            self.logger,
+            refresh_signal=refresh_signal,
+            need_first_refresh=False,
         )
         if not success:
             return None
@@ -190,14 +232,26 @@ class CompoundScheme:
         if not success:
             self.logger.log(f'方案"{self.name}"在复制植物时出现传承错误，中断复合')
             return None
-        plant_id = self.synthesis_plant(self.source_plant_id, self.n1, refresh_signal)
-        if plant_id is None:
+        self.source_plant_id = self.synthesis_plant(
+            self.source_plant_id, self.n1, refresh_signal
+        )
+        if self.source_plant_id is None:
             return None
-        self.source_plant_id = plant_id
-        plant_id = self.synthesis_plant(copy_plant_id, self.n2, refresh_signal)
-        if plant_id is None:
+        for quality_index in self.n1_post_quailty_index:
+            self.source_plant_id = self.synthesis_plant(
+                self.source_plant_id, 1, refresh_signal, quality_index=quality_index
+            )
+            if self.source_plant_id is None:
+                return None
+        copy_plant_id = self.synthesis_plant(copy_plant_id, self.n2, refresh_signal)
+        if copy_plant_id is None:
             return None
-        copy_plant_id = plant_id
+        for quality_index in self.n2_post_quailty_index:
+            copy_plant_id = self.synthesis_plant(
+                copy_plant_id, 1, refresh_signal, quality_index=quality_index
+            )
+            if copy_plant_id is None:
+                return None
         return copy_plant_id
 
     def _synthesis(self, id1, id2, book_id, reinforce_num):
@@ -255,6 +309,8 @@ class CompoundScheme:
             "chosen_attribute": self.chosen_attribute,
             "end_mantissa": self.end_mantissa,
             "end_exponent": self.end_exponent,
+            "n1_post_quailty_index": self.n1_post_quailty_index,
+            "n2_post_quailty_index": self.n2_post_quailty_index,
         }
 
     def deserialize(self, d):
@@ -360,7 +416,7 @@ class AutoCompoundMan:
                 scheme_inherit_reinforce_num_required,
                 scheme_synthesis_book_num_required,
                 scheme_synthesis_reinforce_num_required,
-                scheme_deputy_plant_num_required,
+                scheme_quality_dict,
             ) = scheme.one_cycle_consume()
             inherit_book_dict[chosen_attribute] = (
                 inherit_book_dict.get(chosen_attribute, 0) + inherit_book_num_required
@@ -371,10 +427,14 @@ class AutoCompoundMan:
                 + scheme_synthesis_book_num_required
             )
             synthesis_reinforce_num_required += scheme_synthesis_reinforce_num_required
-            quality_dict[scheme.need_quality_index] = (
-                quality_dict.get(scheme.need_quality_index, 0)
-                + scheme_deputy_plant_num_required
-            )
+            for (
+                quality_index,
+                scheme_deputy_plant_num_required,
+            ) in scheme_quality_dict.items():
+                quality_dict[quality_index] = (
+                    quality_dict.get(quality_index, 0)
+                    + scheme_deputy_plant_num_required
+                )
         return (
             inherit_book_dict,
             synthesis_book_dict,
@@ -490,18 +550,29 @@ class AutoCompoundMan:
                 )
         return result
 
-    def get_plant_id_list(self, num, quality_index):
+    def get_plant_id_list(self, scheme: CompoundScheme):
         auto_compound_pool_id = list(self.auto_compound_pool_id)
         result = []
+        quality_dict = scheme.plant_comsume_calc()
         for plant_id in auto_compound_pool_id:
             plant = self.repo.get_plant(plant_id)
             if plant is None:
                 continue
-            if plant.quality_index == quality_index:
-                result.append(plant_id)
-            if len(result) == num:
-                break
-        if num > len(result):
+            if (
+                plant.quality_index not in quality_dict
+                or quality_dict[plant.quality_index] == 0
+            ):
+                continue
+            quality_dict[plant.quality_index] -= 1
+            result.append(plant_id)
+        need_continue = True
+        for k, v in quality_dict.items():
+            if v > 0:
+                self.logger.log(
+                    f'方案"{scheme.name}"复合所需的{quality_name_list[k]}植物数量不足，中止复合'
+                )
+                need_continue = False
+        if not need_continue:
             return None
         for plant_id in result:
             self.auto_compound_pool_id.remove(plant_id)
@@ -537,13 +608,8 @@ class AutoCompoundMan:
             scheme.liezhi_plant_id = self.liezhi_plant_id
 
         for scheme in enabled_scheme_list:
-            plant_list = self.get_plant_id_list(
-                scheme.deputy_plant_num_required, scheme.need_quality_index
-            )
+            plant_list = self.get_plant_id_list(scheme)
             if plant_list is None:
-                self.logger.log(
-                    f'方案"{scheme.name}"复合所需的{quality_name_list[scheme.need_quality_index]}植物数量不足，中止复合'
-                )
                 return False
             scheme.import_deputy_plant(plant_list)
 

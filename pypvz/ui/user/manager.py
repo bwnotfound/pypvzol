@@ -159,6 +159,7 @@ class AutoSynthesisMan:
         need_synthesis=None,
         synthesis_number=None,
         refresh_signal=None,
+        need_first_refresh=True,
     ):
         try:
             length = len(self.auto_synthesis_pool_id)
@@ -170,7 +171,7 @@ class AutoSynthesisMan:
             elif length < 0:
                 logger.log("合成次数不能为负数")
                 return False
-            self.check_data()
+            self.check_data(need_first_refresh)
             signal_block_emit(refresh_signal)
             while not (len(self.auto_synthesis_pool_id) == 0) and length > 0:
                 if interrupt_event is not None and interrupt_event.is_set():
@@ -187,7 +188,6 @@ class AutoSynthesisMan:
                     logger.log("合成异常，已跳出合成")
                     return False
                 length -= 1
-            logger.log("合成完成")
         except Exception as e:
             if (
                 isinstance(e, RuntimeError)

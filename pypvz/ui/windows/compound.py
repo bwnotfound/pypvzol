@@ -71,10 +71,9 @@ class AutoCompoundWindow(QMainWindow):
     def init_ui(self):
         self.setWindowTitle("自动复合")
 
-        # 将窗口居中显示，宽度为显示器宽度的80%，高度为显示器高度的80%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.95), int(screen_size.height() * 0.8))
-        self.move(int(screen_size.width() * 0.025), int(screen_size.height() * 0.1))
+        self.resize(int(screen_size.width() * 0.95), int(screen_size.height() * 0.85))
+        self.move(int(screen_size.width() * 0.025), int(screen_size.height() * 0.05))
 
         main_widget = QWidget()
         main_layout = QHBoxLayout()
@@ -775,9 +774,9 @@ class CompoundSchemeWidget(QWidget):
         layout1 = QHBoxLayout()
         layout1.addWidget(QLabel("k值:"))
         self.k_choice = QComboBox()
-        for i in range(11):
+        for i in range(1, 11):
             self.k_choice.addItem(str(i))
-        self.k_choice.setCurrentIndex(self.scheme.k)
+        self.k_choice.setCurrentText(str(self.scheme.k))
         self.k_choice.currentIndexChanged.connect(self.k_choice_changed)
         layout1.addWidget(self.k_choice)
         setting_panel_layout.addLayout(layout1)
@@ -787,7 +786,7 @@ class CompoundSchemeWidget(QWidget):
         self.n1_choice = QComboBox()
         for i in range(11):
             self.n1_choice.addItem(str(i))
-        self.n1_choice.setCurrentIndex(self.scheme.n1)
+        self.n1_choice.setCurrentText(str(self.scheme.n1))
         self.n1_choice.currentIndexChanged.connect(self.n1_choice_changed)
         layout2.addWidget(self.n1_choice)
         setting_panel_layout.addLayout(layout2)
@@ -797,7 +796,7 @@ class CompoundSchemeWidget(QWidget):
         self.n2_choice = QComboBox()
         for i in range(31):
             self.n2_choice.addItem(str(i))
-        self.n2_choice.setCurrentIndex(self.scheme.n2)
+        self.n2_choice.setCurrentText(str(self.scheme.n2))
         self.n2_choice.currentIndexChanged.connect(self.n2_choice_changed)
         layout3.addWidget(self.n2_choice)
         setting_panel_layout.addLayout(layout3)
@@ -805,9 +804,9 @@ class CompoundSchemeWidget(QWidget):
         layout4 = QHBoxLayout()
         layout4.addWidget(QLabel("m值:"))
         self.m_choice = QComboBox()
-        for i in range(16):
+        for i in range(1, 11):
             self.m_choice.addItem(str(i))
-        self.m_choice.setCurrentIndex(self.scheme.m)
+        self.m_choice.setCurrentText(str(self.scheme.m))
         self.m_choice.currentIndexChanged.connect(self.m_choice_changed)
         layout4.addWidget(self.m_choice)
         setting_panel_layout.addLayout(layout4)
@@ -848,6 +847,10 @@ class CompoundSchemeWidget(QWidget):
         self.quality_choice.currentIndexChanged.connect(self.quality_choice_changed)
         setting_panel_layout.addWidget(self.quality_choice)
 
+        set_quality_list_btn = QPushButton("设置后续品质列表")
+        set_quality_list_btn.clicked.connect(self.set_quality_list_btn_clicked)
+        setting_panel_layout.addWidget(set_quality_list_btn)
+
         setting_panel_layout.addWidget(QLabel("以下是部分合成信息"))
         self.information_text_box = QPlainTextEdit()
         self.information_text_box.setReadOnly(True)
@@ -857,6 +860,9 @@ class CompoundSchemeWidget(QWidget):
         setting_panel_layout.addStretch(1)
         setting_panel.setLayout(setting_panel_layout)
         self.main_layout.addWidget(setting_panel)
+
+    def set_quality_list_btn_clicked(self):
+        SetPostQualityListWindow(self.scheme, self).show()
 
     def quality_choice_changed(self):
         self.scheme.need_quality_index = self.quality_choice.currentIndex()
@@ -947,3 +953,108 @@ class CompoundSchemeWidget(QWidget):
     def refresh_all(self):
         self.refresh_source_plant_textbox()
         self.refresh_information_text_box()
+
+
+class SetPostQualityListWindow(QMainWindow):
+    def __init__(self, scheme: CompoundScheme, parent=None):
+        super().__init__(parent=parent)
+        self.scheme = scheme
+        self.current_list_widget = None
+        self.init_ui()
+        self.refresh_list()
+
+    def init_ui(self):
+        self.setWindowTitle("设置自动复合后续品质序列")
+
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.3), int(screen_size.height() * 0.5))
+        self.move(int(screen_size.width() * 0.35), int(screen_size.height() * 0.20))
+
+        main_widget = QWidget()
+        main_layout = QHBoxLayout()
+        self.setCentralWidget(main_widget)
+        main_widget.setLayout(main_layout)
+
+        layout = QVBoxLayout()
+        layout.addStretch(1)
+        self.quality_combobox = QComboBox()
+        for quality_name in quality_name_list[quality_name_list.index("魔神") :]:
+            self.quality_combobox.addItem(quality_name)
+        self.quality_combobox.setCurrentIndex(0)
+        layout.addWidget(self.quality_combobox)
+        n1_add_btn = QPushButton("添加到n1后续列表")
+        n1_add_btn.clicked.connect(self.n1_add_btn_clicked)
+        layout.addWidget(n1_add_btn)
+        n2_add_btn = QPushButton("添加到n2后续列表")
+        n2_add_btn.clicked.connect(self.n2_add_btn_clicked)
+        layout.addWidget(n2_add_btn)
+        layout.addStretch(1)
+        main_layout.addLayout(layout)
+
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("n1后续品质列表"))
+        self.n1_quality_list = QListWidget()
+        self.n1_quality_list.setSelectionMode(
+            QListWidget.SelectionMode.ExtendedSelection
+        )
+        self.n1_quality_list.itemPressed.connect(self.n1_quality_list_item_pressed)
+        layout.addWidget(self.n1_quality_list)
+        main_layout.addLayout(layout)
+
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("n2后续品质列表"))
+        self.n2_quality_list = QListWidget()
+        self.n2_quality_list.setSelectionMode(
+            QListWidget.SelectionMode.ExtendedSelection
+        )
+        self.n2_quality_list.itemPressed.connect(self.n2_quality_list_item_pressed)
+        layout.addWidget(self.n2_quality_list)
+        main_layout.addLayout(layout)
+
+    def n1_add_btn_clicked(self):
+        quality_index = quality_name_list.index(self.quality_combobox.currentText())
+        self.scheme.n1_post_quailty_index.append(quality_index)
+        self.refresh_list()
+
+    def n2_add_btn_clicked(self):
+        quality_index = quality_name_list.index(self.quality_combobox.currentText())
+        self.scheme.n2_post_quailty_index.append(quality_index)
+        self.refresh_list()
+
+    def n1_quality_list_item_pressed(self):
+        self.current_list_widget = self.n1_quality_list
+
+    def n2_quality_list_item_pressed(self):
+        self.current_list_widget = self.n2_quality_list
+
+    def refresh_list(self):
+        self.n1_quality_list.clear()
+        self.n2_quality_list.clear()
+        for i, quality_index in enumerate(self.scheme.n1_post_quailty_index):
+            quality_name = quality_name_list[quality_index]
+            item = QListWidgetItem(quality_name)
+            item.setData(Qt.ItemDataRole.UserRole, i)
+            self.n1_quality_list.addItem(item)
+        for i, quality_index in enumerate(self.scheme.n2_post_quailty_index):
+            quality_name = quality_name_list[quality_index]
+            item = QListWidgetItem(quality_name)
+            item.setData(Qt.ItemDataRole.UserRole, i)
+            self.n2_quality_list.addItem(item)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
+            if self.current_list_widget is None:
+                return
+            selected_items = self.current_list_widget.selectedItems()
+            selected_index = [
+                item.data(Qt.ItemDataRole.UserRole) for item in selected_items
+            ]
+            if len(selected_index) == 0:
+                return
+            if self.current_list_widget is self.n1_quality_list:
+                for index in reversed(selected_index):
+                    self.scheme.n1_post_quailty_index.pop(index)
+            if self.current_list_widget is self.n2_quality_list:
+                for index in reversed(selected_index):
+                    self.scheme.n2_post_quailty_index.pop(index)
+            self.refresh_list()

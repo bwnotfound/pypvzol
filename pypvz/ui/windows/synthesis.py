@@ -623,6 +623,7 @@ class SynthesisThread(threading.Thread):
                 synthesis_number=self.synthesis_number,
                 refresh_signal=self.refresh_all_signal,
             )
+            self.usersettings.logger.log("合成完成")
         finally:
             self.synthesis_finish_signal.emit()
             self.rest_event.set()

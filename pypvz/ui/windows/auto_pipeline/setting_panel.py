@@ -10,7 +10,7 @@ from PyQt6 import QtGui
 
 from ...wrapped import QLabel
 from ....upgrade import quality_name_list
-from ...user.auto_pipeline import UpgradeQuality, OpenBox
+from ...user.auto_pipeline import UpgradeQuality, OpenBox, AutoUpgradeQuality
 
 
 class OpenBoxWidget(QWidget):
@@ -106,6 +106,40 @@ class UpgradeQualityWidget(QWidget):
         text = self.upgrade_plant_amount.text()
         amount = int(text) if text != "" else 0
         self.pipeline.upgrade_plant_amount = amount
+
+    def pool_size_combobox_current_index_changed(self, index):
+        self.pipeline.pool_size = index + 1
+
+    def need_show_all_info_checkbox_state_changed(self):
+        self.pipeline.need_show_all_info = self.need_show_all_info_checkbox.isChecked()
+
+
+class AutoUpgradeQualityWidget(QWidget):
+    def __init__(self, pipeline: AutoUpgradeQuality, parent=None):
+        super().__init__(parent=parent)
+        self.pipeline = pipeline
+        self.init_ui()
+
+    def init_ui(self):
+        self.main_layout = QVBoxLayout()
+
+        self.main_layout.addWidget(QLabel("并发数:"))
+        self.pool_size_combobox = QComboBox()
+        self.pool_size_combobox.addItems([str(i) for i in range(1, 21)])
+        self.pool_size_combobox.setCurrentIndex(self.pipeline.pool_size - 1)
+        self.pool_size_combobox.currentIndexChanged.connect(
+            self.pool_size_combobox_current_index_changed
+        )
+        self.main_layout.addWidget(self.pool_size_combobox)
+
+        self.need_show_all_info_checkbox = QCheckBox("显示所有信息")
+        self.need_show_all_info_checkbox.setChecked(self.pipeline.need_show_all_info)
+        self.need_show_all_info_checkbox.stateChanged.connect(
+            self.need_show_all_info_checkbox_state_changed
+        )
+        self.main_layout.addWidget(self.need_show_all_info_checkbox)
+
+        self.setLayout(self.main_layout)
 
     def pool_size_combobox_current_index_changed(self, index):
         self.pipeline.pool_size = index + 1
