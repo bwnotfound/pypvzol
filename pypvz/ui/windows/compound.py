@@ -433,6 +433,13 @@ class AutoCompoundWindow(QMainWindow):
             "穿透合成书",
             "护甲传承书",
             "护甲合成书",
+            "耀世盛典",
+            "上古奇书",
+            "永恒天书",
+            "太上宝典",
+            "混沌宝鉴",
+            "无极玉碟",
+            "魔神植物包",
         ]:
             tool = self.repo.get_tool(self.lib.name2tool[tool_name].id)
             if tool is None:

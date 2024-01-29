@@ -707,7 +707,7 @@ class TerritoryMan:
             message = f"挑战领地难度{self.difficulty_choice}"
             result = self.should_fight()
             if not result["continue"]:
-                message += ", {}，选择挑战难度三，挑战结果：".format(result["result"])
+                message += ", {}，选择挑战难度三，".format(result["result"])
                 response = self.challenge(3)
             else:
                 response = self.challenge()

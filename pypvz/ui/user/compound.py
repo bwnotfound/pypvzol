@@ -343,17 +343,7 @@ class AutoCompoundMan:
         for scheme in self.scheme_list:
             scheme.check_data(False)
 
-    def one_cycle_consume_check(self):
-        result = []
-        if self.liezhi_plant_id is None:
-            result.append("未设置劣质双格植物")
-        if self.receiver_plant_id is None:
-            result.append("未设置主力植物")
-        for scheme in self.scheme_list:
-            if not scheme.enabled:
-                continue
-            if scheme.source_plant_id is None:
-                result.append(f'方案"{scheme.name}"未设置底座植物')
+    def one_cycle_comsume_calc(self):
         inherit_book_dict = {}
         synthesis_book_dict = {}
         quality_dict = {}
@@ -385,6 +375,33 @@ class AutoCompoundMan:
                 quality_dict.get(scheme.need_quality_index, 0)
                 + scheme_deputy_plant_num_required
             )
+        return (
+            inherit_book_dict,
+            synthesis_book_dict,
+            quality_dict,
+            inherit_reinforce_num_required,
+            synthesis_reinforce_num_required,
+        )
+
+    def one_cycle_consume_check(self):
+        result = []
+        if self.liezhi_plant_id is None:
+            result.append("未设置劣质双格植物")
+        if self.receiver_plant_id is None:
+            result.append("未设置主力植物")
+        for scheme in self.scheme_list:
+            if not scheme.enabled:
+                continue
+            if scheme.source_plant_id is None:
+                result.append(f'方案"{scheme.name}"未设置底座植物')
+
+        (
+            inherit_book_dict,
+            synthesis_book_dict,
+            quality_dict,
+            inherit_reinforce_num_required,
+            synthesis_reinforce_num_required,
+        ) = self.one_cycle_comsume_calc()
         for chosen_attribute, inherit_book_num_required in inherit_book_dict.items():
             inherit_book = self.repo.get_tool(
                 self.attribute_inheritage_book_dict[chosen_attribute]

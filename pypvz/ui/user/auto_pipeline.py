@@ -181,6 +181,17 @@ class OpenBox(Pipeline):
             )
         return result
 
+    def register_auto_set_amount(self, func):
+        self.auto_set_amount_func = func
+
+    def auto_set_amount(self):
+        msg = "一键设置开箱数不管用啦，自己手动设置吧"
+        if hasattr(self, "auto_set_amount_func"):
+            if not self.auto_set_amount_func():
+                self.logger.log(msg)
+        else:
+            self.logger.log(msg)
+
     def run(self, stop_channel: Queue):
         tool = self.repo.get_tool(self.box_id)
         if tool is None:
@@ -611,15 +622,85 @@ class PipelineScheme:
 
         self.pipeline4: list[Pipeline] = [AutoComponent(cfg, lib, repo, logger)]
         self.pipeline4_choice_index = 0
+        
+        self.register_openbox_auto_set_amount()
+
+    @property
+    def p1(self):
+        return self.pipeline1[self.pipeline1_choice_index]
+
+    @property
+    def p2(self):
+        return self.pipeline2[self.pipeline2_choice_index]
+
+    @property
+    def p3(self):
+        return self.pipeline3[self.pipeline3_choice_index]
+
+    @property
+    def p4(self):
+        return self.pipeline4[self.pipeline4_choice_index]
 
     def check_requirements(self):
         self.repo.refresh_repository(self.logger)
         result = []
-        result.extend(self.pipeline1[self.pipeline1_choice_index].check_requirements())
-        result.extend(self.pipeline2[self.pipeline2_choice_index].check_requirements())
-        result.extend(self.pipeline3[self.pipeline3_choice_index].check_requirements())
-        result.extend(self.pipeline4[self.pipeline4_choice_index].check_requirements())
+        result.extend(self.p1.check_requirements())
+        result.extend(self.p2.check_requirements())
+        result.extend(self.p3.check_requirements())
+        result.extend(self.p4.check_requirements())
+        if (
+            isinstance(self.p1, OpenBox)
+            and (
+                isinstance(self.p3, UpgradeQuality) or isinstance(self.p3, SkipPipeline)
+            )
+            and isinstance(self.p4, AutoComponent)
+        ):
+            (
+                inherit_book_dict,
+                synthesis_book_dict,
+                quality_dict,
+                inherit_reinforce_num_required,
+                synthesis_reinforce_num_required,
+            ) = self.p4.auto_component_man.one_cycle_comsume_calc()
+            deputy_plant_num_required = 0
+            for v in quality_dict.values():
+                deputy_plant_num_required += v
+            if self.p1.amount != deputy_plant_num_required:
+                result.append(
+                    "复合需要{}个植物，但开箱设置的是{}个植物，请改成复合所需要的植物数量".format(
+                        deputy_plant_num_required, self.p1.amount
+                    )
+                )
+
         return result
+
+    def register_openbox_auto_set_amount(self):
+        def run():
+            if (
+                isinstance(self.p1, OpenBox)
+                and (
+                    isinstance(self.p3, UpgradeQuality)
+                    or isinstance(self.p3, SkipPipeline)
+                )
+                and isinstance(self.p4, AutoComponent)
+            ):
+                (
+                    inherit_book_dict,
+                    synthesis_book_dict,
+                    quality_dict,
+                    inherit_reinforce_num_required,
+                    synthesis_reinforce_num_required,
+                ) = self.p4.auto_component_man.one_cycle_comsume_calc()
+                deputy_plant_num_required = 0
+                for v in quality_dict.values():
+                    deputy_plant_num_required += v
+                self.p1.amount = deputy_plant_num_required
+                return True
+            return False
+
+        o = self.pipeline1[1]
+        assert isinstance(o, OpenBox)
+        o.register_auto_set_amount(run)
 
     def run(self, stop_channel: Queue, stop_after_finish=True):
         cnt = 0

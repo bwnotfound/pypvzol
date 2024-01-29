@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QComboBox,
     QCheckBox,
+    QPushButton,
 )
 from PyQt6 import QtGui
 
@@ -34,14 +35,21 @@ class OpenBoxWidget(QWidget):
             self.box_type_combobox_current_index_changed
         )
         self.main_layout.addWidget(self.box_type_combobox)
+        auto_set_amount = QPushButton("自动设置数量")
+        auto_set_amount.clicked.connect(self.auto_set_amount_btn_clicked)
+        self.main_layout.addWidget(auto_set_amount)
 
         self.setLayout(self.main_layout)
+
+    def auto_set_amount_btn_clicked(self):
+        self.pipeline.auto_set_amount()
+        self.inputbox.setText(str(self.pipeline.amount))
 
     def inputbox_text_changed(self):
         text = self.inputbox.text()
         amount = int(text) if text != "" else 0
         self.pipeline.amount = amount
-    
+
     def box_type_combobox_current_index_changed(self, index):
         self.pipeline.current_box_type_index = index
 
