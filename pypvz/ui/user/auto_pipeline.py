@@ -164,6 +164,24 @@ class OpenBox(Pipeline):
 
     def check_requirements(self):
         result = []
+        quality_dict = None
+        if hasattr(self, "quality_dict_func"):
+            quality_dict = self.quality_dict_func()
+        if quality_dict is not None:
+            moshen_index = quality_name_list.index("魔神")
+            amount = 0
+            for quality_index, plant_num in quality_dict.items():
+                if quality_index < moshen_index:
+                    result.append("智能升品方案中有低于魔神的品质，不符合要求")
+                    return result
+                amount += plant_num
+            if amount != self.amount:
+                result.append(
+                    "复合总共需要{}个植物，但开箱设置的是{}个植物，请改成复合所需要的植物总数量".format(
+                        amount, self.amount
+                    )
+                )
+                return result
         tool = self.repo.get_tool(self.box_id)
         if tool is None or tool['amount'] < self.amount:
             result.append(
@@ -186,6 +204,9 @@ class OpenBox(Pipeline):
 
     def register_auto_set_amount(self, func):
         self.auto_set_amount_func = func
+
+    def register_quality_dict_func(self, func: AutoCompoundMan):
+        self.quality_dict_func = func
 
     def auto_set_amount(self):
         msg = "一键设置开箱数不管用啦，自己手动设置吧"
@@ -786,7 +807,7 @@ class PipelineScheme:
         self.pipeline4: list[Pipeline] = [AutoComponent(cfg, lib, repo, logger)]
         self.pipeline4_choice_index = 0
 
-        self.register_openbox_auto_set_amount()
+        self.register_openbox()
         self.register_auto_upgrade_quality()
 
     @property
@@ -864,8 +885,8 @@ class PipelineScheme:
         assert isinstance(u, AutoUpgradeQuality)
         u.register_quality_dict_func(run)
 
-    def register_openbox_auto_set_amount(self):
-        def run():
+    def register_openbox(self):
+        def run1():
             if (
                 isinstance(self.p1, OpenBox)
                 and (
@@ -889,9 +910,22 @@ class PipelineScheme:
                 return True
             return False
 
+        def run2():
+            if isinstance(self.p1, OpenBox) and isinstance(self.p4, AutoComponent):
+                (
+                    inherit_book_dict,
+                    synthesis_book_dict,
+                    quality_dict,
+                    inherit_reinforce_num_required,
+                    synthesis_reinforce_num_required,
+                ) = self.p4.auto_component_man.one_cycle_comsume_calc()
+                return quality_dict
+            return None
+
         o = self.pipeline1[1]
         assert isinstance(o, OpenBox)
-        o.register_auto_set_amount(run)
+        o.register_auto_set_amount(run1)
+        o.register_quality_dict_func(run2)
 
     def run(self, stop_channel: Queue, stop_after_finish=True):
         cnt = 0
