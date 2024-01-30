@@ -19,6 +19,7 @@ from ...utils.recover import RecoverMan
 from ..wrapped import signal_block_emit
 from ...library import attribute2plant_attribute
 from . import load_data, save_data
+from ...utils.common import format_number
 
 
 class AutoSynthesisMan:
@@ -158,6 +159,7 @@ class AutoSynthesisMan:
         need_synthesis=None,
         synthesis_number=None,
         refresh_signal=None,
+        need_first_refresh=True,
     ):
         try:
             length = len(self.auto_synthesis_pool_id)
@@ -169,7 +171,7 @@ class AutoSynthesisMan:
             elif length < 0:
                 logger.log("合成次数不能为负数")
                 return False
-            self.check_data()
+            self.check_data(need_first_refresh)
             signal_block_emit(refresh_signal)
             while not (len(self.auto_synthesis_pool_id) == 0) and length > 0:
                 if interrupt_event is not None and interrupt_event.is_set():
@@ -186,7 +188,6 @@ class AutoSynthesisMan:
                     logger.log("合成异常，已跳出合成")
                     return False
                 length -= 1
-            logger.log("合成完成")
         except Exception as e:
             if (
                 isinstance(e, RuntimeError)
@@ -572,6 +573,14 @@ class TerritoryMan:
         self.wr = WebRequest(cfg)
         self.difficulty_choice = 3
         self.team = []
+        self.smart_enabled = False
+        self.max_fight_mantissa = 1.0
+        self.max_fight_exponent = 0
+        self.pool_size = 1
+
+    @property
+    def max_fight(self):
+        return self.max_fight_mantissa * (10 ** (self.max_fight_exponent + 8))
 
     def check_data(self, refresh_repo=True):
         if refresh_repo:
@@ -601,8 +610,41 @@ class TerritoryMan:
             return False
         return True
 
-    def challenge(self):
-        body = [float(2000 + self.difficulty_choice), [], float(1), float(0)]
+    def should_fight(self):
+        if not self.smart_enabled or self.difficulty_choice != 4:
+            return {"continue": True}
+        body = [float(2004)]
+        while True:
+            response = self.wr.amf_post_retry(
+                body,
+                "api.territory.getTerritory",
+                "/pvz/amf/",
+                "查看领地信息",
+                logger=self.logger,
+                except_retry=True,
+            )
+            if response.status != 0:
+                if "匹配对手中" in response.body.description:
+                    continue
+                raise RuntimeError(response.body.description)
+            break
+        for enemy in response.body["teritory"][1:]:
+            if enemy["organisms"] is None or len(enemy["organisms"]) == 0:
+                continue
+            defender = enemy["organisms"][0]
+            if int(defender['fighting']) > self.max_fight:
+                return {
+                    "continue": False,
+                    "result": "对方战力{}超过最大战力限制".format(
+                        format_number(int(defender['fighting']))
+                    ),
+                }
+        return {"continue": True}
+
+    def challenge(self, difficulty_choice=None):
+        if difficulty_choice is None:
+            difficulty_choice = self.difficulty_choice
+        body = [float(2000 + difficulty_choice), [], float(1), float(0)]
         response = self.wr.amf_post_retry(
             body,
             "api.territory.challenge",
@@ -613,8 +655,8 @@ class TerritoryMan:
         )
         return response
 
-    def auto_challenge(self, stop_channel: Queue):
-        while True:
+    def auto_challenge_concurrent(self, stop_channel: Queue):
+        def run():
             message = f"挑战领地难度{self.difficulty_choice}"
             response = self.challenge()
             if response.status == 1:
@@ -622,6 +664,7 @@ class TerritoryMan:
                 if "匹配对手中" in response.body.description:
                     message = message + "继续运行"
                     self.logger.log(message)
+                    return True
                 else:
                     self.logger.log(message)
                     return False
@@ -635,6 +678,60 @@ class TerritoryMan:
                 self.logger.log(message)
             if stop_channel.qsize() > 0:
                 return False
+            return True
+
+        pool_size = self.pool_size
+        future_list = []
+
+        def pop_future():
+            for future in concurrent.futures.as_completed(future_list):
+                index = future_list.index(future)
+                result = future.result()
+                future_list.pop(index)
+                return result
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=pool_size) as executor:
+            while stop_channel.qsize() == 0:
+                while len(future_list) >= pool_size:
+                    result = pop_future()
+                    if not result:
+                        return False
+                future_list.append(executor.submit(run))
+        if stop_channel.qsize() > 0:
+            return False
+
+    def auto_challenge(self, stop_channel: Queue):
+        if not self.smart_enabled:
+            return self.auto_challenge_concurrent(stop_channel)
+        while stop_channel.qsize() == 0:
+            message = f"挑战领地难度{self.difficulty_choice}"
+            result = self.should_fight()
+            if not result["continue"]:
+                message += ", {}，选择挑战难度三，".format(result["result"])
+                response = self.challenge(3)
+            else:
+                response = self.challenge()
+            if response.status == 1:
+                message = message + "失败. 原因: {}.".format(response.body.description)
+                if "匹配对手中" in response.body.description:
+                    message = message + "继续运行"
+                    self.logger.log(message)
+                    continue
+                else:
+                    self.logger.log(message)
+                    return False
+            else:
+                result = response.body
+                message = message + "成功. "
+                message = message + "挑战结果：{}".format(
+                    "胜利" if result['fight']['is_winning'] else "失败"
+                )
+                message = message + ". 现在荣誉: {}".format(result['honor'])
+                self.logger.log(message)
+            if stop_channel.qsize() > 0:
+                return False
+        if stop_channel.qsize() > 0:
+            return False
 
     def release_plant(self, user_id):
         body = [float(user_id)]
@@ -686,6 +783,10 @@ class TerritoryMan:
         data = {
             "difficulty_choice": self.difficulty_choice,
             "team": self.team,
+            "smart_enabled": self.smart_enabled,
+            "max_fight_mantissa": self.max_fight_mantissa,
+            "max_fight_exponent": self.max_fight_exponent,
+            "pool_size": self.pool_size,
         }
         return save_data(data, save_dir, "auto_territory")
 

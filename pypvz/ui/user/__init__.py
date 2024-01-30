@@ -17,7 +17,10 @@ def load_data(load_dir, load_name, instance=None):
     if instance is not None:
         for k, v in data.items():
             if hasattr(instance, k):
-                setattr(instance, k, v)
+                try:
+                    setattr(instance, k, v)
+                except:
+                    pass
     return data
 
 

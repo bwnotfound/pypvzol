@@ -13,6 +13,9 @@ from ..message import Logger
 from ... import UpgradeMan
 from .auto_challenge import Challenge4Level
 from ...shop import PurchaseItem
+from .compound import AutoCompoundMan
+from ...upgrade import quality_name_list
+from ...repository import Plant
 
 
 class Pipeline:
@@ -180,6 +183,17 @@ class OpenBox(Pipeline):
                 )
             )
         return result
+
+    def register_auto_set_amount(self, func):
+        self.auto_set_amount_func = func
+
+    def auto_set_amount(self):
+        msg = "一键设置开箱数不管用啦，自己手动设置吧"
+        if hasattr(self, "auto_set_amount_func"):
+            if not self.auto_set_amount_func():
+                self.logger.log(msg)
+        else:
+            self.logger.log(msg)
 
     def run(self, stop_channel: Queue):
         tool = self.repo.get_tool(self.box_id)
@@ -464,6 +478,165 @@ class UpgradeQuality(Pipeline):
                 setattr(self, k, v)
 
 
+class AutoUpgradeQuality(Pipeline):  # 智能升品，仅适用于开魔神箱
+    def __init__(self, cfg: Config, lib: Library, repo: Repository, logger: Logger):
+        super().__init__("智能升品")
+        self.cfg = cfg
+        self.lib = lib
+        self.repo = repo
+        self.logger = logger
+        self.need_show_all_info = False
+        self.pool_size = 3
+        self.interrupt_event = Event()
+        self.rest_event = Event()
+
+    def register_quality_dict_func(self, func):
+        self.quality_dict_func = func
+
+    def get_quality_dict(self) -> None | dict[int, int]:
+        assert hasattr(self, "quality_dict_func")
+        return self.quality_dict_func()
+
+    def check_requirements(self):
+        quality_dict = self.get_quality_dict()
+        if quality_dict is None:
+            return ["智能升品需设置流水线为自动开箱-练级-智能升品-复合"]
+
+        def get_tool(book_name):
+            for tool in self.lib.tools.values():
+                if tool.name == book_name:
+                    return tool
+
+        quality_book = [
+            get_tool("耀世盛典"),
+            get_tool("上古奇书"),
+            get_tool("永恒天书"),
+            get_tool("太上宝典"),
+            get_tool("混沌宝鉴"),
+            get_tool("无极玉碟"),
+        ]
+        result = []
+        acquired_book_num = {i: 0 for i in range(len(quality_book))}
+        moshen_index = quality_name_list.index("魔神")
+        for quality_index, plant_num in quality_dict.items():
+            if quality_index < moshen_index:
+                return ["智能升品检测到复合方案中有低于魔神的品质，不符合要求"]
+            if quality_index == moshen_index:
+                continue
+            quality_index -= moshen_index + 1
+            for i in range(quality_index + 1):
+                acquired_book_num[i] += plant_num
+        for index, book_num in acquired_book_num.items():
+            if book_num == 0:
+                continue
+            book = quality_book[index]
+            tool = self.repo.get_tool(book.id)
+            if tool is None or tool['amount'] < book_num:
+                result.append(
+                    "{}数量不足，需要{}个，实际只有{}个".format(
+                        book.name,
+                        book_num,
+                        (tool['amount'] if tool is not None else 0),
+                    )
+                )
+        return result
+
+    def run(self, plant_list: list[Plant], stop_channel: Queue):
+        quality_dict = self.get_quality_dict()
+        if quality_dict is None:
+            return {
+                "success": False,
+                "info": "智能升品需设置流水线为自动开箱-练级-智能升品-复合",
+            }
+
+        plant_id_list = [plant.id for plant in plant_list]
+        moshen_index = quality_name_list.index("魔神")
+
+        for quality_index, plant_num in quality_dict.items():
+            if quality_index <= moshen_index:
+                continue
+            upgrade_plant_id_list = plant_id_list[:plant_num]
+            plant_id_list = plant_id_list[plant_num:]
+
+            self.rest_event.clear()
+            from ..windows.quality import UpgradeQualityThread
+
+            self.quality_thread = UpgradeQualityThread(
+                self.repo,
+                self.lib,
+                self.logger,
+                UpgradeMan(self.cfg),
+                upgrade_plant_id_list,
+                quality_index,
+                self.need_show_all_info,
+                None,
+                self.interrupt_event,
+                None,
+                self.rest_event,
+                self.pool_size,
+            )
+            self.interrupt_event.clear()
+            self.quality_thread.start()
+            while stop_channel.qsize() == 0 and not self.rest_event.is_set():
+                sleep(0.1)
+            if stop_channel.qsize() > 0:
+                self.interrupt_event.set()
+                self.rest_event.wait()
+                return {
+                    "success": False,
+                    "info": "用户终止",
+                }
+        self.repo.refresh_repository()
+
+        in_plant_quality_dict = {}
+        plant_id_list = [plant.id for plant in plant_list]
+        for plant_id in plant_id_list:
+            plant = self.repo.get_plant(plant_id)
+            if plant is None:
+                return {
+                    "success": False,
+                    "info": "智能升品失败，原因：本该存在的植物不存在了",
+                }
+            if plant.quality_index not in in_plant_quality_dict:
+                in_plant_quality_dict[plant.quality_index] = 0
+            in_plant_quality_dict[plant.quality_index] += 1
+        for quality_index, plant_num in quality_dict.items():
+            if in_plant_quality_dict.get(quality_index, 0) < plant_num:
+                return {
+                    "success": False,
+                    "info": "智能升品失败，原因：{}品质植物预期升品{}个，实际升品{}个".format(
+                        quality_name_list[quality_index],
+                        plant_num,
+                        in_plant_quality_dict.get(quality_index, 0),
+                    ),
+                }
+
+        return {
+            "success": True,
+            "info": "升品成功",
+            "result": plant_list,
+        }
+
+    def setting_widget(self, parent=None):
+        from ..windows.auto_pipeline.setting_panel import AutoUpgradeQualityWidget
+
+        return AutoUpgradeQualityWidget(self, parent=parent)
+
+    def has_setting_widget(self):
+        return True
+
+    def serialize(self):
+        return {
+            "need_show_all_info": self.need_show_all_info,
+            "pool_size": self.pool_size,
+        }
+
+    def deserialize(self, d):
+        for k, v in d.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+
+
 class AutoComponent(Pipeline):
     def __init__(self, cfg: Config, lib: Library, repo: Repository, logger: Logger):
         super().__init__("自动复合")
@@ -606,20 +779,119 @@ class PipelineScheme:
         self.pipeline3: list[Pipeline] = [
             UpgradeQuality(cfg, lib, repo, logger),
             SkipPipeline(),
+            AutoUpgradeQuality(cfg, lib, repo, logger),
         ]
         self.pipeline3_choice_index = 0
 
         self.pipeline4: list[Pipeline] = [AutoComponent(cfg, lib, repo, logger)]
         self.pipeline4_choice_index = 0
 
+        self.register_openbox_auto_set_amount()
+        self.register_auto_upgrade_quality()
+
+    @property
+    def p1(self):
+        return self.pipeline1[self.pipeline1_choice_index]
+
+    @property
+    def p2(self):
+        return self.pipeline2[self.pipeline2_choice_index]
+
+    @property
+    def p3(self):
+        return self.pipeline3[self.pipeline3_choice_index]
+
+    @property
+    def p4(self):
+        return self.pipeline4[self.pipeline4_choice_index]
+
     def check_requirements(self):
         self.repo.refresh_repository(self.logger)
         result = []
-        result.extend(self.pipeline1[self.pipeline1_choice_index].check_requirements())
-        result.extend(self.pipeline2[self.pipeline2_choice_index].check_requirements())
-        result.extend(self.pipeline3[self.pipeline3_choice_index].check_requirements())
-        result.extend(self.pipeline4[self.pipeline4_choice_index].check_requirements())
+        result.extend(self.p1.check_requirements())
+        result.extend(self.p2.check_requirements())
+        result.extend(self.p3.check_requirements())
+        result.extend(self.p4.check_requirements())
+        if (
+            isinstance(self.p1, OpenBox)
+            and (
+                isinstance(self.p3, UpgradeQuality) or isinstance(self.p3, SkipPipeline)
+            )
+            and isinstance(self.p4, AutoComponent)
+        ):
+            (
+                inherit_book_dict,
+                synthesis_book_dict,
+                quality_dict,
+                inherit_reinforce_num_required,
+                synthesis_reinforce_num_required,
+            ) = self.p4.auto_component_man.one_cycle_comsume_calc()
+            deputy_plant_num_required = 0
+            for v in quality_dict.values():
+                deputy_plant_num_required += v
+            if self.p1.amount != deputy_plant_num_required:
+                result.append(
+                    "复合需要{}个植物，但开箱设置的是{}个植物，请改成复合所需要的植物数量".format(
+                        deputy_plant_num_required, self.p1.amount
+                    )
+                )
+
         return result
+
+    def register_auto_upgrade_quality(self):
+        def run():
+            if not (
+                isinstance(self.p1, OpenBox)
+                and (isinstance(self.p3, AutoUpgradeQuality))
+                and isinstance(self.p4, AutoComponent)
+            ):
+                return None
+
+            result = {}
+            auto_compound = self.p4
+            assert isinstance(auto_compound, AutoComponent)
+            for scheme in auto_compound.auto_component_man.scheme_list:
+                if not scheme.enabled:
+                    continue
+                scheme_quality_dict = scheme.plant_comsume_calc()
+                for k, v in scheme_quality_dict.items():
+                    if k not in result:
+                        result[k] = 0
+                    result[k] += v
+            return result
+
+        u = self.pipeline3[2]
+        assert isinstance(u, AutoUpgradeQuality)
+        u.register_quality_dict_func(run)
+
+    def register_openbox_auto_set_amount(self):
+        def run():
+            if (
+                isinstance(self.p1, OpenBox)
+                and (
+                    isinstance(self.p3, UpgradeQuality)
+                    or isinstance(self.p3, SkipPipeline)
+                    or isinstance(self.p3, AutoUpgradeQuality)
+                )
+                and isinstance(self.p4, AutoComponent)
+            ):
+                (
+                    inherit_book_dict,
+                    synthesis_book_dict,
+                    quality_dict,
+                    inherit_reinforce_num_required,
+                    synthesis_reinforce_num_required,
+                ) = self.p4.auto_component_man.one_cycle_comsume_calc()
+                deputy_plant_num_required = 0
+                for v in quality_dict.values():
+                    deputy_plant_num_required += v
+                self.p1.amount = deputy_plant_num_required
+                return True
+            return False
+
+        o = self.pipeline1[1]
+        assert isinstance(o, OpenBox)
+        o.register_auto_set_amount(run)
 
     def run(self, stop_channel: Queue, stop_after_finish=True):
         cnt = 0
