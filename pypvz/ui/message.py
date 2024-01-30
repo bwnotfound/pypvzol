@@ -31,12 +31,14 @@ class Logger:
         message = self._log_str_format(msg)
         if log_info:
             self.logger.info(message)
-            self.extra_logger.info(message)
+            if self.extra_logger is not None:
+                self.extra_logger.info(message)
 
     def reverse_log(self, msg: str, log_info=True):
         message = self._log_str_format(msg)
         self.logger.info(message)
-        self.extra_logger.info(message)
+        if self.extra_logger is not None:
+            self.extra_logger.info(message)
 
 
 class IOLogger:
@@ -58,7 +60,7 @@ class IOLogger:
 
         self.max_file_num = max_file_num
         self.save_path = os.path.join(
-            save_dir, "日志_起始时间{}.txt".format(strftime("%Y-%m-%d_%H-%M-%S", localtime()))
+            save_dir, "日志_起始时间_{}.txt".format(strftime("%Y-%m-%d", localtime()))
         )
         self._check_file_num()
         _logger = logging.Logger("IOLogger", level=logging.INFO)
@@ -80,6 +82,17 @@ class IOLogger:
         if len(file_list) > self.max_file_num:
             for file in file_list[self.max_file_num :]:
                 os.remove(file)
+
+    @staticmethod
+    def get_account_logs(log_dir):
+        if not os.path.exists(log_dir):
+            return None
+        file_list = os.listdir(log_dir)
+        file_list = [
+            os.path.join(log_dir, file) for file in file_list if file.endswith(".txt")
+        ]
+        file_list.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        return file_list
 
     def get_logger(self):
         return self.logger

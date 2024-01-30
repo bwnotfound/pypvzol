@@ -1,13 +1,14 @@
 import logging
 from threading import Thread, Event, Lock
 import concurrent.futures
-from queue import Queue
 import time
 import pickle
+import os
 
 from .file_man import FileManager
 from ..ui.user.usersettings import UserSettings, get_usersettings
 from .assistant_user import AssistantAccount
+from ..ui.message import IOLogger
 
 
 class UserManager:
@@ -131,34 +132,39 @@ class AssistantManager:
         self.loop_account_man = UserManager()
 
     def get_usersettings_from_cfg(
-        self, cfg, data: bytes, need_save=True
+        self, cfg, data: bytes, need_save=True, account_id=None
     ) -> UserSettings:
-        user_dir = self.file_man.format_usersettings_save_dir(cfg)
+        if account_id is not None:
+            user_dir = self.file_man.format_usersettings_save_dir(account_id)
+        else:
+            user_dir = None
         usersettings = get_usersettings(
             cfg, user_dir, extra_logger=self.logger, need_logs=need_save
         )
         usersettings.import_data(data)
         return usersettings
 
-    def get_usersettings_from_bytes(self, data: bytes, need_save=True) -> UserSettings:
+    def get_usersettings_from_bytes(
+        self, data: bytes, need_save=True, account_id=None
+    ) -> UserSettings:
         try:
             data = pickle.loads(data)
             cfg, data = data["config"], data["data"]
             usersettings = self.get_usersettings_from_cfg(
-                cfg, data, need_save=need_save
+                cfg, data, need_save=need_save, account_id=account_id
             )
             return usersettings
         except Exception as e:
             # self.logger.warning(e)
             return None
 
-    def run_user(self, data: bytes, usersettings_stop_channel):
-        usersettings = self.get_usersettings_from_bytes(data)
+    def run_user(self, account: AssistantAccount):
+        usersettings = self.get_usersettings_from_bytes(account.data, account_id=account.id)
         if usersettings is None:
             self.logger.warning("Account数据为空")
             return
         usersettings.exit_if_nothing_todo = True
-        usersettings._start(usersettings_stop_channel)
+        usersettings._start(account.usersettings_stop_channel)
 
     def get_user_extra_data(self, data: bytes):
         assert isinstance(data, bytes)
@@ -176,6 +182,23 @@ class AssistantManager:
                 "cookie": usersettings.cfg.cookie,
             },
         }
+
+    def get_account_logs(self, account_id):
+        log_dir = os.path.join(
+            self.file_man.format_usersettings_save_dir(account_id), "logs"
+        )
+        log_path_list = IOLogger.get_account_logs(log_dir)
+        if log_path_list is None:
+            return {
+                "code": 1,
+                "message": "日志文件夹不存在，可能是因为账号未运行过",
+            }
+        result = []
+        for log_path in log_path_list:
+            with open(log_path, "r", encoding="utf-8") as f:
+                s = f.read()
+            result.append({"logName": os.path.basename(log_path), "content": s})
+        return {"code": 0, "message": "所有日志读取成功", "result": result}
 
     def _run_one_cycle(self):
         if self.stop_circle_event.is_set():
@@ -211,8 +234,7 @@ class AssistantManager:
                     (
                         executor.submit(
                             self.run_user,
-                            account.data,
-                            account.usersettings_stop_channel,
+                            account,
                         ),
                         account.id,
                     )
@@ -261,8 +283,7 @@ class AssistantManager:
                         (
                             executor.submit(
                                 self.run_user,
-                                account.data,
-                                account.usersettings_stop_channel,
+                                account,
                             ),
                             account.id,
                         )

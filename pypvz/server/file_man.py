@@ -11,11 +11,5 @@ class FileManager:
         self.logger = logger
         self.usersettings_root_dir = os.path.join(data_dir, 'usersettings')
 
-    def format_usersettings_save_dir(self, cfg):
-        config = Config(cfg)
-        return os.path.join(
-            self.usersettings_root_dir,
-            "{}_{}".format(
-                config.username, hashlib.md5(config.cookie.encode()).hexdigest()
-            ),
-        )
+    def format_usersettings_save_dir(self, accountId):
+        return os.path.join(self.usersettings_root_dir, str(accountId))

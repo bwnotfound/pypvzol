@@ -383,22 +383,19 @@ class UserSettings:
 #         self.finish_trigger.emit(usersettings)
 
 
-def get_usersettings(cfg, root_dir, extra_logger=None, need_logs=True) -> UserSettings:
+def get_usersettings(cfg, user_dir, extra_logger=None, need_logs=True) -> UserSettings:
     config = Config(cfg)
-
-    setting_dir = None
-    if need_logs and isinstance(root_dir, str):
-        data_dir = os.path.join(
-            root_dir,
-            f"data/user/{config.username}/{config.region}/{config.host}",
-        )
-        log_dir = os.path.join(data_dir, "log")
+    if need_logs:
+        assert isinstance(user_dir, str)
+        # data_dir = os.path.join(
+        #     root_dir,
+        #     f"data/user/{config.username}/{config.region}/{config.host}",
+        # )
+        log_dir = os.path.join(user_dir, "logs")
         os.makedirs(log_dir, exist_ok=True)
         logger = IOLogger(log_dir, extra_logger=extra_logger)
-    elif not need_logs:
-        logger = IOLogger(root_dir, extra_logger=extra_logger)
     else:
-        raise NotImplementedError
+        logger = IOLogger(user_dir, extra_logger=extra_logger)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
@@ -418,6 +415,6 @@ def get_usersettings(cfg, root_dir, extra_logger=None, need_logs=True) -> UserSe
         lib,
         user,
         logger,
-        save_dir=setting_dir,
+        save_dir=None,
     )
     return usersettings
