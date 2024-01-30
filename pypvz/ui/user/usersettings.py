@@ -414,7 +414,7 @@ def get_usersettings(cfg, user_dir, extra_logger=None, need_logs=True) -> UserSe
         repo,
         lib,
         user,
-        logger,
+        logger.get_logger(),
         save_dir=None,
     )
     return usersettings

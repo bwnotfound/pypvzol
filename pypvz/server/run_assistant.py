@@ -4,6 +4,7 @@ import concurrent.futures
 import time
 import pickle
 import os
+import shutil
 
 from .file_man import FileManager
 from ..ui.user.usersettings import UserSettings, get_usersettings
@@ -123,7 +124,7 @@ class AssistantManager:
     def __init__(self, file_man: FileManager, logger: logging.Logger):
         self.file_man = file_man
         self.logger = logger
-        self.pool_max = 2
+        self.pool_max = 1
         self.stop_circle_event = Event()
         self.stop_loop_event = Event()
         self.run_circle_thread = None
@@ -159,7 +160,9 @@ class AssistantManager:
             return None
 
     def run_user(self, account: AssistantAccount):
-        usersettings = self.get_usersettings_from_bytes(account.data, account_id=account.id)
+        usersettings = self.get_usersettings_from_bytes(
+            account.data, account_id=account.id
+        )
         if usersettings is None:
             self.logger.warning("Account数据为空")
             return
@@ -337,3 +340,10 @@ class AssistantManager:
                 account.usersettings_stop_channel.put(None)
             self.run_loop_thread.join()
             self.run_loop_thread = None
+
+    def remove_account(self, account_id):
+        self.circle_account_man.remove_account(account_id)
+        self.loop_account_man.remove_account(account_id)
+        shutil.rmtree(
+            self.file_man.format_usersettings_save_dir(account_id), ignore_errors=True
+        )

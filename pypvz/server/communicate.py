@@ -340,6 +340,9 @@ class Communicator:
     def get_account_logs(self, accountId):
         return self.java_convert(self.assistant_man.get_account_logs(accountId))
 
+    def remove_account(self, accountId):
+        self.assistant_man.remove_account(accountId)
+
     class Java:
         implements = ["com.bwnotfound.pvzol_server.pyassistant.python.PyCommunicator"]
 
