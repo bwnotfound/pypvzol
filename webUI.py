@@ -590,7 +590,7 @@ class FunctionPanelWindow(QMainWindow):
         simulate_btn.clicked.connect(self.simulate_btn_clicked)
         menu_layout.addWidget(simulate_btn, 4, 0)
 
-        open_fuben_btn = QPushButton("自动开副本面板")
+        open_fuben_btn = QPushButton("自动开图面板")
         open_fuben_btn.clicked.connect(self.open_fuben_btn_clicked)
         menu_layout.addWidget(open_fuben_btn, 5, 0)
 

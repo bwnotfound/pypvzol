@@ -67,10 +67,10 @@ class OpenFubenMan:
                 plant = self.repo.get_plant(plant_id)
                 if plant is None:
                     continue
-                if plant.hp_now / plant.hp_max < self.recover_threshold:
+                if plant.hp_now / plant.hp_max <= self.recover_threshold:
                     recover_list.append(plant_id)
             if len(recover_list) == 0:
-                return
+                return True
             success_num, fail_num = self.recover_man.recover_list(
                 recover_list, choice=self.recover_choice
             )
