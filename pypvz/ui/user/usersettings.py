@@ -178,7 +178,10 @@ class UserSettings:
                         self.territory_man.check_data(False)
                         result = self.territory_man.upload_team()
                         self.logger.log(result['result'])
-                        self.territory_man.auto_challenge(stop_channel)
+                        self.arena_man.arena.refresh_arena()
+                        self.territory_man.auto_challenge(
+                            self.user.name, self.arena_man.arena.rank, stop_channel
+                        )
                         result = self.territory_man.release_plant(self.user.id)
                         self.logger.log(result['result'])
                 except Exception as e:

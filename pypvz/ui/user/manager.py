@@ -5,6 +5,8 @@ import logging
 import os
 from threading import Event
 import time
+import requests
+import hashlib
 from ... import (
     Config,
     Repository,
@@ -565,6 +567,22 @@ class FubenMan:
                 self.caves = []
 
 
+class TerritoryUser:
+    def __init__(self, name, rank, region, cookie):
+        self.name = name
+        self.rank = rank
+        self.region = region
+        self.cookie = hashlib.md5(cookie.encode()).hexdigest()
+
+    def to_json(self):
+        return {
+            "gameName": self.name,
+            "rank": self.rank,
+            "region": self.region,
+            "encryptedCookie": self.cookie,
+        }
+
+
 class TerritoryMan:
     def __init__(self, cfg: Config, repo: Repository, logger: Logger):
         self.cfg = cfg
@@ -577,10 +595,93 @@ class TerritoryMan:
         self.max_fight_mantissa = 1.0
         self.max_fight_exponent = 0
         self.pool_size = 1
+        self.url_prefix = "http://bwnotfound.com/api/assistant/territory"
+        self.territory_mutex_enabled = False
+
+    @property
+    def is_test_server(self):
+        return self.cfg.host == "test.pvzol.org"
 
     @property
     def max_fight(self):
         return self.max_fight_mantissa * (10 ** (self.max_fight_exponent + 8))
+
+    def should_interrupt(self, territory_user: TerritoryUser):
+        resp = requests.post(
+            self.url_prefix + "/interrupt", json=territory_user.to_json()
+        )
+        if resp.status_code != 200:
+            return {
+                "success": False,
+                "result": "领地互斥获取是否需要中断失败，原因是响应状态码为{}".format(resp.status_code),
+            }
+        result = resp.json()
+        if result['code'] != 0:
+            return {
+                "success": False,
+                "result": "领地互斥获取是否需要中断失败，原因是{}".format(result['msg']),
+            }
+        return {"success": True, "result": result['result']}
+
+    def release(self, territory_user: TerritoryUser):
+        resp = requests.post(
+            self.url_prefix + "/release", json=territory_user.to_json()
+        )
+        result = None
+        if resp.status_code != 200:
+            result = {
+                "success": False,
+                "result": "领地互斥释放领地失败，原因是响应状态码为{}".format(resp.status_code),
+            }
+            self.logger.log(result['result'])
+            return result
+        resp_json = resp.json()
+        if resp_json['code'] != 0:
+            result = {
+                "success": False,
+                "result": "领地互斥释放领地失败，原因是{}".format(resp_json['msg']),
+            }
+            self.logger.log(result['result'])
+        else:
+            result = {"success": True, "result": resp_json['result']}
+        return result
+
+    # -1:用户不合法 0:获取并可以运行 1:已经在运行 2:还需等待
+    def acquire_permission(self, territory_user: TerritoryUser):
+        resp = requests.post(
+            self.url_prefix + "/acquire", json=territory_user.to_json()
+        )
+        if resp.status_code != 200:
+            return {
+                "success": False,
+                "result": "领地互斥获取领地失败，原因是响应状态码为{}".format(resp.status_code),
+            }
+        result = resp.json()
+        if result['code'] == -1:
+            return {
+                "success": False,
+                "result": "领地互斥获取领地失败，原因是{}".format(result['msg']),
+            }
+        return {"success": True, "result": result['code']}
+
+    def acquire_permission_retry(
+        self, territory_user: TerritoryUser, stop_channel: Queue
+    ):
+        if not self.territory_mutex_enabled:
+            return True
+        while stop_channel.qsize() == 0:
+            result = self.acquire_permission(territory_user)
+            if not result['success']:
+                self.logger.log(result['result'])
+                return False
+            code = result['result']
+            if code == 2:
+                self.logger.log("领地互斥还有其他人在跑，选择等待1s")
+                time.sleep(1)
+                continue
+            if code == 0 or code == 1:
+                return True
+        return False
 
     def check_data(self, refresh_repo=True):
         if refresh_repo:
@@ -655,7 +756,9 @@ class TerritoryMan:
         )
         return response
 
-    def auto_challenge_concurrent(self, stop_channel: Queue):
+    def auto_challenge_concurrent(
+        self, territory_user: TerritoryUser, stop_channel: Queue
+    ):
         def run():
             message = f"挑战领地难度{self.difficulty_choice}"
             response = self.challenge()
@@ -692,45 +795,103 @@ class TerritoryMan:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=pool_size) as executor:
             while stop_channel.qsize() == 0:
-                while len(future_list) >= pool_size:
-                    result = pop_future()
-                    if not result:
+                if self.territory_mutex_enabled:
+                    if not self.acquire_permission_retry(territory_user, stop_channel):
+                        self.release(territory_user)
                         return False
-                future_list.append(executor.submit(run))
+                while stop_channel.qsize() == 0:
+                    if self.territory_mutex_enabled:
+                        result = self.should_interrupt(territory_user)
+                        if not result['success']:
+                            self.logger.log(result['result'])
+                            self.release(territory_user)
+                            return False
+                        if result['result']:
+                            self.logger.log("领地互斥检测到需要中断，交出运行权")
+                            while len(future_list) > 0:
+                                result = pop_future()
+                                if not result:
+                                    self.release(territory_user)
+                                    return False
+                            break
+                    while len(future_list) >= pool_size:
+                        result = pop_future()
+                        if not result:
+                            if self.territory_mutex_enabled:
+                                self.release(territory_user)
+                            return False
+                    future_list.append(executor.submit(run))
+                if stop_channel.qsize() > 0:
+                    if self.territory_mutex_enabled:
+                        self.release(territory_user)
+                    return False
+                if not self.territory_mutex_enabled:
+                    break
+        if self.territory_mutex_enabled:
+            self.release(territory_user)
         if stop_channel.qsize() > 0:
             return False
+        return False
 
-    def auto_challenge(self, stop_channel: Queue):
+    def auto_challenge(self, name, rank, stop_channel: Queue):
+        if self.is_test_server and self.territory_mutex_enabled:
+            self.territory_mutex_enabled = False
+            self.logger.log("测试服不支持领地互斥，已关闭领地互斥")
+        territory_user = TerritoryUser(name, rank, self.cfg.region, self.cfg.cookie)
         if not self.smart_enabled:
-            return self.auto_challenge_concurrent(stop_channel)
+            return self.auto_challenge_concurrent(territory_user, stop_channel)
         while stop_channel.qsize() == 0:
-            message = f"挑战领地难度{self.difficulty_choice}"
-            result = self.should_fight()
-            if not result["continue"]:
-                message += ", {}，选择挑战难度三，".format(result["result"])
-                response = self.challenge(3)
-            else:
-                response = self.challenge()
-            if response.status == 1:
-                message = message + "失败. 原因: {}.".format(response.body.description)
-                if "匹配对手中" in response.body.description:
-                    message = message + "继续运行"
-                    self.logger.log(message)
-                    continue
-                else:
-                    self.logger.log(message)
+            if self.territory_mutex_enabled:
+                if not self.acquire_permission_retry(territory_user, stop_channel):
+                    self.release(territory_user)
                     return False
-            else:
-                result = response.body
-                message = message + "成功. "
-                message = message + "挑战结果：{}".format(
-                    "胜利" if result['fight']['is_winning'] else "失败"
-                )
-                message = message + ". 现在荣誉: {}".format(result['honor'])
-                self.logger.log(message)
+            while stop_channel.qsize() == 0:
+                if self.territory_mutex_enabled:
+                    result = self.should_interrupt(territory_user)
+                    if not result['success']:
+                        self.logger.log(result['result'])
+                        self.release(territory_user)
+                        return False
+                    if result['result']:
+                        self.logger.log("领地互斥检测到需要中断，交出运行权")
+                        break
+                message = f"挑战领地难度{self.difficulty_choice}"
+                result = self.should_fight()
+                if not result["continue"]:
+                    message += ", {}，选择挑战难度三，".format(result["result"])
+                    response = self.challenge(3)
+                else:
+                    response = self.challenge()
+                if response.status == 1:
+                    message = message + "失败. 原因: {}.".format(response.body.description)
+                    if "匹配对手中" in response.body.description:
+                        message = message + "继续运行"
+                        self.logger.log(message)
+                        continue
+                    else:
+                        self.logger.log(message)
+                        if self.territory_mutex_enabled:
+                            self.release(territory_user)
+                            return False
+                else:
+                    result = response.body
+                    message = message + "成功. "
+                    message = message + "挑战结果：{}".format(
+                        "胜利" if result['fight']['is_winning'] else "失败"
+                    )
+                    message = message + ". 现在荣誉: {}".format(result['honor'])
+                    self.logger.log(message)
+                if stop_channel.qsize() > 0:
+                    if self.territory_mutex_enabled:
+                        self.release(territory_user)
+                        return False
             if stop_channel.qsize() > 0:
+                self.release(territory_user)
                 return False
-        if stop_channel.qsize() > 0:
+            if not self.territory_mutex_enabled:
+                break
+        if self.territory_mutex_enabled:
+            self.release(territory_user)
             return False
 
     def release_plant(self, user_id):
@@ -787,6 +948,7 @@ class TerritoryMan:
             "max_fight_mantissa": self.max_fight_mantissa,
             "max_fight_exponent": self.max_fight_exponent,
             "pool_size": self.pool_size,
+            "territory_mutex_enabled": self.territory_mutex_enabled,
         }
         return save_data(data, save_dir, "auto_territory")
 
