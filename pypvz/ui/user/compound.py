@@ -232,20 +232,22 @@ class CompoundScheme:
         if not success:
             self.logger.log(f'方案"{self.name}"在复制植物时出现传承错误，中断复合')
             return None
-        self.source_plant_id = self.synthesis_plant(
-            self.source_plant_id, self.n1, refresh_signal
-        )
-        if self.source_plant_id is None:
-            return None
+        if self.n1 > 0:
+            self.source_plant_id = self.synthesis_plant(
+                self.source_plant_id, self.n1, refresh_signal
+            )
+            if self.source_plant_id is None:
+                return None
         for quality_index in self.n1_post_quailty_index:
             self.source_plant_id = self.synthesis_plant(
                 self.source_plant_id, 1, refresh_signal, quality_index=quality_index
             )
             if self.source_plant_id is None:
                 return None
-        copy_plant_id = self.synthesis_plant(copy_plant_id, self.n2, refresh_signal)
-        if copy_plant_id is None:
-            return None
+        if self.n2 > 0:
+            copy_plant_id = self.synthesis_plant(copy_plant_id, self.n2, refresh_signal)
+            if copy_plant_id is None:
+                return None
         for quality_index in self.n2_post_quailty_index:
             copy_plant_id = self.synthesis_plant(
                 copy_plant_id, 1, refresh_signal, quality_index=quality_index
