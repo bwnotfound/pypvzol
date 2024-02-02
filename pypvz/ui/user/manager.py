@@ -872,7 +872,7 @@ class TerritoryMan:
                         self.logger.log(message)
                         if self.territory_mutex_enabled:
                             self.release(territory_user)
-                            return False
+                        return False
                 else:
                     result = response.body
                     message = message + "成功. "
