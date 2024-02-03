@@ -58,7 +58,7 @@ class UserSettings:
         self.start_thread = None
 
         self.challenge4Level = Challenge4Level(cfg, user, repo, lib, logger=self.logger)
-        self.challenge4Level_enabled = True
+        self.challenge4Level_enabled = False
         self.shop_enabled = False
 
         self.shop = Shop(cfg)

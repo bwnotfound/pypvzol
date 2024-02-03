@@ -158,6 +158,8 @@ class WebRequest:
                 return private_cached
 
             def check_status(status_code):
+                if status_code == 502:
+                    raise RuntimeError(f"服务器更新中")
                 if status_code != 200:
                     raise RuntimeError(f"Request Get Error: {status_code} Url: {url}")
 
@@ -244,6 +246,8 @@ class WebRequest:
                 kwargs["timeout"] = self.cfg.timeout
 
             def check_status(status_code):
+                if status_code == 502:
+                    raise RuntimeError(f"服务器更新中")
                 if status_code != 200:
                     raise RuntimeError(f"Request Post Error: {status_code} Url: {url}")
 
@@ -337,7 +341,9 @@ class WebRequest:
                         self.cfg.sleep_freq(3)
                         continue
                     if "服务器更新" in text:
-                        warning_msg = "请求{}的时候服务器更新，选择等待10秒后重试".format(msg)
+                        warning_msg = (
+                            "请求{}的时候服务器更新，选择等待10秒后重试".format(msg)
+                        )
                         cnt -= 1
                         if logger is not None:
                             logger.log(warning_msg)
@@ -350,7 +356,20 @@ class WebRequest:
                 break
             except Exception as e:
                 if "429" in str(e):
-                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试".format(msg)
+                    warning_msg = (
+                        "请求{}过于频繁，触发ip限流，选择等待10秒后重试".format(msg)
+                    )
+                    cnt -= 1
+                    if logger is not None:
+                        logger.log(warning_msg)
+                    else:
+                        logging.warning(warning_msg)
+                    self.cfg.sleep_freq(10)
+                    continue
+                if "服务器更新" in str(e):
+                    warning_msg = "请求{}的时候服务器更新，选择等待10秒后重试".format(
+                        msg
+                    )
                     cnt -= 1
                     if logger is not None:
                         logger.log(warning_msg)
@@ -460,7 +479,9 @@ class WebRequest:
                         self.cfg.sleep_freq(3)
                         continue
                     if "更新" in response.body.description:
-                        warning_msg = "{}的时候服务器更新，选择等待10秒后重试".format(msg)
+                        warning_msg = "{}的时候服务器更新，选择等待10秒后重试".format(
+                            msg
+                        )
                         cnt -= 1
                         if logger is not None:
                             logger.log(warning_msg)
@@ -471,7 +492,20 @@ class WebRequest:
                 break
             except RuntimeError as e:
                 if "429" in str(e):
-                    warning_msg = "请求{}过于频繁，触发ip限流，选择等待10秒后重试".format(msg)
+                    warning_msg = (
+                        "请求{}过于频繁，触发ip限流，选择等待10秒后重试".format(msg)
+                    )
+                    cnt -= 1
+                    if logger is not None:
+                        logger.log(warning_msg)
+                    else:
+                        logging.warning(warning_msg)
+                    self.cfg.sleep_freq(10)
+                    continue
+                if "服务器更新" in str(e):
+                    warning_msg = "请求{}的时候服务器更新，选择等待10秒后重试".format(
+                        msg
+                    )
                     cnt -= 1
                     if logger is not None:
                         logger.log(warning_msg)

@@ -158,7 +158,7 @@ class AddCaveWindow(QMainWindow):
             if not result["success"]:
                 self.close()
             self.current_garden_layer_choice = QComboBox()
-            self.current_garden_layer_choice.addItems(["1", "2", "3", "4", "5"])
+            self.current_garden_layer_choice.addItems(["1", "2", "3", "4", "5", "6"])
             self.current_garden_layer_choice.setCurrentIndex(0)
             self.current_garden_layer_choice.currentIndexChanged.connect(
                 self.current_garden_layer_choice_currentIndexChanged

@@ -223,11 +223,11 @@ class CaveMan:
 
     def switch_garden_layer(self, target_layer, logger):
         '''
-        target_layer in [1,2,3,4]
+        target_layer in [1,2,3,4,5,6]
 
         洞口已切换到第{}层
         '''
-        target_char = "一二三四五"[target_layer - 1]
+        target_char = "一二三四五六"[target_layer - 1]
         body = [float(1), float(0), float(0), []]
         while True:
             response = self.wr.amf_post_retry(
