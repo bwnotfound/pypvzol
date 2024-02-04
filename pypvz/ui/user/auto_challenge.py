@@ -350,25 +350,17 @@ class Challenge4Level:
             trash_plant_list = [
                 self.repo.get_plant(plant_id) for plant_id in self.trash_plant_list
             ]
+            new_trash_plant_id_list = []
             for plant in trash_plant_list:
                 if plant is None:
                     continue
                 if not hasattr(plant, "predict_grade"):
+                    if plant.grade < self.pop_grade:
+                        new_trash_plant_id_list.append(plant.id)
                     continue
-                if plant.predict_grade > self.pop_grade:
-                    self.repo.refresh_repository()
-                    trash_plant_list = [
-                        self.repo.get_plant(plant_id)
-                        for plant_id in self.trash_plant_list
-                    ]
-                    trash_plant_list = list(
-                        filter(
-                            lambda x: (x is not None) and x.grade < self.pop_grade,
-                            trash_plant_list,
-                        )
-                    )
-                    self.trash_plant_list = [x.id for x in trash_plant_list]
-                    break
+                if plant.predict_grade < self.pop_grade:
+                    new_trash_plant_id_list.append(plant.id)
+            self.trash_plant_list = new_trash_plant_id_list
 
     def challenge_cave(self, stop_channel: Queue):
         _cave_map = {}
