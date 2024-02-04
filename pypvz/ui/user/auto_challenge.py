@@ -66,7 +66,6 @@ class Challenge4Level:
         self.series_success_exit = False
 
         self.disable_cave_info_fetch = False
-        self.challenge_sand_cave_only_in_disable_mode = False
         self.need_recover = True
         self.accelerate_repository_in_challenge_cave = False
 
@@ -76,6 +75,7 @@ class Challenge4Level:
         self.main_plant_recover_rate = 0.1
 
         self.has_challenged = False
+        self.cooldown_cave_id_set = set()
 
     def add_cave(
         self,
@@ -203,7 +203,7 @@ class Challenge4Level:
                 break
             team.append(plant_id)
             team_grid_amount += width
-        if team_grid_amount == team_limit:
+        if team_grid_amount == team_limit or grade is None:
             return team
 
         trash_plant_list = [
@@ -244,7 +244,9 @@ class Challenge4Level:
             success_num_all += success_num
             if fail_num == 0:
                 break
-            self.logger.log("尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num))
+            self.logger.log(
+                "尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num)
+            )
             self.repo.refresh_repository(logger=self.logger)
             cnt += 1
         else:
@@ -254,7 +256,7 @@ class Challenge4Level:
             self.logger.log("成功给{}个植物回复血量".format(success_num_all))
         return True
 
-    def format_upgrade_message(self, team, response_body):
+    def format_upgrade_message(self, team, response_body, cave_grade):
         message = ""
         plant_list = list(
             filter(
@@ -289,7 +291,9 @@ class Challenge4Level:
                 for plant, grade1, grade2 in upgrade_data_list
             ]
             if len(upgrade_msg_list) > 0:
-                message = message + "\n\t升级植物: {}".format(' '.join(upgrade_msg_list))
+                message = message + "\n\t升级植物: {}".format(
+                    ' '.join(upgrade_msg_list)
+                )
         else:
             plant_grade_list = []
             for plant in plant_list:
@@ -298,7 +302,10 @@ class Challenge4Level:
                 plant_grade_list.append((plant, plant.predict_grade))
             upgrade_data_list = []
             for plant, grade in plant_grade_list:
-                plant.predict_grade = plant.predict_grade + 2.5
+                if plant.predict_grade < cave_grade - 29:
+                    plant.predict_grade = cave_grade - 29
+                elif plant.predict_grade < cave_grade - 5:
+                    plant.predict_grade = plant.predict_grade + 2.5
                 upgrade_data_list.append((plant, grade, plant.predict_grade))
             upgrade_msg_list = [
                 "{}({}->{})".format(
@@ -309,7 +316,9 @@ class Challenge4Level:
                 for plant, grade1, grade2 in upgrade_data_list
             ]
             if len(upgrade_msg_list) > 0:
-                message = message + "\n\t预测升级植物: {}".format(' '.join(upgrade_msg_list))
+                message = message + "\n\t预测升级植物: {}".format(
+                    ' '.join(upgrade_msg_list)
+                )
         if self.show_lottery:
             lottery_result = self.caveMan.get_lottery(response_body)
             if lottery_result["success"]:
@@ -390,23 +399,17 @@ class Challenge4Level:
                 if not sc.enabled or sc.cave.type not in [1, 2, 3]:
                     continue
                 if self.disable_cave_info_fetch:
-                    if self.challenge_sand_cave_only_in_disable_mode:
-                        if not sc.use_sand:
-                            continue
-                    if not hasattr(sc, "friend_id2cave_id"):
-                        sc.friend_id2cave_id = {}
-                    cave_id = sc.friend_id2cave_id.get(friend_id, None)
-                    if cave_id is None:
-                        self.switch_garden_layer(sc.garden_layer)
-                        cave = get_cave(friend_id, sc)
-                        cave_id = cave.cave_id
-                        sc.friend_id2cave_id[friend_id] = cave_id
+                    cave_id = sc.cave.quick_cave_id(friend_id)
+                    if cave_id in self.cooldown_cave_id_set:
+                        continue
 
                     if self.enable_sand and sc.use_sand:
                         sand_result = self.caveMan.use_sand(cave_id)
                         if sand_result["success"]:
                             self.logger.log(
-                                "成功对{}使用时之沙".format(sc.cave.format_name(sc.difficulty))
+                                "成功对{}使用时之沙".format(
+                                    sc.cave.format_name(sc.difficulty)
+                                )
                             )
                         else:
                             self.logger.log(sand_result["result"])
@@ -461,7 +464,8 @@ class Challenge4Level:
                         success, result = result["success"], result["result"]
                         if not success:
                             if (
-                                "狩猎场挑战次数已达上限" in result or "挑战次数不足" in result
+                                "狩猎场挑战次数已达上限" in result
+                                or "挑战次数不足" in result
                             ) and self.auto_use_challenge_book:
                                 use_result = self.repo.use_item(
                                     self.lib.name2tool["高级挑战书"].id,
@@ -480,9 +484,13 @@ class Challenge4Level:
                                     self.logger.log(use_result["result"])
                                     continue
                             if "冷却中" in result:
-                                message = message + "失败，已跳过该洞口。原因: 洞口冷却中."
+                                message = (
+                                    message + "失败，已跳过该洞口。原因: 洞口冷却中."
+                                )
                                 self.logger.log(message)
                                 need_skip = True
+                                if self.disable_cave_info_fetch:
+                                    self.cooldown_cave_id_set.add(cave_id)
                                 break
                             message = message + "失败. 原因: {}.".format(result)
                             self.logger.log(message)
@@ -506,7 +514,9 @@ class Challenge4Level:
                             )
                         continue
                 else:
-                    message = message + "失败. 原因: 重试次数超过{}次.".format(max_retry)
+                    message = message + "失败. 原因: 重试次数超过{}次.".format(
+                        max_retry
+                    )
                     self.logger.log(message)
                     return False
 
@@ -526,8 +536,12 @@ class Challenge4Level:
                     else:
                         sc.series_success_count = 0
                     if self.show_series_success:
-                        message = message + "，连胜次数：{}".format(sc.series_success_count)
-                message = message + self.format_upgrade_message(team, result)
+                        message = message + "，连胜次数：{}".format(
+                            sc.series_success_count
+                        )
+                message = message + self.format_upgrade_message(
+                    team, result, sc.cave.grade
+                )
                 self.logger.log(message)
                 if self.pop_after_100:
                     self.pop_trash_plant()
@@ -558,11 +572,12 @@ class Challenge4Level:
                     return
                 if sc.cave.type != 4 or not sc.enabled:
                     continue
-                cave = get_stone_cave(sc.cave.layer, sc.cave.number)
-                if not cave.is_ready:
-                    continue
-                team = self._assemble_team(cave.grade)
-                if team is None:
+                if not self.disable_cave_info_fetch:
+                    cave = get_stone_cave(sc.cave.layer, sc.cave.number)
+                    if not cave.is_ready:
+                        continue
+                team = self._assemble_team(sc.cave.grade)
+                if team is None or len(team) == 0:
                     continue
                 if (
                     self.need_recover
@@ -574,18 +589,23 @@ class Challenge4Level:
                 difficulty = sc.difficulty
 
                 message = "挑战{}".format(
-                    cave.format_name(difficulty),
+                    sc.cave.format_name(difficulty),
                 )
+                if self.disable_cave_info_fetch:
+                    cave_id = sc.cave.quick_cave_id()
+                else:
+                    cave_id = cave.id
                 cnt, max_retry = 0, 20
                 while cnt < max_retry:
                     cnt += 1
                     try:
-                        result = self.caveMan.challenge(cave.id, team, difficulty, 4)
+                        result = self.caveMan.challenge(cave_id, team, difficulty, 4)
                         success, result = result["success"], result["result"]
                         if not success:
                             message = message + "失败. 原因: {}.".format(result)
                             self.logger.log(message)
                             return
+                            # if "挑战次数不足" in result:
                         else:
                             message = message + "成功. "
                             self.has_challenged = True
@@ -605,7 +625,9 @@ class Challenge4Level:
                             )
                         continue
                 else:
-                    message = message + "失败. 原因: 重试次数超过{}次.".format(max_retry)
+                    message = message + "失败. 原因: 重试次数超过{}次.".format(
+                        max_retry
+                    )
                     self.logger.log(message)
                     return
 
@@ -613,7 +635,9 @@ class Challenge4Level:
                 message = message + "挑战结果：{}".format(
                     "胜利" if result['is_winning'] else "失败"
                 )
-                message = message + self.format_upgrade_message(team, result)
+                message = message + self.format_upgrade_message(
+                    team, result, sc.cave.grade
+                )
                 self.logger.log(message)
                 if self.pop_after_100:
                     self.pop_trash_plant()
@@ -668,42 +692,38 @@ class Challenge4Level:
         if self.enable_stone:
             self.challenge_stone_fuben(stop_channel)
         if self.cfg.server == "官服":
-            try:
-                self.challenge_cave(stop_channel)
-            except Exception as e:
-                self.logger.log("挑战宝石副本异常，异常种类:{}。跳过宝石副本".format(type(e).__name__))
+            raise NotImplementedError("助手不支持官服")
         elif self.cfg.server != "私服":
-            raise NotImplementedError
-        else:
-            while True:
-                enter_time = time.perf_counter()
-                for garden_layer in self.garden_layer_caves.keys():
-                    if stop_channel.qsize() > 0:
-                        break
-                    if self.cfg.server == "私服":
-                        self.friend_id2cave = self.garden_layer_friend_id2cave.get(
-                            garden_layer, None
-                        )
-                        if self.friend_id2cave is None:
-                            raise RuntimeError("garden layer is not added 2")
-                        if not self.disable_cave_info_fetch:
-                            if not self.switch_garden_layer(garden_layer):
-                                continue
-                    try:
-                        if not self.challenge_cave(stop_channel):
-                            return False
-                    except Exception as e:
-                        self.logger.log(
-                            "挑战第{}层洞口异常，异常种类:{}。跳过该层".format(
-                                garden_layer, type(e).__name__
-                            )
-                        )
-                time.sleep(max(0, 0.2 - (time.perf_counter() - enter_time)))
+            raise NotImplementedError("助手不支持服务器:{}".format(self.cfg.server))
+        while True:
+            enter_time = time.perf_counter()
+            for garden_layer in self.garden_layer_caves.keys():
                 if stop_channel.qsize() > 0:
                     break
-                if self.exit_no_trash_plant and len(self.trash_plant_list) != 0:
-                    continue
+                if self.cfg.server == "私服":
+                    self.friend_id2cave = self.garden_layer_friend_id2cave.get(
+                        garden_layer, None
+                    )
+                    if self.friend_id2cave is None:
+                        raise RuntimeError("garden layer is not added 2")
+                    if not self.disable_cave_info_fetch:
+                        if not self.switch_garden_layer(garden_layer):
+                            continue
+                try:
+                    if not self.challenge_cave(stop_channel):
+                        return False
+                except Exception as e:
+                    self.logger.log(
+                        "挑战第{}层洞口异常，异常种类:{}。跳过该层".format(
+                            garden_layer, type(e).__name__
+                        )
+                    )
+            time.sleep(max(0, 0.2 - (time.perf_counter() - enter_time)))
+            if stop_channel.qsize() > 0:
                 break
+            if self.exit_no_trash_plant and len(self.trash_plant_list) != 0:
+                continue
+            break
         self.logger.log("挑战完成")
         return True
 
@@ -725,7 +745,6 @@ class Challenge4Level:
             "enable_stone": self.enable_stone,
             "enable_large_plant_team": self.enable_large_plant_team,
             "disable_cave_info_fetch": self.disable_cave_info_fetch,
-            "challenge_sand_cave_only_in_disable_mode": self.challenge_sand_cave_only_in_disable_mode,
             "need_recover": self.need_recover,
             "accelerate_repository_in_challenge_cave": self.accelerate_repository_in_challenge_cave,
             "main_plant_recover": self.main_plant_recover,

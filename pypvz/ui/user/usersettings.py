@@ -206,6 +206,7 @@ class UserSettings:
                     break
             if self.challenge4Level_enabled:
                 try:
+                    self.challenge4Level.cooldown_cave_id_set.clear()
                     while True:
                         self.challenge4Level.has_challenged = False
                         if not self.challenge4Level.auto_challenge(stop_channel):

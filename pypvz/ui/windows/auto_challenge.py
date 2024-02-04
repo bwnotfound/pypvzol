@@ -261,7 +261,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         )
         show_series_success_layout.addWidget(self.show_series_success_checkbox)
         right_panel_layout.addLayout(show_series_success_layout)
-        
+
         series_success_exit_layout = QHBoxLayout()
         series_success_exit_layout.addWidget(QLabel("连胜20次停止:"))
         self.series_success_exit_checkbox = QCheckBox()
@@ -349,7 +349,9 @@ class Challenge4levelSettingWindow(QMainWindow):
             )
             right_panel_layout.addWidget(self.enable_large_plant_team)
 
-        right_panel_layout.addWidget(QLabel("--以下功能需认真选取--\n--(因为不恰当使用会有bug)--"))
+        right_panel_layout.addWidget(
+            QLabel("--以下功能需认真选取--\n--(因为不恰当使用会有bug)--")
+        )
 
         self.need_recover_checkbox = QCheckBox("需要恢复植物血量")
         self.need_recover_checkbox.setChecked(self.challenge4Level.need_recover)
@@ -367,20 +369,9 @@ class Challenge4levelSettingWindow(QMainWindow):
         )
         right_panel_layout.addWidget(self.disable_cave_info_fetch_checkbox)
 
-        self.challenge_sand_cave_only_in_disable_mode_checkbox = QCheckBox(
-            "加速时只刷用时之沙的洞"
+        self.accelerate_repository_in_challenge_cave_checkbox = QCheckBox(
+            "跳过仓库来加速"
         )
-        self.challenge_sand_cave_only_in_disable_mode_checkbox.setChecked(
-            self.challenge4Level.challenge_sand_cave_only_in_disable_mode
-        )
-        self.challenge_sand_cave_only_in_disable_mode_checkbox.stateChanged.connect(
-            self.challenge_sand_cave_only_in_disable_mode_checkbox_stateChanged
-        )
-        right_panel_layout.addWidget(
-            self.challenge_sand_cave_only_in_disable_mode_checkbox
-        )
-
-        self.accelerate_repository_in_challenge_cave_checkbox = QCheckBox("跳过仓库来加速")
         self.accelerate_repository_in_challenge_cave_checkbox.setChecked(
             self.challenge4Level.accelerate_repository_in_challenge_cave
         )
@@ -394,16 +385,12 @@ class Challenge4levelSettingWindow(QMainWindow):
         warning_textbox = QPlainTextEdit()
         warning_textbox.setReadOnly(True)
         warning_textbox.setPlainText(
-            "警告：使用上述功能需详细查看此警告\n"
-            "注意，加速原理是直接挑战对应洞口\n"
-            "因此如果加速不选\"只刷时之沙的洞\"会导致每次循环都会尝试那些没冷却的洞\n"
-            "比如你选了10个洞口，只有一个要用时之沙，那么每次都会尝试挑战那9个不用时之沙的洞口\n"
-            "会造成很大的性能浪费\n"
-            "对于加速跳过仓库，这个选项开启后，原理是不会去获取仓库信息，会预测你的炮灰等级变化，从而加速\n"
+            "!!!警告：使用上述功能需详细查看此警告!!!\n"
+            "刷洞加速原理是直接挑战对应洞口，允许使用时之沙则挑战前直接使用时之沙，无视洞口实际冷却情况\n"
+            "跳过仓库加速原理是跳过仓库信息获取，转而假设植物不死，预测植物等级\n"
             "但是因为跳过了仓库信息获取，因此无法保证植物存在和植物血量\n"
-            "选择此选项也会跳过植物回血，请保证以下情况不会发生的时候使用仓库加速:\n"
-            "1. 你的植物不会死亡，包括主力和炮灰\n"
-            "2. 你的植物不会消失，包括主力和炮灰\n"
+            "使用仓库加速请保证你的植物不会死亡或消失\n"
+            "全自动开启仓库加速尤其需要小心，一旦植物死掉，全自动就会出错并异常\n"
         )
         warning_textbox.setFixedHeight(int(self.height() * 0.15))
         right_panel_layout.addWidget(warning_textbox)
@@ -420,7 +407,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         self.challenge4Level.show_series_success = (
             self.show_series_success_checkbox.isChecked()
         )
-            
+
     def series_success_exit_checkbox_stateChanged(self):
         self.challenge4Level.series_success_exit = (
             self.series_success_exit_checkbox.isChecked()
@@ -455,11 +442,6 @@ class Challenge4levelSettingWindow(QMainWindow):
     def accelerate_repository_in_challenge_cave_checkbox_stateChanged(self):
         self.challenge4Level.accelerate_repository_in_challenge_cave = (
             self.accelerate_repository_in_challenge_cave_checkbox.isChecked()
-        )
-
-    def challenge_sand_cave_only_in_disable_mode_checkbox_stateChanged(self):
-        self.challenge4Level.challenge_sand_cave_only_in_disable_mode = (
-            self.challenge_sand_cave_only_in_disable_mode_checkbox.isChecked()
         )
 
     def need_recover_checkbox_stateChanged(self):
