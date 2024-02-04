@@ -391,7 +391,7 @@ class Challenge4Level:
                 if not sc.enabled or sc.cave.type not in [1, 2, 3]:
                     continue
                 if self.disable_cave_info_fetch:
-                    cave_id = sc.cave.quick_cave_id(friend_id)
+                    cave_id = sc.cave.quick_cave_id(friend_id, sc.garden_layer)
                     if cave_id in self.cooldown_cave_id_set:
                         continue
 

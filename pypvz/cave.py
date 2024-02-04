@@ -47,14 +47,19 @@ class Cave:
         else:
             raise NotImplementedError
 
-    def quick_cave_id(self, user_id=None):
+    def quick_cave_id(self, user_id=None, garden_layer=None):
         if self.type <= 3:
-            assert user_id is not None
+            assert user_id is not None and garden_layer is not None
+            if self.type == 1:
+                offset = 9 * 3
+            else:
+                offset = 12 * 4
             return (
                 user_id * 1000
                 + [1, 6, 3][self.type - 1] * 100
                 + (self.layer - 1) * 12
                 + self.number
+                + (garden_layer - 1) * offset
             )
         elif self.type == 4:
             return self.layer * 100 + self.number
