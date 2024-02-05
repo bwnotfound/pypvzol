@@ -5,6 +5,8 @@ import logging
 import os
 from threading import Event
 import time
+import requests
+import hashlib
 from ... import (
     Config,
     Repository,
@@ -89,13 +91,19 @@ class AutoSynthesisMan:
             }
         book_amount = book['amount']
         if not book_amount > 0:
-            return {"success": False, "result": f"{self.chosen_attribute}合成书数量不足"}
+            return {
+                "success": False,
+                "result": f"{self.chosen_attribute}合成书数量不足",
+            }
         reinforce = self.repo.get_tool(self.lib.name2tool["增强卷轴"].id)
         if reinforce is None:
             return {"success": False, "result": "没有增强卷轴了"}
         reinforce_amount = reinforce['amount']
         if reinforce_amount < self.reinforce_number:
-            return {"success": False, "result": f"增强卷轴数量不足10个(目前数量：{reinforce_amount})"}
+            return {
+                "success": False,
+                "result": f"增强卷轴数量不足10个(目前数量：{reinforce_amount})",
+            }
         deputy_plant_id = list(self.auto_synthesis_pool_id)[0]
 
         try:
@@ -107,7 +115,9 @@ class AutoSynthesisMan:
             )
         except Exception as e:
             if "amf返回结果为空" in str(e):
-                msg = "可能由以下原因引起：参与合成的植物不见了、增强卷轴不够、合成书不够"
+                msg = (
+                    "可能由以下原因引起：参与合成的植物不见了、增强卷轴不够、合成书不够"
+                )
                 return {
                     "success": False,
                     "result": "合成异常，已跳出合成。{}".format(msg),
@@ -324,7 +334,9 @@ class FubenMan:
             success_num_all += success_num
             if fail_num == 0:
                 break
-            self.logger.log("尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num))
+            self.logger.log(
+                "尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num)
+            )
             self.repo.refresh_repository(logger=self.logger)
             cnt += 1
         else:
@@ -381,7 +393,9 @@ class FubenMan:
                 )
                 if not use_result["success"]:
                     self.logger.log(
-                        "使用{}本副本挑战书失败，原因：{}".format(amount, use_result['result'])
+                        "使用{}本副本挑战书失败，原因：{}".format(
+                            amount, use_result['result']
+                        )
                     )
                     return False
                 if use_result["effect"] != amount:
@@ -392,20 +406,26 @@ class FubenMan:
                     )
                     return False
                 self.logger.log(
-                    "使用{}本副本挑战书成功，剩余{}本".format(amount, repo_tool_amount - amount)
+                    "使用{}本副本挑战书成功，剩余{}本".format(
+                        amount, repo_tool_amount - amount
+                    )
                 )
                 self.repo.remove_tool(self.lib.fuben_book_id, amount)
                 break
             except Exception as e:
                 self.logger.log(
-                    "使用{}本副本挑战书出现异常，异常种类：{}，尝试刷新仓库".format(amount, type(e).__name__)
+                    "使用{}本副本挑战书出现异常，异常种类：{}，尝试刷新仓库".format(
+                        amount, type(e).__name__
+                    )
                 )
                 self.repo.refresh_repository()
                 if (
                     self.repo.get_tool(self.lib.fuben_book_id, return_amount=True)
                     == repo_tool_amount - amount
                 ):
-                    self.logger.log("仓库副本挑战书数量减少符合预期值，判定使用副本挑战书成功")
+                    self.logger.log(
+                        "仓库副本挑战书数量减少符合预期值，判定使用副本挑战书成功"
+                    )
                     break
                 cnt += 1
                 self.logger.log(
@@ -510,7 +530,9 @@ class FubenMan:
                                     cave.rest_count = max(cave.rest_count - 1, 0)
                                 self.has_challenged = True
                         except Exception as e:
-                            self.logger.log("挑战副本异常，异常类型：{}".format(type(e).__name__))
+                            self.logger.log(
+                                "挑战副本异常，异常类型：{}".format(type(e).__name__)
+                            )
                             has_failure = True
                 if self.challenge_amount == 0 and not self.use_fuben_book_enabled:
                     self.logger.log("副本挑战次数用完了")
@@ -565,6 +587,22 @@ class FubenMan:
                 self.caves = []
 
 
+class TerritoryUser:
+    def __init__(self, name, rank, region, cookie):
+        self.name = name
+        self.rank = rank
+        self.region = region
+        self.cookie = hashlib.md5(cookie.encode()).hexdigest()
+
+    def to_json(self):
+        return {
+            "gameName": self.name,
+            "rank": self.rank,
+            "region": self.region,
+            "encryptedCookie": self.cookie,
+        }
+
+
 class TerritoryMan:
     def __init__(self, cfg: Config, repo: Repository, logger: Logger):
         self.cfg = cfg
@@ -577,10 +615,101 @@ class TerritoryMan:
         self.max_fight_mantissa = 1.0
         self.max_fight_exponent = 0
         self.pool_size = 1
+        self.url_prefix = "http://bwnotfound.com/api/assistant/territory"
+        self.territory_mutex_enabled = False
+
+    @property
+    def is_test_server(self):
+        return self.cfg.host == "test.pvzol.org"
 
     @property
     def max_fight(self):
         return self.max_fight_mantissa * (10 ** (self.max_fight_exponent + 8))
+
+    def should_interrupt(self, territory_user: TerritoryUser):
+        resp = requests.post(
+            self.url_prefix + "/interrupt", json=territory_user.to_json()
+        )
+        if resp.status_code != 200:
+            return {
+                "success": False,
+                "result": "领地互斥获取是否需要中断失败，原因是响应状态码为{}".format(
+                    resp.status_code
+                ),
+            }
+        result = resp.json()
+        if result['code'] != 0:
+            return {
+                "success": False,
+                "result": "领地互斥获取是否需要中断失败，原因是{}".format(
+                    result['msg']
+                ),
+            }
+        return {"success": True, "result": result['result']}
+
+    def release(self, territory_user: TerritoryUser):
+        resp = requests.post(
+            self.url_prefix + "/release", json=territory_user.to_json()
+        )
+        result = None
+        if resp.status_code != 200:
+            result = {
+                "success": False,
+                "result": "领地互斥释放领地失败，原因是响应状态码为{}".format(
+                    resp.status_code
+                ),
+            }
+            self.logger.log(result['result'])
+            return result
+        resp_json = resp.json()
+        if resp_json['code'] != 0:
+            result = {
+                "success": False,
+                "result": "领地互斥释放领地失败，原因是{}".format(resp_json['msg']),
+            }
+            self.logger.log(result['result'])
+        else:
+            result = {"success": True, "result": resp_json['result']}
+        return result
+
+    # -1:用户不合法 0:获取并可以运行 1:已经在运行 2:还需等待
+    def acquire_permission(self, territory_user: TerritoryUser):
+        resp = requests.post(
+            self.url_prefix + "/acquire", json=territory_user.to_json()
+        )
+        if resp.status_code != 200:
+            return {
+                "success": False,
+                "result": "领地互斥获取领地失败，原因是响应状态码为{}".format(
+                    resp.status_code
+                ),
+            }
+        result = resp.json()
+        if result['code'] == -1:
+            return {
+                "success": False,
+                "result": "领地互斥获取领地失败，原因是{}".format(result['msg']),
+            }
+        return {"success": True, "result": result['code']}
+
+    def acquire_permission_retry(
+        self, territory_user: TerritoryUser, stop_channel: Queue
+    ):
+        if not self.territory_mutex_enabled:
+            return True
+        while stop_channel.qsize() == 0:
+            result = self.acquire_permission(territory_user)
+            if not result['success']:
+                self.logger.log(result['result'])
+                return False
+            code = result['result']
+            if code == 2:
+                self.logger.log("领地互斥还有其他人在跑，选择等待1s")
+                time.sleep(1)
+                continue
+            if code == 0 or code == 1:
+                return True
+        return False
 
     def check_data(self, refresh_repo=True):
         if refresh_repo:
@@ -655,7 +784,9 @@ class TerritoryMan:
         )
         return response
 
-    def auto_challenge_concurrent(self, stop_channel: Queue):
+    def auto_challenge_concurrent(
+        self, territory_user: TerritoryUser, stop_channel: Queue
+    ):
         def run():
             message = f"挑战领地难度{self.difficulty_choice}"
             response = self.challenge()
@@ -692,45 +823,105 @@ class TerritoryMan:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=pool_size) as executor:
             while stop_channel.qsize() == 0:
-                while len(future_list) >= pool_size:
-                    result = pop_future()
-                    if not result:
+                if self.territory_mutex_enabled:
+                    if not self.acquire_permission_retry(territory_user, stop_channel):
+                        self.release(territory_user)
                         return False
-                future_list.append(executor.submit(run))
+                while stop_channel.qsize() == 0:
+                    if self.territory_mutex_enabled:
+                        result = self.should_interrupt(territory_user)
+                        if not result['success']:
+                            self.logger.log(result['result'])
+                            self.release(territory_user)
+                            return False
+                        if result['result']:
+                            self.logger.log("领地互斥检测到需要中断，交出运行权")
+                            while len(future_list) > 0:
+                                result = pop_future()
+                                if not result:
+                                    self.release(territory_user)
+                                    return False
+                            break
+                    while len(future_list) >= pool_size:
+                        result = pop_future()
+                        if not result:
+                            if self.territory_mutex_enabled:
+                                self.release(territory_user)
+                            return False
+                    future_list.append(executor.submit(run))
+                if stop_channel.qsize() > 0:
+                    if self.territory_mutex_enabled:
+                        self.release(territory_user)
+                    return False
+                if not self.territory_mutex_enabled:
+                    break
+        if self.territory_mutex_enabled:
+            self.release(territory_user)
         if stop_channel.qsize() > 0:
             return False
+        return False
 
-    def auto_challenge(self, stop_channel: Queue):
+    def auto_challenge(self, name, rank, stop_channel: Queue):
+        if self.is_test_server and self.territory_mutex_enabled:
+            self.territory_mutex_enabled = False
+            self.logger.log("测试服不支持领地互斥，已关闭领地互斥")
+        territory_user = TerritoryUser(name, rank, self.cfg.region, self.cfg.cookie)
         if not self.smart_enabled:
-            return self.auto_challenge_concurrent(stop_channel)
+            return self.auto_challenge_concurrent(territory_user, stop_channel)
         while stop_channel.qsize() == 0:
-            message = f"挑战领地难度{self.difficulty_choice}"
-            result = self.should_fight()
-            if not result["continue"]:
-                message += ", {}，选择挑战难度三，".format(result["result"])
-                response = self.challenge(3)
-            else:
-                response = self.challenge()
-            if response.status == 1:
-                message = message + "失败. 原因: {}.".format(response.body.description)
-                if "匹配对手中" in response.body.description:
-                    message = message + "继续运行"
-                    self.logger.log(message)
-                    continue
-                else:
-                    self.logger.log(message)
+            if self.territory_mutex_enabled:
+                if not self.acquire_permission_retry(territory_user, stop_channel):
+                    self.release(territory_user)
                     return False
-            else:
-                result = response.body
-                message = message + "成功. "
-                message = message + "挑战结果：{}".format(
-                    "胜利" if result['fight']['is_winning'] else "失败"
-                )
-                message = message + ". 现在荣誉: {}".format(result['honor'])
-                self.logger.log(message)
+            while stop_channel.qsize() == 0:
+                if self.territory_mutex_enabled:
+                    result = self.should_interrupt(territory_user)
+                    if not result['success']:
+                        self.logger.log(result['result'])
+                        self.release(territory_user)
+                        return False
+                    if result['result']:
+                        self.logger.log("领地互斥检测到需要中断，交出运行权")
+                        break
+                message = f"挑战领地难度{self.difficulty_choice}"
+                result = self.should_fight()
+                if not result["continue"]:
+                    message += ", {}，选择挑战难度三，".format(result["result"])
+                    response = self.challenge(3)
+                else:
+                    response = self.challenge()
+                if response.status == 1:
+                    message = message + "失败. 原因: {}.".format(
+                        response.body.description
+                    )
+                    if "匹配对手中" in response.body.description:
+                        message = message + "继续运行"
+                        self.logger.log(message)
+                        continue
+                    else:
+                        self.logger.log(message)
+                        if self.territory_mutex_enabled:
+                            self.release(territory_user)
+                        return False
+                else:
+                    result = response.body
+                    message = message + "成功. "
+                    message = message + "挑战结果：{}".format(
+                        "胜利" if result['fight']['is_winning'] else "失败"
+                    )
+                    message = message + ". 现在荣誉: {}".format(result['honor'])
+                    self.logger.log(message)
+                if stop_channel.qsize() > 0:
+                    if self.territory_mutex_enabled:
+                        self.release(territory_user)
+                        return False
             if stop_channel.qsize() > 0:
+                self.release(territory_user)
                 return False
-        if stop_channel.qsize() > 0:
+            if not self.territory_mutex_enabled:
+                break
+        if self.territory_mutex_enabled:
+            self.release(territory_user)
             return False
 
     def release_plant(self, user_id):
@@ -787,6 +978,7 @@ class TerritoryMan:
             "max_fight_mantissa": self.max_fight_mantissa,
             "max_fight_exponent": self.max_fight_exponent,
             "pool_size": self.pool_size,
+            "territory_mutex_enabled": self.territory_mutex_enabled,
         }
         return save_data(data, save_dir, "auto_territory")
 
@@ -1013,7 +1205,9 @@ class ServerBattleMan:
                         result = self.serverbattle.challenge()
                         if result is None:
                             if empty_cnt >= max_empty_retry:
-                                self.logger.log("跨服挑战异常，可能是次数用完了。退出跨服挑战。")
+                                self.logger.log(
+                                    "跨服挑战异常，可能是次数用完了。退出跨服挑战。"
+                                )
                                 return
                             self.logger.log(
                                 "跨服挑战异常，可能是次数用完了。重新尝试，最多尝试{}次".format(
@@ -1025,7 +1219,9 @@ class ServerBattleMan:
                         break
                     except Exception as e:
                         self.logger.log(
-                            "跨服挑战异常，异常类型：{}".format(type(e).__name__, max_retry - cnt)
+                            "跨服挑战异常，异常类型：{}".format(
+                                type(e).__name__, max_retry - cnt
+                            )
                         )
                         has_exception = True
                         break
@@ -1041,7 +1237,8 @@ class ServerBattleMan:
                         return
                 current_challenge_num -= 1
                 self.logger.log(
-                    result["result"] + ". 还剩{}次挑战次数".format(current_challenge_num)
+                    result["result"]
+                    + ". 还剩{}次挑战次数".format(current_challenge_num)
                 )
                 if stop_channel.qsize() > 0:
                     return
@@ -1089,11 +1286,15 @@ class ArenaMan:
                 error_type = result["error_type"]
                 if error_type == 1:
                     self.logger.log(
-                        "挑战竞技场出现异常。原因：{}。判断为挑战次数不足，终止挑战".format(result["result"])
+                        "挑战竞技场出现异常。原因：{}。判断为挑战次数不足，终止挑战".format(
+                            result["result"]
+                        )
                     )
                     return
                 elif error_type == 2:
-                    self.logger.log("挑战竞技场出现异常。原因：{}。".format(result["result"]))
+                    self.logger.log(
+                        "挑战竞技场出现异常。原因：{}。".format(result["result"])
+                    )
                     return
                 self.logger.log(result["result"])
                 return
@@ -1127,11 +1328,19 @@ class CommandMan:
                     self.logger.log("{}执行成功".format(command_str))
                 else:
                     if result['error_type'] == 2:
-                        self.logger.log("指令{}有误，请重新设定该指令。".format(command_str))
+                        self.logger.log(
+                            "指令{}有误，请重新设定该指令。".format(command_str)
+                        )
                     elif result['error_type'] == 3:
-                        self.logger.log("指令{}执行时发现未稳定通过，请先稳定通过".format(command_str))
+                        self.logger.log(
+                            "指令{}执行时发现未稳定通过，请先稳定通过".format(
+                                command_str
+                            )
+                        )
                     elif result['error_type'] == 1:
-                        self.logger.log("指令{}执行至道具异常，认定执行完毕".format(command_str))
+                        self.logger.log(
+                            "指令{}执行至道具异常，认定执行完毕".format(command_str)
+                        )
                     break
 
     def save(self, save_dir=None):
@@ -1185,7 +1394,11 @@ class SkillStoneMan:
             "talent_" + str(stone_index + 1),
         ]
         response = self.wr.amf_post_retry(
-            body, 'api.apiorganism.upgradeTalent', "/pvz/amf/", "升级宝石", allow_empty=True
+            body,
+            'api.apiorganism.upgradeTalent',
+            "/pvz/amf/",
+            "升级宝石",
+            allow_empty=True,
         )
         if response is None:
             return response

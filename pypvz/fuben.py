@@ -10,7 +10,9 @@ class FubenCave:
         self.name = root['name']
         self.cave_id = int(root['cave_id'])
         self.rest_count = int(root['lcc'])  # 0~20，或者-1无限
-        self.status = int(root['status'])  # 3: 能开启 4: 已开启未通关 5: 已通关。只要看3和5，4不管，自己判断
+        self.status = int(
+            root['status']
+        )  # 3: 能开启 4: 已开启未通关 5: 已通关。只要看3和5，4不管，自己判断
         self.open_tools = []
         for s in root['open_tools'].split(","):
             data = s.split("|")

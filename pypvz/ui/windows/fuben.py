@@ -49,7 +49,9 @@ class FubenSelectWindow(QMainWindow):
         self.cave_type_list_widget.itemClicked.connect(
             self.cave_type_list_widget_clicked
         )
-        for i, name in enumerate(["炽热沙漠", "幽静树海", "冰火世界", "死亡峡谷", "荒原驿道"]):
+        for i, name in enumerate(
+            ["炽热沙漠", "幽静树海", "冰火世界", "死亡峡谷", "荒原驿道"]
+        ):
             item = QListWidgetItem("{}".format(name))
             item.setData(Qt.ItemDataRole.UserRole, i + 1)
             self.cave_type_list_widget.addItem(item)

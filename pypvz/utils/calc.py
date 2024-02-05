@@ -39,12 +39,12 @@ def simulate_imprisonment(book_num, riguang_level):
         #     a_1_last = 1 - a0 - a1
         #     result += (a_1_last - a_1) * (i - 1)
         #     a_1 = a_1_last
-    
+
         tem = (-3 * p**2 + 4 * p) ** 0.5
         m = p / 2 + tem / 2
         n = p / 2 - tem / 2
         result = (2 * p - p**2) / tem * (m / (1 - m) - n / (1 - n)) + 1
-        
+
         no_hit_round_count_list.append(result)
     loss_round_count_list = [None for _ in range(book_num + 1)]
     hit_num_possible_list = [0 for _ in range(6)]

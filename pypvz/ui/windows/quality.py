@@ -258,7 +258,9 @@ class UpgradeQualityThread(Thread):
                 self.logger.reverse_log(msg, self.need_show_all_info)
             signal_block_emit(self.refresh_signal)
         except Exception as e:
-            self.logger.log(f"刷品过程中出现异常，已跳过当前植物。原因种类：{type(e).__name__}")
+            self.logger.log(
+                f"刷品过程中出现异常，已跳过当前植物。原因种类：{type(e).__name__}"
+            )
             has_failure = True
         if has_failure:
             return False
@@ -278,10 +280,16 @@ class UpgradeQualityThread(Thread):
                     if result.result():
                         plant_id_set.remove(plant_id_list[i])
                 except Exception as e:
-                    logging.warning("刷品过程中出现异常，异常类型：{}".format(type(e).__name__))
+                    logging.warning(
+                        "刷品过程中出现异常，异常类型：{}".format(type(e).__name__)
+                    )
             if len(plant_id_set) == 0:
                 break
-            self.logger.log("刷品过程中出现异常，重启刷品，一共还剩{}个植物需重新刷品".format(len(plant_id_set)))
+            self.logger.log(
+                "刷品过程中出现异常，重启刷品，一共还剩{}个植物需重新刷品".format(
+                    len(plant_id_set)
+                )
+            )
 
     def run(self):
         try:

@@ -58,7 +58,7 @@ class UserSettings:
         self.start_thread = None
 
         self.challenge4Level = Challenge4Level(cfg, user, repo, lib, logger=self.logger)
-        self.challenge4Level_enabled = True
+        self.challenge4Level_enabled = False
         self.shop_enabled = False
 
         self.shop = Shop(cfg)
@@ -124,7 +124,9 @@ class UserSettings:
                         self.daily_man.arena_reward_acquire(self.lib)
                     self.logger.log("每日日常完成")
                 except Exception as e:
-                    self.logger.log(f"每日日常失败，异常种类:{type(e).__name__}。跳过每日日常")
+                    self.logger.log(
+                        f"每日日常失败，异常种类:{type(e).__name__}。跳过每日日常"
+                    )
                 if stop_channel.qsize() > 0:
                     break
             if self.task_enabled:
@@ -139,7 +141,9 @@ class UserSettings:
                                 result = self.task.claim_reward(task, self.lib)
                                 self.logger.log(result['result'])
                 except Exception as e:
-                    self.logger.log(f"领取任务奖励失败，异常种类:{type(e).__name__}。跳过领取任务奖励")
+                    self.logger.log(
+                        f"领取任务奖励失败，异常种类:{type(e).__name__}。跳过领取任务奖励"
+                    )
                 if stop_channel.qsize() > 0:
                     break
             if self.garden_enabled:
@@ -148,7 +152,9 @@ class UserSettings:
                     if self.garden_man.auto_challenge(stop_channel):
                         need_continue = True
                 except Exception as e:
-                    self.logger.log(f"自动花园挑战失败，异常种类:{type(e).__name__}。跳过自动花园挑战")
+                    self.logger.log(
+                        f"自动花园挑战失败，异常种类:{type(e).__name__}。跳过自动花园挑战"
+                    )
                 if stop_channel.qsize() > 0:
                     break
             if self.arena_enabled:
@@ -162,14 +168,18 @@ class UserSettings:
                             if not result['success']:
                                 break
                 except Exception as e:
-                    self.logger.log(f"竞技场挑战失败，异常种类:{type(e).__name__}。跳过竞技场挑战")
+                    self.logger.log(
+                        f"竞技场挑战失败，异常种类:{type(e).__name__}。跳过竞技场挑战"
+                    )
                 if stop_channel.qsize() > 0:
                     break
             if self.command_enabled:
                 try:
                     self.command_man.start(stop_channel)
                 except Exception as e:
-                    self.logger.log(f"自动指令执行失败，异常种类:{type(e).__name__}。跳过自动指令")
+                    self.logger.log(
+                        f"自动指令执行失败，异常种类:{type(e).__name__}。跳过自动指令"
+                    )
                 if stop_channel.qsize() > 0:
                     break
             if self.territory_enabled:
@@ -178,18 +188,25 @@ class UserSettings:
                         self.territory_man.check_data(False)
                         result = self.territory_man.upload_team()
                         self.logger.log(result['result'])
-                        self.territory_man.auto_challenge(stop_channel)
+                        self.arena_man.arena.refresh_arena()
+                        self.territory_man.auto_challenge(
+                            self.user.name, self.arena_man.arena.rank, stop_channel
+                        )
                         result = self.territory_man.release_plant(self.user.id)
                         self.logger.log(result['result'])
                 except Exception as e:
-                    self.logger.log(f"领地挑战失败，异常种类:{type(e).__name__}。跳过领地挑战")
+                    self.logger.log(
+                        f"领地挑战失败，异常种类:{type(e).__name__}。跳过领地挑战"
+                    )
                 if stop_channel.qsize() > 0:
                     break
             if self.serverbattle_enabled:
                 try:
                     self.serverbattle_man.auto_challenge(stop_channel)
                 except Exception as e:
-                    self.logger.log(f"跨服挑战失败，异常种类:{type(e).__name__}。跳过跨服挑战")
+                    self.logger.log(
+                        f"跨服挑战失败，异常种类:{type(e).__name__}。跳过跨服挑战"
+                    )
                 if stop_channel.qsize() > 0:
                     break
             if self.fuben_enabled:
@@ -198,11 +215,14 @@ class UserSettings:
                         if not self.fuben_man.auto_challenge(stop_channel):
                             break
                 except Exception as e:
-                    self.logger.log(f"自动副本挑战失败，异常种类:{type(e).__name__}。跳过自动副本挑战")
+                    self.logger.log(
+                        f"自动副本挑战失败，异常种类:{type(e).__name__}。跳过自动副本挑战"
+                    )
                 if stop_channel.qsize() > 0:
                     break
             if self.challenge4Level_enabled:
                 try:
+                    self.challenge4Level.cooldown_cave_id_set.clear()
                     while True:
                         self.challenge4Level.has_challenged = False
                         if not self.challenge4Level.auto_challenge(stop_channel):
@@ -214,7 +234,9 @@ class UserSettings:
                         ):
                             break
                 except Exception as e:
-                    self.logger.log(f"自动挑战失败，异常种类:{type(e).__name__}。跳过自动挑战")
+                    self.logger.log(
+                        f"自动挑战失败，异常种类:{type(e).__name__}。跳过自动挑战"
+                    )
             if self.exit_if_nothing_todo and not need_continue:
                 self.logger.log("没有可以做的事情了，退出用户")
                 if close_signal is not None:

@@ -86,9 +86,7 @@ class AutoSynthesisWindow(QMainWindow):
         for name in attribute_list:
             self.auto_synthesis_attribute_choice.addItem(name)
         self.auto_synthesis_attribute_choice.setCurrentIndex(
-            attribute_list.index(
-                self.usersettings.auto_synthesis_man.chosen_attribute
-            )
+            attribute_list.index(self.usersettings.auto_synthesis_man.chosen_attribute)
         )
         self.auto_synthesis_attribute_choice.currentIndexChanged.connect(
             self.auto_synthesis_attribute_choice_changed
@@ -185,7 +183,9 @@ class AutoSynthesisWindow(QMainWindow):
         self.auto_synthesis_btn = auto_synthesis_btn = QPushButton("全部合成")
         auto_synthesis_btn.clicked.connect(self.auto_synthesis_btn_clicked)
         widget6_layout.addWidget(auto_synthesis_btn)
-        self.auto_synthesis_single_btn = auto_synthesis_single_btn = QPushButton("合成一次")
+        self.auto_synthesis_single_btn = auto_synthesis_single_btn = QPushButton(
+            "合成一次"
+        )
         auto_synthesis_single_btn.clicked.connect(
             self.auto_synthesis_single_btn_clicked
         )
@@ -261,9 +261,7 @@ class AutoSynthesisWindow(QMainWindow):
                     format_number(
                         getattr(
                             plant,
-                            attribute2plant_attribute[
-                                attr_name
-                            ],
+                            attribute2plant_attribute[attr_name],
                         )
                     ),
                 )
@@ -433,19 +431,13 @@ class AutoSynthesisWindow(QMainWindow):
 
     def _check_plant(self, plant, full_check=False, alert=True):
         result = None
-        chosen_attr_name = (
-            attribute2plant_attribute[
-                self.usersettings.auto_synthesis_man.chosen_attribute
-            ]
-        )
-        for (
-            attr_dict_name
-        ) in attribute2plant_attribute.keys():
+        chosen_attr_name = attribute2plant_attribute[
+            self.usersettings.auto_synthesis_man.chosen_attribute
+        ]
+        for attr_dict_name in attribute2plant_attribute.keys():
             if attr_dict_name == "战力":
                 continue
-            attr_name = attribute2plant_attribute[
-                attr_dict_name
-            ]
+            attr_name = attribute2plant_attribute[attr_dict_name]
             if attr_name == chosen_attr_name and not full_check:
                 continue
             attr = getattr(plant, attr_name)
@@ -485,7 +477,7 @@ class AutoSynthesisWindow(QMainWindow):
                     self.usersettings.logger.log("合成数据检查出异常，停止合成")
                     return False
         return True
-    
+
     def remove_abnormal_plant_btn_clicked(self):
         cnt = 0
         for deputy_plant_id in list(
@@ -517,7 +509,9 @@ class AutoSynthesisWindow(QMainWindow):
             self.usersettings.auto_synthesis_man.check_data()
             self.refresh_all()
         except Exception as e:
-            self.usersettings.logger.log("合成异常。异常种类：{}".format(type(e).__name__))
+            self.usersettings.logger.log(
+                "合成异常。异常种类：{}".format(type(e).__name__)
+            )
         finally:
             self.auto_synthesis_single_btn.setEnabled(True)
 

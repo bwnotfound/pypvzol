@@ -213,10 +213,14 @@ class CompoundScheme:
             after_plant1 = self.repo.get_plant(id1)
             attr_name = attribute2plant_attribute[self.chosen_attribute]
             if getattr(after_plant1, attr_name) == getattr(plant1, attr_name):
-                self.logger.log("复合异常。检测传出植物前后属性一致，判断为传承失败。尝试重新传承")
+                self.logger.log(
+                    "复合异常。检测传出植物前后属性一致，判断为传承失败。尝试重新传承"
+                )
                 return self.exchange_one(id1, id2, book_id, num)
             else:
-                self.logger.log("复合异常。检测传出植物前后属性不一致，判断为传承成功。")
+                self.logger.log(
+                    "复合异常。检测传出植物前后属性不一致，判断为传承成功。"
+                )
                 return True
         return result["success"]
 
@@ -232,20 +236,22 @@ class CompoundScheme:
         if not success:
             self.logger.log(f'方案"{self.name}"在复制植物时出现传承错误，中断复合')
             return None
-        self.source_plant_id = self.synthesis_plant(
-            self.source_plant_id, self.n1, refresh_signal
-        )
-        if self.source_plant_id is None:
-            return None
+        if self.n1 > 0:
+            self.source_plant_id = self.synthesis_plant(
+                self.source_plant_id, self.n1, refresh_signal
+            )
+            if self.source_plant_id is None:
+                return None
         for quality_index in self.n1_post_quailty_index:
             self.source_plant_id = self.synthesis_plant(
                 self.source_plant_id, 1, refresh_signal, quality_index=quality_index
             )
             if self.source_plant_id is None:
                 return None
-        copy_plant_id = self.synthesis_plant(copy_plant_id, self.n2, refresh_signal)
-        if copy_plant_id is None:
-            return None
+        if self.n2 > 0:
+            copy_plant_id = self.synthesis_plant(copy_plant_id, self.n2, refresh_signal)
+            if copy_plant_id is None:
+                return None
         for quality_index in self.n2_post_quailty_index:
             copy_plant_id = self.synthesis_plant(
                 copy_plant_id, 1, refresh_signal, quality_index=quality_index
@@ -264,7 +270,9 @@ class CompoundScheme:
             )
         except Exception as e:
             if "amf返回结果为空" in str(e):
-                msg = "可能由以下原因引起：参与合成的植物不见了、增强卷轴不够、合成书不够"
+                msg = (
+                    "可能由以下原因引起：参与合成的植物不见了、增强卷轴不够、合成书不够"
+                )
                 return {
                     "success": False,
                     "result": "合成异常，已跳出合成。{}".format(msg),
@@ -284,14 +292,18 @@ class CompoundScheme:
         for i in range(self.m):
             copy_plant_id = self.copy_source_plant(refresh_signal)
             if copy_plant_id is None:
-                self.logger.log(f'方案"{self.name}"复制第{i+1}个植物失败，退出当前方案复合')
+                self.logger.log(
+                    f'方案"{self.name}"复制第{i+1}个植物失败，退出当前方案复合'
+                )
                 return False
             result = self._synthesis(
                 self.liezhi_plant_id, copy_plant_id, self.synthesis_book['id'], 10
             )
             if not result["success"]:
                 self.logger.log(result['result'])
-                self.logger.log("自动复合中把复制出来的植物给劣质双格吃时发生合成异常，退出当前方案复合")
+                self.logger.log(
+                    "自动复合中把复制出来的植物给劣质双格吃时发生合成异常，退出当前方案复合"
+                )
                 return False
             self.logger.log("复制第{}个植物成功".format(i + 1))
         return True
@@ -542,9 +554,11 @@ class AutoCompoundMan:
                 result.append(
                     "{}品质的植物数量现有{}个，需要{}个".format(
                         quality_name_list[quality_index],
-                        pool_quality_dict[quality_index]
-                        if quality_index in pool_quality_dict
-                        else 0,
+                        (
+                            pool_quality_dict[quality_index]
+                            if quality_index in pool_quality_dict
+                            else 0
+                        ),
                         deputy_plant_num_required,
                     )
                 )
@@ -591,9 +605,13 @@ class AutoCompoundMan:
             after_plant1 = self.repo.get_plant(id1)
             for attr_name in list(attribute2plant_attribute.values())[:6]:
                 if getattr(after_plant1, attr_name) != getattr(plant1, attr_name):
-                    self.logger.log("全传异常。检测传出植物前后属性不一致，判断为传承成功。")
+                    self.logger.log(
+                        "全传异常。检测传出植物前后属性不一致，判断为传承成功。"
+                    )
                     return True
-            self.logger.log("全传异常。检测传出植物前后属性一致，判断为传承失败。尝试重新传承")
+            self.logger.log(
+                "全传异常。检测传出植物前后属性一致，判断为传承失败。尝试重新传承"
+            )
             return self.exchange_all(id1, id2)
         return result["success"]
 
@@ -601,7 +619,11 @@ class AutoCompoundMan:
         result = self.one_cycle_consume_check()
         enabled_scheme_list = [scheme for scheme in self.scheme_list if scheme.enabled]
         if len(result) > 0:
-            message = "统计复合一个循环所需要的材料时发现以下缺失：\n" + "\n".join(result) + "\n请补齐材料后开始复合"
+            message = (
+                "统计复合一个循环所需要的材料时发现以下缺失：\n"
+                + "\n".join(result)
+                + "\n请补齐材料后开始复合"
+            )
             self.logger.log(message)
             return False
         for scheme in self.scheme_list:
@@ -626,9 +648,13 @@ class AutoCompoundMan:
                 success_list.append(future.result())
             except Exception as e:
                 if isinstance(e, RuntimeError):
-                    self.logger.log(f'方案"{scheme.name}"自动复合异常。异常原因：{str(e)}')
+                    self.logger.log(
+                        f'方案"{scheme.name}"自动复合异常。异常原因：{str(e)}'
+                    )
                 else:
-                    self.logger.log(f'方案"{scheme.name}"自动复合异常。异常类型：{type(e).__name__}')
+                    self.logger.log(
+                        f'方案"{scheme.name}"自动复合异常。异常类型：{type(e).__name__}'
+                    )
                 return False
         flag = False
         for s, scheme in zip(success_list, enabled_scheme_list):

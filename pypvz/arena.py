@@ -16,7 +16,11 @@ class Arena:
 
     def refresh_arena(self):
         response = self.wr.amf_post_retry(
-            [], "api.arena.getArenaList", "/pvz/amf/", "获取竞技场列表", except_retry=True
+            [],
+            "api.arena.getArenaList",
+            "/pvz/amf/",
+            "获取竞技场列表",
+            except_retry=True,
         )
         self.opponent_list = [ArenaOpponent(root) for root in response.body['opponent']]
         self.challenge_num = int(response.body['owner']["num"])
@@ -40,7 +44,9 @@ class Arena:
         if response.status == 1:
             return {
                 "success": False,
-                "result": "挑战竞技场出现异常。原因：{}".format(response.body.description),
+                "result": "挑战竞技场出现异常。原因：{}".format(
+                    response.body.description
+                ),
             }
         return {
             "success": True,

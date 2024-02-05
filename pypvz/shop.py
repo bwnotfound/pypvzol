@@ -28,12 +28,22 @@ class Shop:
         self.cfg = cfg
         self.wr = WebRequest(cfg)
         self.type_list = [1, 2, 5, 3, 6]
-        self.shop_name_list = ["普通商店", "礼券商店", "荣誉商店", "金券商城", "VIP商城"]
+        self.shop_name_list = [
+            "普通商店",
+            "礼券商店",
+            "荣誉商店",
+            "金券商城",
+            "VIP商城",
+        ]
 
     def _refresh_shop(self, shop_type: int):
         body = [float(shop_type)]
         resp = self.wr.amf_post_retry(
-            body, "api.shop.getMerchandises", "/pvz/amf/", "获取商店信息", except_retry=True
+            body,
+            "api.shop.getMerchandises",
+            "/pvz/amf/",
+            "获取商店信息",
+            except_retry=True,
         )
         return resp
 

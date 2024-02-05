@@ -19,7 +19,7 @@ class GardenMan:
     def challenge(self, id, plant_list):
         """
         Challenge all caves of a garden .
-        
+
         Args:
             id (int): friend id.
             plant_list (list[int]): plant id list
@@ -48,9 +48,7 @@ class GardenMan:
             ev = remoting.Envelope(pyamf.AMF0)
             ev['/1'] = req
             bin_msg = remoting.encode(ev, strict=True)
-            resp = self.wr.post(
-                "/pvz/amf/", data=bin_msg.getvalue()
-            )
+            resp = self.wr.post("/pvz/amf/", data=bin_msg.getvalue())
             # TODO: check result
 
     def challenge_all(self, target_level_min, plant_list):

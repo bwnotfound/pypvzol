@@ -47,6 +47,25 @@ class Cave:
         else:
             raise NotImplementedError
 
+    def quick_cave_id(self, user_id=None, garden_layer=None):
+        if self.type <= 3:
+            assert user_id is not None and garden_layer is not None
+            if self.type == 1:
+                offset = 9 * 3
+            else:
+                offset = 12 * 4
+            return (
+                user_id * 1000
+                + [1, 6, 3][self.type - 1] * 100
+                + (self.layer - 1) * 12
+                + self.number
+                + (garden_layer - 1) * offset
+            )
+        elif self.type == 4:
+            return self.layer * 100 + self.number
+        else:
+            raise NotImplementedError
+
     def format_name(self, difficulty=None):
         if self.type <= 3:
             type_name_list = ["暗洞", "公洞", "个洞"]
@@ -55,9 +74,11 @@ class Cave:
                 type_name_list[self.type - 1],
                 self.layer,
                 self.number,
-                "({})".format(difficulty_name_list[difficulty - 1])
-                if (difficulty is not None)
-                else "",
+                (
+                    "({})".format(difficulty_name_list[difficulty - 1])
+                    if (difficulty is not None)
+                    else ""
+                ),
                 self.name,
             )
         elif self.type == 4:
@@ -168,7 +189,9 @@ class CaveMan:
             [int(i) for i in plant_list],
             float(difficulty),
         ]
-        response = self.wr.amf_post_retry(body, target_amf, '/pvz/amf/', '洞口挑战', allow_empty=True)
+        response = self.wr.amf_post_retry(
+            body, target_amf, '/pvz/amf/', '洞口挑战', allow_empty=True
+        )
         if response is None:
             return {
                 "success": False,
@@ -194,7 +217,9 @@ class CaveMan:
         else:
             return {
                 "success": False,
-                "result": "获取战力品信息失败。原因：{}".format(response.body.description),
+                "result": "获取战力品信息失败。原因：{}".format(
+                    response.body.description
+                ),
             }
 
     def get_garden_cave(self, id):
@@ -223,15 +248,19 @@ class CaveMan:
 
     def switch_garden_layer(self, target_layer, logger):
         '''
-        target_layer in [1,2,3,4]
+        target_layer in [1,2,3,4,5,6]
 
         洞口已切换到第{}层
         '''
-        target_char = "一二三四五"[target_layer - 1]
+        target_char = "一二三四五六"[target_layer - 1]
         body = [float(1), float(0), float(0), []]
         while True:
             response = self.wr.amf_post_retry(
-                body, "api.garden.challenge", '/pvz/amf/', '切换花园层', except_retry=True
+                body,
+                "api.garden.challenge",
+                '/pvz/amf/',
+                '切换花园层',
+                except_retry=True,
             )
             resp_text = response.body.description
             if "洞口已切换" not in resp_text:

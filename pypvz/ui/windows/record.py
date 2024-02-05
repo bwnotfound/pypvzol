@@ -58,9 +58,7 @@ class RepositoryRecordWindow(QMainWindow):
         layout2 = QVBoxLayout()
         layout2.addWidget(QLabel("记录结果（改变量）"))
         self.record_list = QListWidget()
-        self.record_list.setSelectionMode(
-            QListWidget.SelectionMode.ExtendedSelection
-        )
+        self.record_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         layout2.addWidget(self.record_list)
         widget2.setLayout(layout2)
         main_layout.addWidget(widget2)
