@@ -9,7 +9,11 @@ class Serverbattle:
     def challenge(self):
         body = []
         response = self.wr.amf_post_retry(
-            body, 'api.serverbattle.challenge', "/pvz/amf/", "跨服挑战", allow_empty=True
+            body,
+            'api.serverbattle.challenge',
+            "/pvz/amf/",
+            "跨服挑战",
+            allow_empty=True,
         )
         if response is None:
             return None

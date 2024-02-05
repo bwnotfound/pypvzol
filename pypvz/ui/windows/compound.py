@@ -516,7 +516,9 @@ class AutoCompoundWindow(QMainWindow):
     def refresh_information_text_box(self):
         message = []
         message.append(
-            "复合池植物总数量：{}个".format(len(self.auto_compound_man.auto_compound_pool_id))
+            "复合池植物总数量：{}个".format(
+                len(self.auto_compound_man.auto_compound_pool_id)
+            )
         )
         plant_quality_dict = {k: 0 for k in quality_name_list}
         for plant_id in self.auto_compound_man.auto_compound_pool_id:
@@ -668,7 +670,9 @@ class AutoCompoundWindow(QMainWindow):
                 except KeyError:
                     plant = self.repo.get_plant(plant_id)
                     if plant is None:
-                        self.logger.log("仓库里没有id为{}的植物，可能已被删除".format(plant_id))
+                        self.logger.log(
+                            "仓库里没有id为{}的植物，可能已被删除".format(plant_id)
+                        )
                     self.logger.log(
                         "合成池里没有植物{}".format(
                             self.format_plant_info(

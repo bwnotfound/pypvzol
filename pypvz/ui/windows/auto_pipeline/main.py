@@ -172,7 +172,9 @@ class PipelineSettingWindow(QMainWindow):
             WaitEventThread(self.rest_event, self.stop_signal).start()
         else:
             self.start_btn.setEnabled(True)
-            raise NotImplementedError("开始全自动按钮文本：{} 未知".format(self.start_btn.text()))
+            raise NotImplementedError(
+                "开始全自动按钮文本：{} 未知".format(self.start_btn.text())
+            )
 
     def stop_handler(self):
         self.start_btn.setText("开始")

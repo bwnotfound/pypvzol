@@ -150,7 +150,9 @@ class UpgradeSkillWidget(QWidget):
         plant_id = item.data(Qt.ItemDataRole.UserRole)
         plant = self.usersettings.repo.get_plant(plant_id)
         if plant is None:
-            self.usersettings.logger.log("仓库里没有id为{}的植物，可能已被删除".format(plant_id))
+            self.usersettings.logger.log(
+                "仓库里没有id为{}的植物，可能已被删除".format(plant_id)
+            )
             return
         self.refresh_plant_attribute_textbox(plant)
 
@@ -313,7 +315,9 @@ class UpgradeStoneWidget(QWidget):
         plant_id = item.data(Qt.ItemDataRole.UserRole)
         plant = self.usersettings.repo.get_plant(plant_id)
         if plant is None:
-            self.usersettings.logger.log("仓库里没有id为{}的植物，可能已被删除".format(plant_id))
+            self.usersettings.logger.log(
+                "仓库里没有id为{}的植物，可能已被删除".format(plant_id)
+            )
             return
         self.refresh_plant_attribute_textbox(plant)
 
@@ -416,7 +420,9 @@ class UpgradeSkillThread(Thread):
                         if plant.special_skill_id == int(skill["id"]):
                             plant.special_skill_id = int(skill["next_grade_id"])
             else:
-                self.usersettings.logger.log("{}升级失败，技能等级没有变化".format(skill_name))
+                self.usersettings.logger.log(
+                    "{}升级失败，技能等级没有变化".format(skill_name)
+                )
                 return False
         return True
 

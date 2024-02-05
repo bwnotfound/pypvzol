@@ -82,7 +82,8 @@ class IOLogger:
         self.max_file_num = max_file_num
         self.signal = signal
         self.save_path = os.path.join(
-            save_dir, "日志_起始时间{}.txt".format(strftime("%Y-%m-%d_%H-%M-%S", localtime()))
+            save_dir,
+            "日志_起始时间{}.txt".format(strftime("%Y-%m-%d_%H-%M-%S", localtime())),
         )
         self._check_file_num()
         self.max_info_capacity = max_info_capacity
@@ -102,9 +103,7 @@ class IOLogger:
         )
         _logger = logging.Logger("IOLogger", level=logging.INFO)
         file_handler = logging.FileHandler(self.save_path, encoding="utf-8")
-        formatter = logging.Formatter(
-            "%(asctime)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         file_handler.setFormatter(formatter)
         _logger.addHandler(file_handler)
         self.logger = Logger(_logger, self.info_channel)
@@ -114,11 +113,13 @@ class IOLogger:
     def _check_file_num(self):
         file_list = os.listdir(self.save_dir)
         file_list = [
-            os.path.join(self.save_dir, file) for file in file_list if file.endswith(".txt")
+            os.path.join(self.save_dir, file)
+            for file in file_list
+            if file.endswith(".txt")
         ]
         file_list.sort(key=lambda x: os.path.getmtime(x), reverse=True)
         if len(file_list) > self.max_file_num:
-            for file in file_list[self.max_file_num:]:
+            for file in file_list[self.max_file_num :]:
                 os.remove(file)
 
     def get_logger(self):

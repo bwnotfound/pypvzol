@@ -77,7 +77,9 @@ class OpenFubenMan:
             success_num_all += success_num
             if fail_num == 0:
                 break
-            self.logger.log("尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num))
+            self.logger.log(
+                "尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num)
+            )
             self.repo.refresh_repository(logger=self.logger)
             cnt += 1
         else:
@@ -170,14 +172,18 @@ class OpenFubenMan:
                 )
                 if response is None:
                     self.logger.log(
-                        "增加世界副本{}的挑战次数返回值为空，判定为增加挑战次数失败".format(target_cave.name)
+                        "增加世界副本{}的挑战次数返回值为空，判定为增加挑战次数失败".format(
+                            target_cave.name
+                        )
                     )
                     return False
                 target_cave.rest_count = int(response.body)
                 break
             except Exception as e:
                 self.logger.log(
-                    "增加世界副本{}的挑战次数出现异常，异常种类：{}。".format(target_cave.name, e)
+                    "增加世界副本{}的挑战次数出现异常，异常种类：{}。".format(
+                        target_cave.name, e
+                    )
                 )
                 self.repo.refresh_repository()
                 now_amount = self.repo.get_tool(self.watch_id, return_amount=True)
@@ -189,7 +195,11 @@ class OpenFubenMan:
                     self.logger.log("仓库怀表量为0，判定使用怀表失败")
                     return False
                 cnt += 1
-                self.logger.log("仓库怀表量未发生变化，暂停1s继续，最多再尝试{}次".format(max_retry - cnt))
+                self.logger.log(
+                    "仓库怀表量未发生变化，暂停1s继续，最多再尝试{}次".format(
+                        max_retry - cnt
+                    )
+                )
                 time.sleep(1)
                 continue
         self.repo.remove_tool(self.watch_id, amount)
@@ -207,7 +217,11 @@ class OpenFubenMan:
                 amount - self.world_fuben_challenge_amount, fuben_book_tool_amount
             )
             if use_amount < amount - self.world_fuben_challenge_amount:
-                self.logger.log("挑战世界副本{}失败，原因：副本挑战书数量不足".format(target_cave.name))
+                self.logger.log(
+                    "挑战世界副本{}失败，原因：副本挑战书数量不足".format(
+                        target_cave.name
+                    )
+                )
                 return False
             repo_tool = self.repo.get_tool(self.fuben_book_id)
             cnt, max_retry = 0, 20
@@ -235,11 +249,15 @@ class OpenFubenMan:
                         self.repo.get_tool(self.fuben_book_id, return_amount=True)
                         != repo_tool['amount']
                     ):
-                        self.logger.log("仓库副本挑战书数量发生变化，判定使用副本挑战书成功")
+                        self.logger.log(
+                            "仓库副本挑战书数量发生变化，判定使用副本挑战书成功"
+                        )
                         break
                     cnt += 1
                     self.logger.log(
-                        "仓库副本挑战书数量未发生变化，暂停1s继续，最多再尝试{}次".format(max_retry - cnt)
+                        "仓库副本挑战书数量未发生变化，暂停1s继续，最多再尝试{}次".format(
+                            max_retry - cnt
+                        )
                     )
                     time.sleep(1)
                     continue
@@ -248,7 +266,11 @@ class OpenFubenMan:
         if target_cave.rest_count >= 0 and target_cave.rest_count < amount:
             use_amount = min(amount - target_cave.rest_count, watch_tool_amount)
             if use_amount < amount - target_cave.rest_count:
-                self.logger.log("挑战世界副本{}失败，原因：时之怀表数量不足".format(target_cave.name))
+                self.logger.log(
+                    "挑战世界副本{}失败，原因：时之怀表数量不足".format(
+                        target_cave.name
+                    )
+                )
                 return False
             self.add_cave_rest_count(target_cave, use_amount)
 
@@ -283,20 +305,30 @@ class OpenFubenMan:
                 result = future.result()
             except Exception as e:
                 self.logger.log(
-                    "挑战世界副本{}出现异常，异常种类：{}。判断为实际挑战了".format(target_cave.name, e)
+                    "挑战世界副本{}出现异常，异常种类：{}。判断为实际挑战了".format(
+                        target_cave.name, e
+                    )
                 )
                 continue
             if result is None:
-                self.logger.log("挑战世界副本{}返回值为空，判定没有实际挑战".format(target_cave.name))
+                self.logger.log(
+                    "挑战世界副本{}返回值为空，判定没有实际挑战".format(
+                        target_cave.name
+                    )
+                )
                 return False
             if not result['success']:
                 self.logger.log(
-                    "挑战世界副本{}失败，原因：{}".format(target_cave.name, result['result'])
+                    "挑战世界副本{}失败，原因：{}".format(
+                        target_cave.name, result['result']
+                    )
                 )
                 return False
         if target_cave.rest_count >= 0:
             target_cave.rest_count = max(0, target_cave.rest_count - amount)
-        self.logger.log("成功挑战世界副本{}，挑战了{}次".format(target_cave.name, amount))
+        self.logger.log(
+            "成功挑战世界副本{}，挑战了{}次".format(target_cave.name, amount)
+        )
         self.world_fuben_challenge_amount -= amount
         return True
 
@@ -325,7 +357,11 @@ class OpenFubenMan:
             try:
                 self.fuben_layer_info_list[i] = future.result()
             except Exception as e:
-                self.logger.log("获取世界副本信息出现异常，异常种类：{}。退出世界副本自动开图".format(e))
+                self.logger.log(
+                    "获取世界副本信息出现异常，异常种类：{}。退出世界副本自动开图".format(
+                        e
+                    )
+                )
                 return False
         return True
 
@@ -351,7 +387,9 @@ class OpenFubenMan:
             allow_empty=True,
         )
         if response is None:
-            self.logger.log("开启世界副本{}返回值为空，判定为开启副本成功".format(target_cave.name))
+            self.logger.log(
+                "开启世界副本{}返回值为空，判定为开启副本成功".format(target_cave.name)
+            )
             return True
         if response.status == 1:
             return False
@@ -407,7 +445,11 @@ class OpenFubenMan:
                     try:
                         open_result = self.open_cave(cave)
                         if not open_result:
-                            self.logger.log("开启世界副本{}失败，尝试刷新仓库跳过该副本".format(cave.name))
+                            self.logger.log(
+                                "开启世界副本{}失败，尝试刷新仓库跳过该副本".format(
+                                    cave.name
+                                )
+                            )
                             self.repo.refresh_repository()
                         break
                     except Exception as e:
@@ -425,7 +467,9 @@ class OpenFubenMan:
 
                 self.logger.log("成功开启世界副本{}".format(cave.name))
                 if not self.challenge_world_cave(cave, 1):
-                    self.logger.log("挑战世界副本{}失败，退出世界副本自动开图".format(cave.name))
+                    self.logger.log(
+                        "挑战世界副本{}失败，退出世界副本自动开图".format(cave.name)
+                    )
                     return
                 self.logger.log("成功挑战世界副本{}，完成本副本开启".format(cave.name))
                 challenged = True
@@ -447,7 +491,9 @@ class OpenFubenMan:
             self.refresh_fuben_info()
             self.repo.refresh_repository()
             if not challenged and len(skip_fuben_list) == 0:
-                self.logger.log("没有挑战或跳过任何副本，视为世界副本开图完毕。退出世界副本自动开图")
+                self.logger.log(
+                    "没有挑战或跳过任何副本，视为世界副本开图完毕。退出世界副本自动开图"
+                )
                 return
 
     def save(self, save_dir):

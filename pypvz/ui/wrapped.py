@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt
 
 normal_font = QFont("Microsoft YaHei", pointSize=10)
 
+
 class QLabel(QLabel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -26,20 +27,22 @@ class QLabel(QLabel):
     def setAlignment(self, a0: Qt.AlignmentFlag) -> None:
         super().setAlignment(a0)
         return self
-    
+
+
 def signal_block_emit(refresh_signal, *args):
     if refresh_signal is None:
         return
     event = threading.Event()
     refresh_signal.emit(*args, event)
     event.wait()
-    
+
+
 class WaitEventThread(threading.Thread):
     def __init__(self, event, signal):
         super().__init__()
         self.event = event
         self.signal = signal
-    
+
     def run(self):
         self.event.wait()
         self.signal.emit()

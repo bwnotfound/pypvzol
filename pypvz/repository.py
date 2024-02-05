@@ -99,16 +99,23 @@ class Repository:
         while cnt < max_retry:
             cnt += 1
             try:
-                resp = self.wr.get_retry(url, "刷新仓库", logger=logger, except_retry=True)
+                resp = self.wr.get_retry(
+                    url, "刷新仓库", logger=logger, except_retry=True
+                )
                 resp_text = resp.decode("utf-8")
                 try:
                     root = fromstring(resp_text)
+                    assert root.find("response").find("status").text == "success"
                     break
                 except:
                     if resp_text.startswith("<html"):
-                        logging.error(f"{resp_text}\n刷新仓库出现问题。大概率是Cookie或者区服选择有误。上面是响应")
+                        logging.error(
+                            f"{resp_text}\n刷新仓库出现问题。大概率是Cookie或者区服选择有误。上面是响应"
+                        )
                         raise RuntimeError("刷新仓库出现问题")
-                    msg = "刷新仓库失败，选择等待3秒后重试。最多再等待{}次".format(max_retry - cnt)
+                    msg = "刷新仓库失败，选择等待3秒后重试。最多再等待{}次".format(
+                        max_retry - cnt
+                    )
                     if logger is not None:
                         logger.log(msg)
                     else:
@@ -227,11 +234,15 @@ class Repository:
             amount = int(amount)
         amount = min(amount, 99999)
         body = [float(tool_id), float(amount)]
-        response = self.wr.amf_post_retry(body, "api.tool.useOf", "/pvz/amf/", "使用物品")
+        response = self.wr.amf_post_retry(
+            body, "api.tool.useOf", "/pvz/amf/", "使用物品"
+        )
         if response.status == 0:
             result = {
                 "success": True,
-                "result": "使用了{}个{}".format(amount, lib.get_tool_by_id(tool_id).name),
+                "result": "使用了{}个{}".format(
+                    amount, lib.get_tool_by_id(tool_id).name
+                ),
             }
             try:
                 effect = int(response.body['effect'])
@@ -249,7 +260,9 @@ class Repository:
         from .utils.common import format_number
 
         body = [float(1), float(tool_id), float(amount)]
-        response = self.wr.amf_post_retry(body, "api.shop.sell", "/pvz/amf/", "出售物品")
+        response = self.wr.amf_post_retry(
+            body, "api.shop.sell", "/pvz/amf/", "出售物品"
+        )
         if response.status == 0:
             return {
                 "success": True,
@@ -267,7 +280,9 @@ class Repository:
 
     def sell_plant(self, plant_id, plant_info):
         body = [float(2), float(plant_id), float(1)]
-        response = self.wr.amf_post_retry(body, "api.shop.sell", "/pvz/amf/", "出售植物")
+        response = self.wr.amf_post_retry(
+            body, "api.shop.sell", "/pvz/amf/", "出售植物"
+        )
         if response.status == 0:
             return {
                 "success": True,
@@ -303,7 +318,9 @@ class Repository:
                 "result": description,
             }
         open_amount = int(response.body['openAmount'])
-        result = "打开了{}个{}，获得了: ".format(open_amount, lib.get_tool_by_id(tool_id).name)
+        result = "打开了{}个{}，获得了: ".format(
+            open_amount, lib.get_tool_by_id(tool_id).name
+        )
         reward_str_list = []
         for reward in response.body['tools']:
             tool = lib.get_tool_by_id(reward['id'])

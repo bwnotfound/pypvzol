@@ -94,7 +94,9 @@ class SynthesisMan:
             float(attribute_book_id),
             float(reinforce_number),
         ]
-        response = self.wr.amf_post_retry(body, 'api.tool.synthesis', "/pvz/amf/", "合成")
+        response = self.wr.amf_post_retry(
+            body, 'api.tool.synthesis', "/pvz/amf/", "合成"
+        )
         if response.status != 0:
             result = {
                 "success": False,

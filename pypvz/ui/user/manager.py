@@ -91,13 +91,19 @@ class AutoSynthesisMan:
             }
         book_amount = book['amount']
         if not book_amount > 0:
-            return {"success": False, "result": f"{self.chosen_attribute}合成书数量不足"}
+            return {
+                "success": False,
+                "result": f"{self.chosen_attribute}合成书数量不足",
+            }
         reinforce = self.repo.get_tool(self.lib.name2tool["增强卷轴"].id)
         if reinforce is None:
             return {"success": False, "result": "没有增强卷轴了"}
         reinforce_amount = reinforce['amount']
         if reinforce_amount < self.reinforce_number:
-            return {"success": False, "result": f"增强卷轴数量不足10个(目前数量：{reinforce_amount})"}
+            return {
+                "success": False,
+                "result": f"增强卷轴数量不足10个(目前数量：{reinforce_amount})",
+            }
         deputy_plant_id = list(self.auto_synthesis_pool_id)[0]
 
         try:
@@ -109,7 +115,9 @@ class AutoSynthesisMan:
             )
         except Exception as e:
             if "amf返回结果为空" in str(e):
-                msg = "可能由以下原因引起：参与合成的植物不见了、增强卷轴不够、合成书不够"
+                msg = (
+                    "可能由以下原因引起：参与合成的植物不见了、增强卷轴不够、合成书不够"
+                )
                 return {
                     "success": False,
                     "result": "合成异常，已跳出合成。{}".format(msg),
@@ -326,7 +334,9 @@ class FubenMan:
             success_num_all += success_num
             if fail_num == 0:
                 break
-            self.logger.log("尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num))
+            self.logger.log(
+                "尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num)
+            )
             self.repo.refresh_repository(logger=self.logger)
             cnt += 1
         else:
@@ -383,7 +393,9 @@ class FubenMan:
                 )
                 if not use_result["success"]:
                     self.logger.log(
-                        "使用{}本副本挑战书失败，原因：{}".format(amount, use_result['result'])
+                        "使用{}本副本挑战书失败，原因：{}".format(
+                            amount, use_result['result']
+                        )
                     )
                     return False
                 if use_result["effect"] != amount:
@@ -394,20 +406,26 @@ class FubenMan:
                     )
                     return False
                 self.logger.log(
-                    "使用{}本副本挑战书成功，剩余{}本".format(amount, repo_tool_amount - amount)
+                    "使用{}本副本挑战书成功，剩余{}本".format(
+                        amount, repo_tool_amount - amount
+                    )
                 )
                 self.repo.remove_tool(self.lib.fuben_book_id, amount)
                 break
             except Exception as e:
                 self.logger.log(
-                    "使用{}本副本挑战书出现异常，异常种类：{}，尝试刷新仓库".format(amount, type(e).__name__)
+                    "使用{}本副本挑战书出现异常，异常种类：{}，尝试刷新仓库".format(
+                        amount, type(e).__name__
+                    )
                 )
                 self.repo.refresh_repository()
                 if (
                     self.repo.get_tool(self.lib.fuben_book_id, return_amount=True)
                     == repo_tool_amount - amount
                 ):
-                    self.logger.log("仓库副本挑战书数量减少符合预期值，判定使用副本挑战书成功")
+                    self.logger.log(
+                        "仓库副本挑战书数量减少符合预期值，判定使用副本挑战书成功"
+                    )
                     break
                 cnt += 1
                 self.logger.log(
@@ -512,7 +530,9 @@ class FubenMan:
                                     cave.rest_count = max(cave.rest_count - 1, 0)
                                 self.has_challenged = True
                         except Exception as e:
-                            self.logger.log("挑战副本异常，异常类型：{}".format(type(e).__name__))
+                            self.logger.log(
+                                "挑战副本异常，异常类型：{}".format(type(e).__name__)
+                            )
                             has_failure = True
                 if self.challenge_amount == 0 and not self.use_fuben_book_enabled:
                     self.logger.log("副本挑战次数用完了")
@@ -613,13 +633,17 @@ class TerritoryMan:
         if resp.status_code != 200:
             return {
                 "success": False,
-                "result": "领地互斥获取是否需要中断失败，原因是响应状态码为{}".format(resp.status_code),
+                "result": "领地互斥获取是否需要中断失败，原因是响应状态码为{}".format(
+                    resp.status_code
+                ),
             }
         result = resp.json()
         if result['code'] != 0:
             return {
                 "success": False,
-                "result": "领地互斥获取是否需要中断失败，原因是{}".format(result['msg']),
+                "result": "领地互斥获取是否需要中断失败，原因是{}".format(
+                    result['msg']
+                ),
             }
         return {"success": True, "result": result['result']}
 
@@ -631,7 +655,9 @@ class TerritoryMan:
         if resp.status_code != 200:
             result = {
                 "success": False,
-                "result": "领地互斥释放领地失败，原因是响应状态码为{}".format(resp.status_code),
+                "result": "领地互斥释放领地失败，原因是响应状态码为{}".format(
+                    resp.status_code
+                ),
             }
             self.logger.log(result['result'])
             return result
@@ -654,7 +680,9 @@ class TerritoryMan:
         if resp.status_code != 200:
             return {
                 "success": False,
-                "result": "领地互斥获取领地失败，原因是响应状态码为{}".format(resp.status_code),
+                "result": "领地互斥获取领地失败，原因是响应状态码为{}".format(
+                    resp.status_code
+                ),
             }
         result = resp.json()
         if result['code'] == -1:
@@ -863,7 +891,9 @@ class TerritoryMan:
                 else:
                     response = self.challenge()
                 if response.status == 1:
-                    message = message + "失败. 原因: {}.".format(response.body.description)
+                    message = message + "失败. 原因: {}.".format(
+                        response.body.description
+                    )
                     if "匹配对手中" in response.body.description:
                         message = message + "继续运行"
                         self.logger.log(message)
@@ -1175,7 +1205,9 @@ class ServerBattleMan:
                         result = self.serverbattle.challenge()
                         if result is None:
                             if empty_cnt >= max_empty_retry:
-                                self.logger.log("跨服挑战异常，可能是次数用完了。退出跨服挑战。")
+                                self.logger.log(
+                                    "跨服挑战异常，可能是次数用完了。退出跨服挑战。"
+                                )
                                 return
                             self.logger.log(
                                 "跨服挑战异常，可能是次数用完了。重新尝试，最多尝试{}次".format(
@@ -1187,7 +1219,9 @@ class ServerBattleMan:
                         break
                     except Exception as e:
                         self.logger.log(
-                            "跨服挑战异常，异常类型：{}".format(type(e).__name__, max_retry - cnt)
+                            "跨服挑战异常，异常类型：{}".format(
+                                type(e).__name__, max_retry - cnt
+                            )
                         )
                         has_exception = True
                         break
@@ -1203,7 +1237,8 @@ class ServerBattleMan:
                         return
                 current_challenge_num -= 1
                 self.logger.log(
-                    result["result"] + ". 还剩{}次挑战次数".format(current_challenge_num)
+                    result["result"]
+                    + ". 还剩{}次挑战次数".format(current_challenge_num)
                 )
                 if stop_channel.qsize() > 0:
                     return
@@ -1251,11 +1286,15 @@ class ArenaMan:
                 error_type = result["error_type"]
                 if error_type == 1:
                     self.logger.log(
-                        "挑战竞技场出现异常。原因：{}。判断为挑战次数不足，终止挑战".format(result["result"])
+                        "挑战竞技场出现异常。原因：{}。判断为挑战次数不足，终止挑战".format(
+                            result["result"]
+                        )
                     )
                     return
                 elif error_type == 2:
-                    self.logger.log("挑战竞技场出现异常。原因：{}。".format(result["result"]))
+                    self.logger.log(
+                        "挑战竞技场出现异常。原因：{}。".format(result["result"])
+                    )
                     return
                 self.logger.log(result["result"])
                 return
@@ -1289,11 +1328,19 @@ class CommandMan:
                     self.logger.log("{}执行成功".format(command_str))
                 else:
                     if result['error_type'] == 2:
-                        self.logger.log("指令{}有误，请重新设定该指令。".format(command_str))
+                        self.logger.log(
+                            "指令{}有误，请重新设定该指令。".format(command_str)
+                        )
                     elif result['error_type'] == 3:
-                        self.logger.log("指令{}执行时发现未稳定通过，请先稳定通过".format(command_str))
+                        self.logger.log(
+                            "指令{}执行时发现未稳定通过，请先稳定通过".format(
+                                command_str
+                            )
+                        )
                     elif result['error_type'] == 1:
-                        self.logger.log("指令{}执行至道具异常，认定执行完毕".format(command_str))
+                        self.logger.log(
+                            "指令{}执行至道具异常，认定执行完毕".format(command_str)
+                        )
                     break
 
     def save(self, save_dir=None):
@@ -1347,7 +1394,11 @@ class SkillStoneMan:
             "talent_" + str(stone_index + 1),
         ]
         response = self.wr.amf_post_retry(
-            body, 'api.apiorganism.upgradeTalent', "/pvz/amf/", "升级宝石", allow_empty=True
+            body,
+            'api.apiorganism.upgradeTalent',
+            "/pvz/amf/",
+            "升级宝石",
+            allow_empty=True,
         )
         if response is None:
             return response

@@ -788,7 +788,7 @@ class CustomMainWindow(QMainWindow):
     def refresh_user_info(self, refresh_all=False):
         delete_layout_children(self.user_info_1)
         delete_layout_children(self.user_info_2)
-        
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             futures = []
             futures.append(
@@ -797,16 +797,14 @@ class CustomMainWindow(QMainWindow):
             futures.append(
                 executor.submit(self.usersettings.arena_man.get_challenge_num)
             )
-            futures.append(
-                executor.submit(self.usersettings.user.get_vip_rest_time)
-            )
+            futures.append(executor.submit(self.usersettings.user.get_vip_rest_time))
             if refresh_all:
                 futures.append(
                     executor.submit(self.usersettings.repo.refresh_repository)
                 )
                 futures.append(executor.submit(self.usersettings.user.refresh()))
         concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
-        
+
         self.user_info_1.addWidget(QLabel(f"{self.usersettings.user.name}"))
         self.user_info_1.addWidget(QLabel(f"等级: {self.usersettings.user.grade}"))
         self.user_info_1.addWidget(
@@ -826,7 +824,9 @@ class CustomMainWindow(QMainWindow):
         )
         self.user_info_2.addWidget(QLabel("领地次数: {}".format(futures[0].result())))
         self.user_info_2.addWidget(QLabel("竞技场次数: {}".format(futures[1].result())))
-        self.user_info_2.addWidget(QLabel("vip剩余天数: {}".format(futures[2].result())))
+        self.user_info_2.addWidget(
+            QLabel("vip剩余天数: {}".format(futures[2].result()))
+        )
         QApplication.processEvents()
 
     def refresh_user_info_btn_clicked(self):
@@ -942,7 +942,9 @@ class LoginWindow(QMainWindow):
 
         login_user_widget = QWidget()
         login_user_layout = QVBoxLayout()
-        login_user_layout.addWidget(QLabel("已登录的用户(双击登录，选中按delete或backspace删除)"))
+        login_user_layout.addWidget(
+            QLabel("已登录的用户(双击登录，选中按delete或backspace删除)")
+        )
         self.login_user_list = login_user_list = QListWidget()
         login_user_list.itemDoubleClicked.connect(self.login_list_item_double_clicked)
         login_user_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
@@ -1008,8 +1010,14 @@ class LoginWindow(QMainWindow):
         server_layout.addWidget(
             QLabel("----------------------------------------------")
         )
-        server_layout.addWidget(QLabel("浏览器访问bwnotfound.com即可配置云端助手一键挂机"))
-        server_layout.addWidget(QLabel('导出的用户配置文件在点击导出后存放在助手文件夹下的"导出的用户数据"中'))
+        server_layout.addWidget(
+            QLabel("浏览器访问bwnotfound.com即可配置云端助手一键挂机")
+        )
+        server_layout.addWidget(
+            QLabel(
+                '导出的用户配置文件在点击导出后存放在助手文件夹下的"导出的用户数据"中'
+            )
+        )
         server_layout.addWidget(QLabel("注意：载入用户配置不会覆盖已有用户配置"))
 
         server_op_btn_layout = QHBoxLayout()
@@ -1340,7 +1348,9 @@ def get_usersettings(cfg: Config, logger: IOLogger, setting_dir):
 
 if __name__ == "__main__":
     # 设置logging监听等级为INFO
-    logging.basicConfig(level=logging.INFO)  # 如果不想让控制台输出那么多信息，可以将这一行注释掉
+    logging.basicConfig(
+        level=logging.INFO
+    )  # 如果不想让控制台输出那么多信息，可以将这一行注释掉
     # 取root_dir为可执行文件的目录
     root_dir = os.getcwd()
     data_dir = os.path.join(root_dir, "data")

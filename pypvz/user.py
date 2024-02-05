@@ -72,8 +72,11 @@ class User:
         cnt, max_retry = 0, 15
         while cnt < max_retry:
             try:
-                resp = self.wr.get_retry("/pvz/index.php/default/user/sig/0", "刷新用户信息")
+                resp = self.wr.get_retry(
+                    "/pvz/index.php/default/user/sig/0", "刷新用户信息"
+                )
                 root = fromstring(resp.decode("utf-8"))
+                assert root.find("response").find("status").text == "success"
                 break
             except Exception as e:
                 cnt += 1
@@ -112,9 +115,15 @@ class User:
         body = [float(1), float(3), float(1), []]
         while True:
             response = self.wr.amf_post_retry(
-                body, "api.garden.challenge", '/pvz/amf/', '切换VIP外显', except_retry=True
+                body,
+                "api.garden.challenge",
+                '/pvz/amf/',
+                '切换VIP外显',
+                except_retry=True,
             )
-            assert response.status == 1, "切换VIP外显失败，返回内容：{}".format(response.body)
+            assert response.status == 1, "切换VIP外显失败，返回内容：{}".format(
+                response.body
+            )
             resp_text = response.body.description
             if logger is not None:
                 logger.log(resp_text)

@@ -490,7 +490,9 @@ class HeritageWindow(QMainWindow):
             if plant is None:
                 self.heritage_from_plant_attribute_list.setPlainText("")
                 self.id1 = None
-                self.usersettings.logger.log("仓库里没有id为{}的植物，可能已被删除".format(self.id1))
+                self.usersettings.logger.log(
+                    "仓库里没有id为{}的植物，可能已被删除".format(self.id1)
+                )
             else:
                 message = self.format_plant_info(plant) + "\n"
                 for k, v in self.heritage_man.heritage_attribute_dict.items():
@@ -503,7 +505,9 @@ class HeritageWindow(QMainWindow):
             if plant is None:
                 self.heritage_to_plant_attribute_list.setPlainText("")
                 self.id2 = None
-                self.usersettings.logger.log("仓库里没有id为{}的植物，可能已被删除".format(self.id2))
+                self.usersettings.logger.log(
+                    "仓库里没有id为{}的植物，可能已被删除".format(self.id2)
+                )
             else:
                 message = self.format_plant_info(plant) + "\n"
                 for k, v in self.heritage_man.heritage_attribute_dict.items():
@@ -558,7 +562,9 @@ class HeritageWindow(QMainWindow):
             if not result["success"]:
                 self.usersettings.logger.log(result["result"])
         except Exception as e:
-            self.usersettings.logger.log("传承失败，异常种类：{}".format(type(e).__name__))
+            self.usersettings.logger.log(
+                "传承失败，异常种类：{}".format(type(e).__name__)
+            )
             return
         finally:
             self.usersettings.repo.refresh_repository()
@@ -609,9 +615,6 @@ class HeritageWindow(QMainWindow):
             self.reinforce_number_box.setCurrentIndex(
                 self.heritage_man.reinforce_number_index
             )
-
-
-
 
 
 class ImageWindow(QMainWindow):

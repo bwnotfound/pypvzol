@@ -221,7 +221,9 @@ class OpenBox(Pipeline):
         if tool is None:
             return {
                 "success": False,
-                "info": "使用{}失败，原因：{}不存在".format(self.box_name, self.box_name),
+                "info": "使用{}失败，原因：{}不存在".format(
+                    self.box_name, self.box_name
+                ),
             }
         if tool['amount'] < self.amount:
             return {
@@ -469,7 +471,9 @@ class UpgradeQuality(Pipeline):
             if repo_plant.quality_index < self.target_quality_index:
                 return {
                     "success": False,
-                    "info": "刷品失败，原因：植物{}品质不达标".format(plant.name(self.lib)),
+                    "info": "刷品失败，原因：植物{}品质不达标".format(
+                        plant.name(self.lib)
+                    ),
                 }
         return {
             "success": True,
@@ -944,7 +948,9 @@ class PipelineScheme:
             self.repo.refresh_repository()
             result = self.check_requirements()
             if len(result) > 0:
-                self.logger.log(f"检测到第{cnt}次全自动缺失以下物品：\n" + '\n'.join(result))
+                self.logger.log(
+                    f"检测到第{cnt}次全自动缺失以下物品：\n" + '\n'.join(result)
+                )
                 return
             result = self.pipeline1[self.pipeline1_choice_index].run(stop_channel)
             if stop_channel.qsize() != 0:

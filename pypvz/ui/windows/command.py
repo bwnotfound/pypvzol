@@ -52,7 +52,17 @@ class CommandSettingWindow(QMainWindow):
         layout.addWidget(QLabel("宝石种类:"))
         self.crystal_type_combobox = QComboBox()
         self.crystal_type_combobox.addItems(
-            ["红宝石", "蓝宝石", "烟晶石", "白宝石", "绿宝石", "日光石", "黑曜石", "紫晶石", "天河石"]
+            [
+                "红宝石",
+                "蓝宝石",
+                "烟晶石",
+                "白宝石",
+                "绿宝石",
+                "日光石",
+                "黑曜石",
+                "紫晶石",
+                "天河石",
+            ]
         )
         self.crystal_type_combobox.setCurrentIndex(5)
         layout.addWidget(self.crystal_type_combobox)

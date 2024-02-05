@@ -57,7 +57,9 @@ class RecoverMan:
                     logging.warning("回复植物血量失败: {}".format(result["result"]))
                     fail_num += 1
             except Exception as e:
-                logging.warning("回复植物血量异常，异常信息：{}:{}".format(type(e).__name__, str(e)))
+                logging.warning(
+                    "回复植物血量异常，异常信息：{}:{}".format(type(e).__name__, str(e))
+                )
                 fail_num += 1
         return success_num, fail_num
 

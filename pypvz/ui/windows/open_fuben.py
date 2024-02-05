@@ -596,7 +596,9 @@ class StoneChallengeThread(Thread):
             success_num_all += success_num
             if fail_num == 0:
                 break
-            self.logger.log("尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num))
+            self.logger.log(
+                "尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num)
+            )
             self.repo.refresh_repository(logger=self.logger)
             cnt += 1
         else:

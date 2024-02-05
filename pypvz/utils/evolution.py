@@ -35,7 +35,9 @@ class EvolutionPathItem:
         self.choice = choice
         return {
             "success": True,
-            "result": "加入进化路线成功： {}->{}".format(self.start_plant.name, next_plant.name),
+            "result": "加入进化路线成功： {}->{}".format(
+                self.start_plant.name, next_plant.name
+            ),
             "target_pid": self.evolution_path["target_id"],
         }
 

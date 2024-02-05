@@ -15,8 +15,12 @@ class Config:
             raise TypeError('config_path must be str or dict')
 
         def error(msg):
-            logging.error(f"config.json中缺少{msg}字段。请删除对应登录账号并重新登录，账号数据并不会丢失")
-            raise KeyError(f'config.json中缺少{msg}字段。请删除对应登录账号并重新登录，账号数据并不会丢失')
+            logging.error(
+                f"config.json中缺少{msg}字段。请删除对应登录账号并重新登录，账号数据并不会丢失"
+            )
+            raise KeyError(
+                f'config.json中缺少{msg}字段。请删除对应登录账号并重新登录，账号数据并不会丢失'
+            )
 
         if 'cookie' not in self.config:
             error("cookie")
