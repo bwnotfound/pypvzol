@@ -51,15 +51,17 @@ class Cave:
         if self.type <= 3:
             assert user_id is not None and garden_layer is not None
             if self.type == 1:
-                offset = 9 * 3
+                garden_layer_offset = 9 * 3
+                layer_offset = 9
             else:
-                offset = 12 * 4
+                garden_layer_offset = 12 * 4
+                layer_offset = 12
             return (
                 user_id * 1000
                 + [1, 6, 3][self.type - 1] * 100
-                + (self.layer - 1) * 12
+                + (self.layer - 1) * layer_offset
                 + self.number
-                + (garden_layer - 1) * offset
+                + (garden_layer - 1) * garden_layer_offset
             )
         elif self.type == 4:
             return self.layer * 100 + self.number
