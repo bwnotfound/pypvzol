@@ -788,13 +788,7 @@ class CustomMainWindow(QMainWindow):
     def refresh_user_info(self, refresh_all=False):
         delete_layout_children(self.user_info_1)
         delete_layout_children(self.user_info_2)
-        self.user_info_1.addWidget(QLabel(f"{self.usersettings.user.name}"))
-        self.user_info_1.addWidget(QLabel(f"等级: {self.usersettings.user.grade}"))
-        self.user_info_1.addWidget(
-            QLabel(
-                f"经验值: {self.usersettings.user.exp_now}/{self.usersettings.user.exp_max}"
-            )
-        )
+        
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             futures = []
             futures.append(
@@ -812,6 +806,14 @@ class CustomMainWindow(QMainWindow):
                 )
                 futures.append(executor.submit(self.usersettings.user.refresh()))
         concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
+        
+        self.user_info_1.addWidget(QLabel(f"{self.usersettings.user.name}"))
+        self.user_info_1.addWidget(QLabel(f"等级: {self.usersettings.user.grade}"))
+        self.user_info_1.addWidget(
+            QLabel(
+                f"经验值: {self.usersettings.user.exp_now}/{self.usersettings.user.exp_max}"
+            )
+        )
         self.user_info_2.addWidget(
             QLabel(
                 f"今日经验: {self.usersettings.user.today_exp} / {self.usersettings.user.today_exp_max}"
