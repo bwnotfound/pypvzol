@@ -159,7 +159,7 @@ class AssistantManager:
             # self.logger.warning(e)
             return None
 
-    def run_user(self, account: AssistantAccount):
+    def run_user(self, account: AssistantAccount, settings=None):
         usersettings = self.get_usersettings_from_bytes(
             account.data, account_id=account.id
         )
@@ -167,6 +167,9 @@ class AssistantManager:
             self.logger.warning("Account数据为空")
             return
         usersettings.exit_if_nothing_todo = True
+        if settings is not None:
+            if "serverbattle_all" in settings and settings["serverbattle_all"]:
+                usersettings.serverbattle_man.rest_challenge_num_limit = 0
         usersettings._start(account.usersettings_stop_channel)
 
     def get_user_extra_data(self, data: bytes):
@@ -203,7 +206,7 @@ class AssistantManager:
             result.append({"logName": os.path.basename(log_path), "content": s})
         return {"code": 0, "message": "所有日志读取成功", "result": result}
 
-    def _run_one_cycle(self):
+    def _run_one_cycle(self, settings):
         if self.stop_circle_event.is_set():
             return
         future_list = []
@@ -238,6 +241,7 @@ class AssistantManager:
                         executor.submit(
                             self.run_user,
                             account,
+                            settings,
                         ),
                         account.id,
                     )
@@ -303,11 +307,11 @@ class AssistantManager:
                 break
             time.sleep(2)
 
-    def run_one_cycle(self):
+    def run_one_cycle(self, settings):
         if self.run_circle_thread is not None:
             return None
         self.stop_circle_event.clear()
-        self.run_circle_thread = Thread(target=self._run_one_cycle)
+        self.run_circle_thread = Thread(target=self._run_one_cycle, args=(settings,))
         self.run_circle_thread.start()
         return self.run_circle_thread
 

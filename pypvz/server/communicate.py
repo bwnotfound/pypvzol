@@ -119,9 +119,7 @@ class Communicator:
 
     def reload_account_list_to_circle(self, account_map_list: list):
         account_list = list(
-            map(
-                lambda x: AssistantAccount(x.get("id"), x.get("data")), account_map_list
-            )
+            map(lambda x: AssistantAccount(x["id"], x["data"]), account_map_list)
         )
         code = self.assistant_man.circle_account_man.load_account_list(account_list)
         if code == 0:
@@ -134,9 +132,7 @@ class Communicator:
 
     def reload_account_list_to_loop(self, account_map_list: list):
         account_list = list(
-            map(
-                lambda x: AssistantAccount(x.get("id"), x.get("data")), account_map_list
-            )
+            map(lambda x: AssistantAccount(x["id"], x["data"]), account_map_list)
         )
         code = self.assistant_man.loop_account_man.load_account_list(account_list)
         if code == 0:
@@ -255,8 +251,10 @@ class Communicator:
             }
         )
 
-    def start_one_circle(self):
-        thread = self.assistant_man.run_one_cycle()
+    # settings: {"serverbattle_all": True}
+    def start_one_circle(self, settings):
+
+        thread = self.assistant_man.run_one_cycle(settings)
         if thread is None:
             return self.java_convert(
                 {
