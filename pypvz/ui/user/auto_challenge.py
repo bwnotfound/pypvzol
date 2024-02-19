@@ -52,7 +52,7 @@ class Challenge4Level:
         self.garden_layer_friend_id2cave = {} if cfg.server == "私服" else None
         self.garden_layer_caves = {} if cfg.server == "私服" else None
         self.hp_choice = "高级血瓶"
-        self.pop_after_100 = False
+        self.pop_after_100 = True
         self.pop_grade = 100
         self.auto_use_challenge_book = False
         self.normal_challenge_book_amount = 1
@@ -76,6 +76,7 @@ class Challenge4Level:
 
         self.has_challenged = False
         self.cooldown_cave_id_set = set()
+        self.stone_book_per_use = 0
 
     def add_cave(
         self,
@@ -632,6 +633,18 @@ class Challenge4Level:
                         result = self.caveMan.challenge(cave_id, team, difficulty, 4)
                         success, result = result["success"], result["result"]
                         if not success:
+                            if "挑战次数不足" in result and self.stone_book_per_use > 0:
+                                use_result = self.repo.use_item(
+                                    self.lib.name2tool["宝石挑战书"].id,
+                                    self.stone_book_per_use,
+                                    self.lib,
+                                )
+                                if use_result["success"]:
+                                    self.logger.log(use_result["result"])
+                                    continue
+                                else:
+                                    self.logger.log(use_result["result"])
+                                    return
                             message = message + "失败. 原因: {}.".format(result)
                             self.logger.log(message)
                             return
@@ -782,6 +795,7 @@ class Challenge4Level:
             "exit_no_trash_plant": self.exit_no_trash_plant,
             "show_series_success": self.show_series_success,
             "series_success_exit": self.series_success_exit,
+            "stone_book_per_use": self.stone_book_per_use,
         }
         return save_data(data, save_dir, "user_challenge4level")
 

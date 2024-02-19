@@ -329,8 +329,8 @@ class AutoChallenge(Pipeline):
         self.challenge4level.main_plant_recover = True
         self.challenge4level.disable_cave_info_fetch = True
         self.challenge4level.enable_sand = True
-        self.challenge4level.pop_after_100 = True
         self.challenge4level.exit_no_trash_plant = True
+        self.challenge4level.stone_book_per_use = 40
         self.repeat_time = 1
 
     def run(self, plant_list, stop_channel: Queue):

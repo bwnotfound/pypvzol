@@ -263,113 +263,19 @@ class AddCaveWindow(QMainWindow):
 
     def cave_list_widget_clicked(self, item: QListWidgetItem):
         cave = item.data(Qt.ItemDataRole.UserRole)
+        difficulty = self.difficulty_choice.currentIndex() + 1
         if self.cfg.server == "私服":
+            if cave.type == 4:
+                difficulty = 1
             self.challenge4Level.add_cave(
                 cave,
-                difficulty=self.difficulty_choice.currentIndex() + 1,
+                difficulty=difficulty,
                 garden_layer=self.current_garden_layer_choice.currentIndex() + 1,
                 use_sand=self.need_use_sand.isChecked(),
             )
         else:
-            self.challenge4Level.add_cave(
-                cave, difficulty=self.difficulty_choice.currentIndex() + 1
-            )
+            self.challenge4Level.add_cave(cave, difficulty=difficulty)
         self.cave_add_update.emit()
-
-
-# class ChallengeGardenCaveSetting(QMainWindow):
-#     def __init__(self, usersettings: UserSettings, parent=None):
-#         super().__init__(parent=parent)
-#         self.usersettings = usersettings
-
-#     def init_ui(self):
-#         self.setWindowTitle("挑战花园设置")
-
-#         # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
-#         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-#         self.resize(int(screen_size.width() * 0.5), int(screen_size.height() * 0.5))
-#         self.move(int(screen_size.width() * 0.25), int(screen_size.height() * 0.25))
-
-#         main_widget = QWidget()
-#         main_layout = QHBoxLayout()
-
-#         friend_list_widget = QWidget()
-#         friend_list_widget.setFixedWidth(int(self.width() * 0.35))
-#         friend_list_layout = QVBoxLayout()
-#         friend_list_layout.addWidget(QLabel("好友列表"))
-#         self.friend_list = QListWidget()
-#         self.friend_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-#         self.friend_list.itemClicked.connect(self.friend_list_selection_changed)
-#         friend_list_layout.addWidget(self.friend_list)
-#         friend_list_widget.setLayout(friend_list_layout)
-#         self.text_box = QPlainTextEdit()
-#         self.text_box.setReadOnly(True)
-#         self.text_box.setFixedWidth(int(self.width() * 0.35))
-#         friend_list_layout.addWidget(self.text_box)
-#         main_layout.addWidget(friend_list_widget)
-#         self.refresh_friend_list()
-
-#         challenge_setting_btn = QPushButton("自动挑战")
-#         challenge_setting_btn.clicked.connect(self.challenge_setting_btn_clicked)
-#         main_layout.addWidget(challenge_setting_btn)
-
-#         challenge_list_widget = QWidget()
-#         challenge_list_widget.setFixedWidth(int(self.width() * 0.35))
-#         challenge_list_layout = QVBoxLayout()
-#         challenge_list_layout.addWidget(QLabel("挑战列表"))
-#         self.challenge_list = QListWidget()
-#         self.challenge_list.setSelectionMode(
-#             QListWidget.SelectionMode.ExtendedSelection
-#         )
-#         challenge_list_layout.addWidget(self.challenge_list)
-#         challenge_list_widget.setLayout(challenge_list_layout)
-#         main_layout.addWidget(challenge_list_widget)
-#         self.refresh_challenge_list()
-
-#         main_widget.setLayout(main_layout)
-#         self.setCentralWidget(main_widget)
-
-#     def refresh_friend_list(self):
-#         self.friend_list.clear()
-#         for friend in self.usersettings.user.friendMan.friends:
-#             item = QListWidgetItem(f"{friend.name}({friend.grade})")
-#             item.setData(Qt.ItemDataRole.UserRole, friend.id)
-#             self.friend_list.addItem(item)
-
-#     def friend_list_selection_changed(self, item: QListWidgetItem):
-#         friend_id = item.data(Qt.ItemDataRole.UserRole)
-#         if not hasattr(self.usersettings.user.friendMan, "id2garden_cave"):
-#             setattr(self.usersettings.user.friendMan, "id2garden_cave", {})
-#         if friend_id not in self.usersettings.user.friendMan.id2garden_cave:
-#             self.usersettings.user.friendMan.id2garden_cave[
-#                 friend_id
-#             ] = self.usersettings.challenge4Level.caveMan.get_garden_cave(friend_id)
-#         garden_cave = self.usersettings.user.friendMan.id2garden_cave[friend_id]
-#         friend = self.usersettings.user.friendMan.id2friend[friend_id]
-#         if garden_cave is None:
-#             text = "该好友花园里暂时没有花园怪"
-#         else:
-#             text = "{}({})的花园:\n花园怪:{}\n奖励:{}".format(
-#                 friend.name,
-#                 friend.grade,
-#                 garden_cave.name,
-#                 ",".join([r.name for r in garden_cave.reward]),
-#             )
-#         self.text_box.setPlainText(text)
-
-#     def challenge_setting_btn_clicked(self):
-#         selected_friend = self.friend_list.selectedItems()
-#         selected_friend_id = [
-#             fid
-#             for fid in map(lambda x: x.data(Qt.ItemDataRole.UserRole), selected_friend)
-#             if (
-#                 self.usersettings.user.friendMan.id2garden_cave.get(fid, None)
-#                 is not None
-#             )
-#         ]
-#         if len(selected_friend_id) == 0:
-#             return
-#         garden_caves = []
 
 
 class HeritageWindow(QMainWindow):
