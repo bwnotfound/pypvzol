@@ -1190,14 +1190,16 @@ class ServerBattleMan:
                 return
             current_challenge_num = self.rest_challenge_num()
             has_exception = False
-            while True:
+            while stop_channel.qsize() == 0:
                 if current_challenge_num <= self.rest_challenge_num_limit:
-                    self.logger.log(
-                        "跨服挑战次数剩余量已达限定值：{}/{}".format(
-                            current_challenge_num, self.rest_challenge_num_limit
+                    current_challenge_num = self.rest_challenge_num()
+                    if current_challenge_num <= self.rest_challenge_num_limit:
+                        self.logger.log(
+                            "跨服挑战次数剩余量已达限定值：{}/{}".format(
+                                current_challenge_num, self.rest_challenge_num_limit
+                            )
                         )
-                    )
-                    return
+                        return
                 cnt, max_retry = 0, 10
                 empty_cnt, max_empty_retry = 0, 3
                 while cnt < max_retry:
@@ -1235,6 +1237,8 @@ class ServerBattleMan:
                     self.logger.log(result["result"])
                     if "匹配" not in result["result"]:
                         return
+                    else:
+                        continue
                 current_challenge_num -= 1
                 self.logger.log(
                     result["result"]

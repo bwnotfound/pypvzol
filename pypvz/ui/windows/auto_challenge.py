@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QSpinBox,
     QComboBox,
+    QLineEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -274,6 +275,17 @@ class Challenge4levelSettingWindow(QMainWindow):
         series_success_exit_layout.addWidget(self.series_success_exit_checkbox)
         right_panel_layout.addLayout(series_success_exit_layout)
 
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("每次自动使用宝石书数量:"))
+        self.stone_book_per_use = QLineEdit()
+        validator = QtGui.QIntValidator()
+        validator.setRange(0, 1000)
+        self.stone_book_per_use.setValidator(validator)
+        self.stone_book_per_use.setText(str(self.challenge4Level.stone_book_per_use))
+        self.stone_book_per_use.textChanged.connect(self.stone_book_per_use_textChanged)
+        layout.addWidget(self.stone_book_per_use)
+        right_panel_layout.addLayout(layout)
+
         widget2 = QWidget()
         widget2_layout = QHBoxLayout()
         widget2_layout.addWidget(QLabel("自动使用挑战书(优先高挑):"))
@@ -402,6 +414,9 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def stone_book_per_use_textChanged(self):
+        self.challenge4Level.stone_book_per_use = int(self.stone_book_per_use.text())
 
     def show_series_success_checkbox_stateChanged(self):
         self.challenge4Level.show_series_success = (
