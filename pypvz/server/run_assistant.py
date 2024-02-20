@@ -170,6 +170,10 @@ class AssistantManager:
         if settings is not None:
             if "serverbattle_all" in settings and settings["serverbattle_all"]:
                 usersettings.serverbattle_man.rest_challenge_num_limit = 0
+            if "disable_cave" in settings and settings["disable_cave"]:
+                usersettings.challenge4Level_enabled = False
+            if "disable_fuben" in settings and settings["disable_fuben"]:
+                usersettings.fuben_enabled = False
         usersettings._start(account.usersettings_stop_channel)
 
     def get_user_extra_data(self, data: bytes):
