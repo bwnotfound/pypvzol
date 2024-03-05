@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QLineEdit,
 )
-from PyQt6.QtGui import QImage, QPixmap, QTextCursor
+from PyQt6.QtGui import QImage, QPixmap, QTextCursor, QTextCharFormat, QColor
 from PyQt6.QtCore import Qt, pyqtSignal
 from PIL import Image
 
@@ -841,10 +841,25 @@ class CustomMainWindow(QMainWindow):
         document = self.text_box.document()
         # 冻结text_box显示，直到document更新完毕后更新
         self.text_box.viewport().setUpdatesEnabled(False)
-        for info in reversed(result):
-            cursor = QTextCursor(document)
+        cursor = QTextCursor(document)
+        for info_item in reversed(result):
             cursor.movePosition(QTextCursor.MoveOperation.Start)
-            cursor.insertText(info + "\n")
+            if isinstance(info_item, str):
+                cursor.insertText(info_item + "\n")
+                self.line_cnt += 1
+                continue
+            for msg, color in info_item:
+                if color is None:
+                    color = (0, 0, 0)
+                if len(color) == 3:
+                    color = color + (255,)
+                if len(color) == 4 and isinstance(color[3], float):
+                    color[3] = int(color[3] * 255)
+                qcolor = QColor(*color)
+                text_format = QTextCharFormat()
+                text_format.setForeground(qcolor)
+                cursor.insertText(msg, text_format)
+            cursor.insertText("\n")
             self.line_cnt += 1
             # self.text_box.insertPlainText(info + "\n")
         while self.line_cnt > self.usersettings.io_logger.max_info_capacity:

@@ -803,7 +803,10 @@ class PipelineScheme:
         ]
         self.pipeline1_choice_index = 0
 
-        self.pipeline2: list[Pipeline] = [AutoChallenge(cfg, lib, repo, user, logger)]
+        self.pipeline2: list[Pipeline] = [
+            AutoChallenge(cfg, lib, repo, user, logger),
+            SkipPipeline(),
+        ]
         self.pipeline2_choice_index = 0
 
         self.pipeline3: list[Pipeline] = [

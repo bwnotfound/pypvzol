@@ -1132,7 +1132,7 @@ class GardenMan:
             return False
         while True:
             failure = False
-            message = "挑战花园boss"
+            message = ["挑战花园boss"]
             cnt, max_retry = 0, 15
             while cnt < max_retry:
                 cnt += 1
@@ -1153,15 +1153,22 @@ class GardenMan:
                 continue
             if lottery_result["success"] and len(lottery_result["result"]["tools"]) > 0:
                 lottery_list = []
-                for item in lottery_result["result"]["tools"]:
+                for i, item in enumerate(lottery_result["result"]["tools"]):
                     id, amount = int(item["id"]), int(item["amount"])
                     lib_tool = self.lib.get_tool_by_id(id)
                     if lib_tool is None:
                         continue
-                    lottery_list.append("{}({})".format(lib_tool.name, amount))
-                message = message + "成功.\n\t战利品: {}".format(" ".join(lottery_list))
+                    tool_msg_list = []
+                    if i > 0:
+                        tool_msg_list.append(", ")
+                    color = (min(255, int(amount / 40)), 0, 0)
+                    tool_msg_list.extend(
+                        [f"{lib_tool.name}(", (f"{amount}", color), ")"]
+                    )
+                    lottery_list.extend(tool_msg_list)
+                message = message + ["成功.\n\t战利品: "] + lottery_list
             else:
-                message = message + "失败。没有花园挑战次数了"
+                message = message + ["失败。没有花园挑战次数了"]
                 failure = True
             self.logger.log(message)
             if stop_channel.qsize() > 0 or failure:
