@@ -13,27 +13,28 @@ from PyQt6.QtWidgets import (
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt
 
-from ...library import Library
 from ..wrapped import QLabel
-from ...shop import Shop
 from ..message import Logger
 from ...shop import PurchaseItem
+from ... import Config, Library, Shop
 
 
 class ShopAutoBuySetting(QMainWindow):
     def __init__(
         self,
+        cfg: Config,
         lib: Library,
-        shop: Shop,
         logger: Logger,
         shop_auto_buy_dict: dict[int, PurchaseItem],
+        target_mode,
         parent=None,
     ):
         super().__init__(parent=parent)
         self.lib = lib
-        self.shop = shop
+        self.shop = Shop(cfg)
         self.logger = logger
         self.shop_auto_buy_dict = shop_auto_buy_dict
+        self.target_mode = target_mode
         self.shop.refresh_shop()
         self.init_ui()
         self.refresh_auto_buy_list()
@@ -44,14 +45,14 @@ class ShopAutoBuySetting(QMainWindow):
 
         # 将窗口居中显示，宽度为显示器宽度的60%，高度为显示器高度的50%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.6), int(screen_size.height() * 0.5))
-        self.move(int(screen_size.width() * 0.2), int(screen_size.height() * 0.25))
+        self.resize(int(screen_size.width() * 0.8), int(screen_size.height() * 0.6))
+        self.move(int(screen_size.width() * 0.1), int(screen_size.height() * 0.2))
 
         main_widget = QWidget()
         main_layout = QHBoxLayout()
 
         shop_list_widget = QWidget()
-        shop_list_widget.setFixedWidth(int(self.width() * 0.5))
+        shop_list_widget.setFixedWidth(int(self.width() * 0.4))
         shop_list_layout = QVBoxLayout()
         shop_list_layout.addWidget(QLabel("商店列表"))
         self.shop_list_tab = QTabWidget()
@@ -69,29 +70,40 @@ class ShopAutoBuySetting(QMainWindow):
 
         btn_panel_widget = QWidget()
         btn_panel_layout = QVBoxLayout()
-        # buy_item_btn = QPushButton("全部购买")
-        # buy_item_btn.clicked.connect(self.buy_item_btn_clicked)
-        # btn_panel_layout.addWidget(buy_item_btn)
-        set_auto_buy_btn = QPushButton("设为自动购买")
-        set_auto_buy_btn.clicked.connect(self.set_auto_buy_btn_clicked)
-        btn_panel_layout.addWidget(set_auto_buy_btn)
+
         layout1 = QHBoxLayout()
-        layout1.addWidget(QLabel("设置购买数量:"))
         self.set_auto_buy_amount_inputbox = QLineEdit()
-        self.set_auto_buy_amount_inputbox.setText("1")
-        self.set_auto_buy_amount_inputbox.setValidator(QtGui.QIntValidator(1, 99999))
+        if not self.target_mode:
+            layout1.addWidget(QLabel("设置购买数量:"))
+            self.set_auto_buy_amount_inputbox.setText("1")
+            self.set_auto_buy_amount_inputbox.setValidator(
+                QtGui.QIntValidator(1, 99999)
+            )
+        else:
+            layout1.addWidget(QLabel("设置购买到多少为止:"))
+            self.set_auto_buy_amount_inputbox.setText("0")
+            self.set_auto_buy_amount_inputbox.setValidator(
+                QtGui.QIntValidator(0, 99999)
+            )
         layout1.addWidget(self.set_auto_buy_amount_inputbox)
         btn_panel_layout.addLayout(layout1)
 
+        set_auto_buy_btn = QPushButton("设为自动购买")
+        set_auto_buy_btn.clicked.connect(self.set_auto_buy_btn_clicked)
+        btn_panel_layout.addWidget(set_auto_buy_btn)
         self.change_auto_buy_amount_layout = QHBoxLayout()
-        self.change_auto_buy_amount_layout.addWidget(QLabel("修改购买数量:"))
         self.auto_buy_amount_inputbox = QLineEdit()
         self.auto_buy_amount_inputbox.setText("")
         self.auto_buy_amount_inputbox.setDisabled(True)
-        self.auto_buy_amount_inputbox.setValidator(QtGui.QIntValidator(1, 99999))
+        if not self.target_mode:
+            self.change_auto_buy_amount_layout.addWidget(QLabel("修改购买数量:"))
+            self.auto_buy_amount_inputbox.setValidator(QtGui.QIntValidator(1, 99999))
+        else:
+            self.change_auto_buy_amount_layout.addWidget(QLabel("修改购买到多少为止:"))
+            self.auto_buy_amount_inputbox.setValidator(QtGui.QIntValidator(0, 99999))
         self.change_auto_buy_amount_layout.addWidget(self.auto_buy_amount_inputbox)
         self.auto_buy_amount_btn = QPushButton("修改")
-        self.auto_buy_amount_btn.clicked.connect(self.auto_buy_amount_btn_clicked)
+        self.auto_buy_amount_btn.clicked.connect(self.set_auto_buy_amount_btn_clicked)
         self.auto_buy_amount_btn.setDisabled(True)
         self.change_auto_buy_amount_layout.addWidget(self.auto_buy_amount_btn)
         btn_panel_layout.addLayout(self.change_auto_buy_amount_layout)
@@ -102,7 +114,12 @@ class ShopAutoBuySetting(QMainWindow):
         auto_buy_list_widget = QWidget()
         auto_buy_list_widget.setFixedWidth(int(self.width() * 0.25))
         auto_buy_list_layout = QVBoxLayout()
-        auto_buy_list_layout.addWidget(QLabel("自动购买列表"))
+        if not self.target_mode:
+            auto_buy_list_layout.addWidget(QLabel("自动购买列表"))
+        else:
+            auto_buy_list_layout.addWidget(
+                QLabel("自动购买列表,括号内是要购买到剩多少的数量")
+            )
         self.auto_buy_list = QListWidget()
         self.auto_buy_list.itemPressed.connect(self.auto_buy_list_item_pressed)
         self.auto_buy_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
@@ -134,11 +151,14 @@ class ShopAutoBuySetting(QMainWindow):
 
     def auto_buy_list_item_pressed(self, item: QListWidgetItem):
         purchase_item = item.data(Qt.ItemDataRole.UserRole)
-        self.auto_buy_amount_inputbox.setText(str(purchase_item.amount))
+        if not self.target_mode:
+            self.auto_buy_amount_inputbox.setText(str(purchase_item.amount))
+        else:
+            self.auto_buy_amount_inputbox.setText(str(purchase_item.target_amount))
         self.auto_buy_amount_inputbox.setEnabled(True)
         self.auto_buy_amount_btn.setEnabled(True)
 
-    def auto_buy_amount_btn_clicked(self):
+    def set_auto_buy_amount_btn_clicked(self):
         selected_items = self.auto_buy_list.selectedItems()
         selected_items = [
             item.data(Qt.ItemDataRole.UserRole) for item in selected_items
@@ -149,7 +169,10 @@ class ShopAutoBuySetting(QMainWindow):
         purchase_item = selected_items[0]
         amount = self.auto_buy_amount_inputbox.text()
         amount = int(amount) if amount != "" else 1
-        self.shop_auto_buy_dict[purchase_item.good.id].amount = amount
+        if not self.target_mode:
+            self.shop_auto_buy_dict[purchase_item.good.id].amount = amount
+        else:
+            self.shop_auto_buy_dict[purchase_item.good.id].target_amount = amount
         self.refresh_auto_buy_list()
         self.auto_buy_amount_inputbox.setText("")
         self.auto_buy_amount_inputbox.setDisabled(True)
@@ -187,7 +210,10 @@ class ShopAutoBuySetting(QMainWindow):
         amount = self.set_auto_buy_amount_inputbox.text()
         amount = int(amount) if amount != "" else 1
         for good in selected_goods:
-            self.shop_auto_buy_dict[good.id] = PurchaseItem(good, amount)
+            if not self.target_mode:
+                self.shop_auto_buy_dict[good.id] = PurchaseItem(good, amount=amount)
+            else:
+                self.shop_auto_buy_dict[good.id] = PurchaseItem(good, target_amount=amount)
         self.refresh_auto_buy_list()
 
     def refresh_auto_buy_list(self):
@@ -196,12 +222,18 @@ class ShopAutoBuySetting(QMainWindow):
             good = purchase_item.good
             if good.type == "tool":
                 tool = self.lib.get_tool_by_id(good.p_id)
-                item = QListWidgetItem(f"{tool.name}({purchase_item.amount})")
+                if not self.target_mode:
+                    item = QListWidgetItem(f"{tool.name}({purchase_item.amount})")
+                else:
+                    item = QListWidgetItem(f"{tool.name}({purchase_item.target_amount})")
                 item.setData(Qt.ItemDataRole.UserRole, purchase_item)
                 self.auto_buy_list.addItem(item)
             elif good.type == "organisms":
                 plant = self.lib.get_plant_by_id(good.p_id)
-                item = QListWidgetItem(f"{plant.name}({purchase_item.amount})")
+                if not self.target_mode:
+                    item = QListWidgetItem(f"{plant.name}({purchase_item.amount})")
+                else:
+                    item = QListWidgetItem(f"{plant.name}({purchase_item.target_amount})")
                 item.setData(Qt.ItemDataRole.UserRole, purchase_item)
                 self.auto_buy_list.addItem(item)
             else:

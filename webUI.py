@@ -231,6 +231,24 @@ class SettingWindow(QMainWindow):
 
         menu_layout.addWidget(task_panel, 2, 0)
 
+        auto_shop = QWidget()
+        auto_shop_layout = QHBoxLayout()
+        self.shop_enable_checkbox = QCheckBox("每日商店购买")
+        self.shop_enable_checkbox.setFont(normal_font)
+        self.shop_enable_checkbox.setChecked(self.usersettings.shop_enabled)
+        self.shop_enable_checkbox.stateChanged.connect(
+            self.shop_enable_checkbox_stateChanged
+        )
+        auto_shop_layout.addWidget(self.shop_enable_checkbox)
+        shop_auto_buy_setting_btn = QPushButton("设置")
+        shop_auto_buy_setting_btn.clicked.connect(
+            self.shop_auto_buy_setting_btn_clicked
+        )
+        auto_shop_layout.addWidget(shop_auto_buy_setting_btn)
+        auto_shop_layout.addStretch(1)
+        auto_shop.setLayout(auto_shop_layout)
+        menu_layout.addWidget(auto_shop, 2, 1)
+
         arena_widget = QWidget()
         arena_layout = QHBoxLayout()
         self.arena_checkbox = QCheckBox("竞技场")
@@ -460,10 +478,11 @@ class SettingWindow(QMainWindow):
 
     def shop_auto_buy_setting_btn_clicked(self):
         self.shop_auto_buy_setting_window = ShopAutoBuySetting(
+            self.usersettings.cfg,
             self.usersettings.lib,
-            self.usersettings.shop,
             self.usersettings.logger,
-            self.usersettings.shop_auto_buy_dict,
+            self.usersettings.shop_man.shop_auto_buy_dict,
+            True,
             parent=self,
         )
         self.shop_auto_buy_setting_window.show()
@@ -483,10 +502,10 @@ class SettingWindow(QMainWindow):
     def active_task_checkbox_stateChanged(self):
         self.usersettings.enable_list[3] = self.active_task_checkbox.isChecked()
 
-    def auto_use_item_checkbox_stateChanged(self):
-        self.usersettings.auto_use_item_enabled = (
-            self.auto_use_item_checkbox.isChecked()
-        )
+    # def auto_use_item_checkbox_stateChanged(self):
+    #     self.usersettings.auto_use_item_enabled = (
+    #         self.auto_use_item_checkbox.isChecked()
+    #     )
 
     def challenge4level_checkbox_stateChanged(self):
         self.usersettings.challenge4Level_enabled = (

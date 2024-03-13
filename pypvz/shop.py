@@ -18,9 +18,10 @@ class Good:
 
 
 class PurchaseItem:
-    def __init__(self, good: Good, amount: int):
+    def __init__(self, good: Good, amount: int = None, target_amount: int = None):
         self.good = good
         self.amount = amount
+        self.target_amount = target_amount
 
 
 class Shop:
