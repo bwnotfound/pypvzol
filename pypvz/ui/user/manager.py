@@ -1490,8 +1490,15 @@ class ShopMan:
                     need_continue = True
 
                 if not result["success"]:
-                    self.logger.log(result["result"])
-                    return False
+                    if "今日还可购买" not in result['result']:
+                        self.logger.log(result["result"])
+                        return False
+                    self.logger.log(
+                        "自动购买商品{}失败，原因是:{}。跳过该商品购买".format(
+                            tool.name, result['result']
+                        )
+                    )
+                    continue
                 if result['tool_id'] != good.p_id:
                     real_buy_tool = self.lib.get_tool_by_id(result['tool_id'])
                     if real_buy_tool is None:
@@ -1508,7 +1515,7 @@ class ShopMan:
                             )
                         )
                     return False
-                self.logger.log("成功购买{}{}个".format(tool.name, result['amount']))
+                self.logger.log("成功购买{}{}个".format(tool.name, buy_amount))
             if not need_continue:
                 break
             self.shop.refresh_shop()

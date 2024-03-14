@@ -137,12 +137,16 @@ class ShopAutoBuySetting(QMainWindow):
         for shop_item in self.shop.shop_goods_list[shop_index]:
             if shop_item.type == "tool":
                 tool = self.lib.get_tool_by_id(shop_item.p_id)
-                item = QListWidgetItem(f"{tool.name}({shop_item.num})")
+                item = QListWidgetItem(
+                    f"{tool.name}({shop_item.num})-价格:{shop_item.price:,}"
+                )
                 item.setData(Qt.ItemDataRole.UserRole, shop_item)
                 shop_list.addItem(item)
             elif shop_item.type == "organisms":
                 plant = self.lib.get_plant_by_id(shop_item.p_id)
-                item = QListWidgetItem(f"{plant.name}({shop_item.num})")
+                item = QListWidgetItem(
+                    f"{plant.name}({shop_item.num})-价格:{shop_item.price:,}"
+                )
                 item.setData(Qt.ItemDataRole.UserRole, shop_item)
                 shop_list.addItem(item)
             else:
@@ -213,7 +217,9 @@ class ShopAutoBuySetting(QMainWindow):
             if not self.target_mode:
                 self.shop_auto_buy_dict[good.id] = PurchaseItem(good, amount=amount)
             else:
-                self.shop_auto_buy_dict[good.id] = PurchaseItem(good, target_amount=amount)
+                self.shop_auto_buy_dict[good.id] = PurchaseItem(
+                    good, target_amount=amount
+                )
         self.refresh_auto_buy_list()
 
     def refresh_auto_buy_list(self):
@@ -223,17 +229,25 @@ class ShopAutoBuySetting(QMainWindow):
             if good.type == "tool":
                 tool = self.lib.get_tool_by_id(good.p_id)
                 if not self.target_mode:
-                    item = QListWidgetItem(f"{tool.name}({purchase_item.amount})")
+                    item = QListWidgetItem(
+                        f"{tool.name}({purchase_item.amount})-价格:{good.price:,}"
+                    )
                 else:
-                    item = QListWidgetItem(f"{tool.name}({purchase_item.target_amount})")
+                    item = QListWidgetItem(
+                        f"{tool.name}({purchase_item.target_amount})-价格:{good.price:,}"
+                    )
                 item.setData(Qt.ItemDataRole.UserRole, purchase_item)
                 self.auto_buy_list.addItem(item)
             elif good.type == "organisms":
                 plant = self.lib.get_plant_by_id(good.p_id)
                 if not self.target_mode:
-                    item = QListWidgetItem(f"{plant.name}({purchase_item.amount})")
+                    item = QListWidgetItem(
+                        f"{plant.name}({purchase_item.amount})-价格:{good.price:,}"
+                    )
                 else:
-                    item = QListWidgetItem(f"{plant.name}({purchase_item.target_amount})")
+                    item = QListWidgetItem(
+                        f"{plant.name}({purchase_item.target_amount})-价格:{good.price:,}"
+                    )
                 item.setData(Qt.ItemDataRole.UserRole, purchase_item)
                 self.auto_buy_list.addItem(item)
             else:

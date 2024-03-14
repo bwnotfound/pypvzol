@@ -732,6 +732,8 @@ class Challenge4Level:
     def auto_challenge(self, stop_channel: Queue):
         # TODO: 显示功能：将process显示，可加速版
         assert self.main_plant_list is not None and self.trash_plant_list is not None
+        if self.pop_after_100:
+            self.pop_trash_plant()
         if self.enable_stone:
             self.challenge_stone_fuben(stop_channel)
         if self.cfg.server == "官服":

@@ -28,13 +28,13 @@ class Shop:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.wr = WebRequest(cfg)
-        self.type_list = [1, 2, 5, 3, 6]
+        self.type_list = [3, 6, 1, 2, 5]
         self.shop_name_list = [
+            "金券商城",
+            "VIP商城",
             "普通商店",
             "礼券商店",
             "荣誉商店",
-            "金券商城",
-            "VIP商城",
         ]
 
     def _refresh_shop(self, shop_type: int):

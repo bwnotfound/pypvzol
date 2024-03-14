@@ -18,7 +18,6 @@ from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QLabel,
     QListWidget,
     QListWidgetItem,
     QPushButton,
@@ -28,6 +27,7 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QComboBox,
     QLineEdit,
+    QFileDialog,
 )
 from PyQt6.QtGui import QImage, QPixmap, QTextCursor, QTextCharFormat, QColor
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -35,7 +35,7 @@ from PIL import Image
 
 from pypvz import WebRequest, Config, User, Repository, Library
 from pypvz.ui.message import IOLogger
-from pypvz.ui.wrapped import QLabel, normal_font
+from pypvz.ui.wrapped import QLabel
 from pypvz.ui.windows.common import (
     HeritageWindow,
 )
@@ -101,7 +101,6 @@ class SettingWindow(QMainWindow):
         challenge4level_widget = QWidget()
         challenge4level_layout = QHBoxLayout()
         self.challenge4level_checkbox = challenge4level_checkbox = QCheckBox("刷洞")
-        challenge4level_checkbox.setFont(normal_font)
         challenge4level_checkbox.setChecked(self.usersettings.challenge4Level_enabled)
         challenge4level_checkbox.stateChanged.connect(
             self.challenge4level_checkbox_stateChanged
@@ -119,7 +118,6 @@ class SettingWindow(QMainWindow):
         fuben_widget = QWidget()
         fuben_layout = QHBoxLayout()
         self.fuben_checkbox = QCheckBox("副本")
-        self.fuben_checkbox.setFont(normal_font)
         self.fuben_checkbox.setChecked(self.usersettings.fuben_enabled)
         self.fuben_checkbox.stateChanged.connect(self.fuben_checkbox_stateChanged)
         fuben_layout.addWidget(self.fuben_checkbox)
@@ -133,7 +131,6 @@ class SettingWindow(QMainWindow):
         command_widget = QWidget()
         command_layout = QHBoxLayout()
         self.command_enable_checkbox = QCheckBox("指令")
-        self.command_enable_checkbox.setFont(normal_font)
         self.command_enable_checkbox.setChecked(self.usersettings.command_enabled)
         self.command_enable_checkbox.stateChanged.connect(
             self.command_enable_checkbox_stateChanged
@@ -149,7 +146,6 @@ class SettingWindow(QMainWindow):
         # shop_enable_widget = QWidget()
         # shop_enable_layout = QHBoxLayout()
         # self.shop_enable_checkbox = shop_enable_checkbox = QCheckBox("商店购买")
-        # shop_enable_checkbox.setFont(normal_font)
         # shop_enable_checkbox.setChecked(self.usersettings.shop_enabled)
         # shop_enable_checkbox.stateChanged.connect(
         #     self.shop_enable_checkbox_stateChanged
@@ -167,7 +163,6 @@ class SettingWindow(QMainWindow):
         task_panel = QWidget()
         task_panel_layout = QVBoxLayout()
         self.task_setting_checkbox = QCheckBox("自动领取任务")
-        self.task_setting_checkbox.setFont(normal_font)
         self.task_setting_checkbox.setChecked(self.usersettings.task_enabled)
         self.task_setting_checkbox.stateChanged.connect(
             self.task_setting_checkbox_stateChanged
@@ -179,7 +174,6 @@ class SettingWindow(QMainWindow):
         main_task_widget = QWidget()
         main_task_layout = QHBoxLayout()
         self.main_task_checkbox = QCheckBox("主线")
-        self.main_task_checkbox.setFont(normal_font)
         self.main_task_checkbox.setChecked(self.usersettings.enable_list[0])
         self.main_task_checkbox.stateChanged.connect(
             self.main_task_checkbox_stateChanged
@@ -191,7 +185,6 @@ class SettingWindow(QMainWindow):
         side_task_widget = QWidget()
         side_task_layout = QHBoxLayout()
         self.side_task_checkbox = QCheckBox("支线")
-        self.side_task_checkbox.setFont(normal_font)
         self.side_task_checkbox.setChecked(self.usersettings.enable_list[1])
         self.side_task_checkbox.stateChanged.connect(
             self.side_task_checkbox_stateChanged
@@ -203,7 +196,6 @@ class SettingWindow(QMainWindow):
         daily_task_widget = QWidget()
         daily_task_layout = QHBoxLayout()
         self.daily_task_checkbox = QCheckBox("日常")
-        self.daily_task_checkbox.setFont(normal_font)
         self.daily_task_checkbox.setChecked(self.usersettings.enable_list[2])
         self.daily_task_checkbox.stateChanged.connect(
             self.daily_task_checkbox_stateChanged
@@ -215,7 +207,6 @@ class SettingWindow(QMainWindow):
         active_task_widget = QWidget()
         active_task_layout = QHBoxLayout()
         self.active_task_checkbox = QCheckBox("活动")
-        self.active_task_checkbox.setFont(normal_font)
         self.active_task_checkbox.setChecked(self.usersettings.enable_list[3])
         self.active_task_checkbox.stateChanged.connect(
             self.active_task_checkbox_stateChanged
@@ -234,7 +225,6 @@ class SettingWindow(QMainWindow):
         auto_shop = QWidget()
         auto_shop_layout = QHBoxLayout()
         self.shop_enable_checkbox = QCheckBox("每日商店购买")
-        self.shop_enable_checkbox.setFont(normal_font)
         self.shop_enable_checkbox.setChecked(self.usersettings.shop_enabled)
         self.shop_enable_checkbox.stateChanged.connect(
             self.shop_enable_checkbox_stateChanged
@@ -252,7 +242,6 @@ class SettingWindow(QMainWindow):
         arena_widget = QWidget()
         arena_layout = QHBoxLayout()
         self.arena_checkbox = QCheckBox("竞技场")
-        self.arena_checkbox.setFont(normal_font)
         self.arena_checkbox.setChecked(self.usersettings.arena_enabled)
         self.arena_checkbox.stateChanged.connect(self.arena_checkbox_stateChanged)
         arena_layout.addWidget(self.arena_checkbox)
@@ -274,7 +263,6 @@ class SettingWindow(QMainWindow):
         serverbattle_layout = QVBoxLayout()
         layout1 = QHBoxLayout()
         self.serverbattle_checkbox = QCheckBox("跨服战")
-        self.serverbattle_checkbox.setFont(normal_font)
         self.serverbattle_checkbox.setChecked(self.usersettings.serverbattle_enabled)
         self.serverbattle_checkbox.stateChanged.connect(
             self.serverbattle_checkbox_stateChanged
@@ -299,7 +287,6 @@ class SettingWindow(QMainWindow):
         daily_widget = QWidget()
         daily_layout = QHBoxLayout()
         self.daily_checkbox = QCheckBox("每日日常")
-        self.daily_checkbox.setFont(normal_font)
         self.daily_checkbox.setChecked(self.usersettings.daily_enabled)
         self.daily_checkbox.stateChanged.connect(self.daily_checkbox_stateChanged)
         daily_layout.addWidget(self.daily_checkbox)
@@ -312,7 +299,6 @@ class SettingWindow(QMainWindow):
         territory_widget = QWidget()
         territory_layout = QHBoxLayout()
         self.territory_checkbox = QCheckBox("领地")
-        self.territory_checkbox.setFont(normal_font)
         self.territory_checkbox.setChecked(self.usersettings.territory_enabled)
         self.territory_checkbox.stateChanged.connect(
             self.territory_checkbox_stateChanged
@@ -328,14 +314,12 @@ class SettingWindow(QMainWindow):
         menu_layout.addWidget(territory_widget, 5, 0)
 
         # self.garden_checkbox = QCheckBox("自动花园boss")
-        # self.garden_checkbox.setFont(normal_font)
         # self.garden_checkbox.setChecked(self.usersettings.garden_enabled)
         # self.garden_checkbox.stateChanged.connect(self.garden_checkbox_stateChanged)
         # menu_layout.addWidget(self.garden_checkbox, 5, 1)
         garden_widget = QWidget()
         garden_layout = QHBoxLayout()
         self.garden_checkbox = QCheckBox("自动花园boss")
-        self.garden_checkbox.setFont(normal_font)
         self.garden_checkbox.setChecked(self.usersettings.garden_enabled)
         self.garden_checkbox.stateChanged.connect(self.garden_checkbox_stateChanged)
         garden_layout.addWidget(self.garden_checkbox)
@@ -387,7 +371,6 @@ class SettingWindow(QMainWindow):
         menu_layout.addWidget(millsecond_delay_widget, 8, 0)
 
         self.close_if_nothing_todo_checkbox = QCheckBox("无事可做时关闭用户")
-        self.close_if_nothing_todo_checkbox.setFont(normal_font)
         self.close_if_nothing_todo_checkbox.setChecked(
             self.usersettings.exit_if_nothing_todo
         )
@@ -966,13 +949,22 @@ class LoginWindow(QMainWindow):
     def init_ui(self):
         self.setWindowTitle("登录")
 
-        # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的60%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.3), int(screen_size.height() * 0.6))
-        self.move(int(screen_size.width() * 0.35), int(screen_size.height() * 0.17))
+        self.resize(int(screen_size.width() * 0.3), int(screen_size.height() * 0.7))
+        self.move(int(screen_size.width() * 0.35), int(screen_size.height() * 0.13))
 
         main_widget = QWidget()
         main_layout = QVBoxLayout()
+        
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("当前版本: pre27"))
+        self.import_data_from_old_version_btn = QPushButton("从旧版本导入数据")
+        self.import_data_from_old_version_btn.clicked.connect(
+            self.import_data_from_old_version_btn_clicked
+        )
+        layout.addWidget(self.import_data_from_old_version_btn)
+        layout.addStretch(1)
+        main_layout.addLayout(layout)
 
         login_user_widget = QWidget()
         login_user_layout = QVBoxLayout()
@@ -1025,13 +1017,18 @@ class LoginWindow(QMainWindow):
         region_widget.setLayout(region_layout)
         main_layout.addWidget(region_widget)
 
+        layout = QHBoxLayout()
         cookie_widget = QWidget()
         cookie_layout = QHBoxLayout()
         cookie_layout.addWidget(QLabel("Cookie:"))
         self.cookie_input = cookie_input = QLineEdit()
         cookie_layout.addWidget(cookie_input)
         cookie_widget.setLayout(cookie_layout)
-        main_layout.addWidget(cookie_widget)
+        layout.addWidget(cookie_widget)
+        self.import_cookie_btn = QPushButton("从文件导入")
+        self.import_cookie_btn.clicked.connect(self.import_cookie_btn_clicked)
+        layout.addWidget(self.import_cookie_btn)
+        main_layout.addLayout(layout)
 
         login_btn = QPushButton("登录")
         login_btn.clicked.connect(self.login_btn_clicked)
@@ -1071,6 +1068,59 @@ class LoginWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def import_cookie_btn_clicked(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择cookie文件",
+            os.path.join(os.path.expanduser("~"), "Desktop"),
+            "All Files (*)",
+        )
+        if file_path is None or len(file_path) == 0:
+            return
+        if file_path and os.path.exists(file_path):
+            with open(file_path, "r", encoding="utf-8") as f:
+                cookie = f.read()
+            cookie = self.filter_cookie(cookie)
+            self.cookie_input.setText(cookie)
+
+    def import_data_from_old_version_btn_clicked(self):
+        # 唤起文件浏览器，让用户选中一个文件夹，默认位置为桌面
+        import shutil
+
+        root_dir = os.getcwd()
+        old_version_data_dir = QFileDialog.getExistingDirectory(
+            self,
+            "选择旧版本数据文件夹",
+            os.path.join(os.path.expanduser("~"), "Desktop"),
+        )
+        if old_version_data_dir is None or len(old_version_data_dir) == 0:
+            return
+        file_name_list = os.listdir(old_version_data_dir)
+        if "data" in file_name_list:
+            old_version_data_dir = os.path.join(old_version_data_dir, "data")
+        else:
+            if os.path.basename(old_version_data_dir) != "data":
+                logging.warning("未找到data文件夹")
+                return
+        file_name_list = os.listdir(old_version_data_dir)
+        if "config" in file_name_list:
+            shutil.copytree(
+                os.path.join(old_version_data_dir, "config"),
+                os.path.join(root_dir, "data/config"),
+                dirs_exist_ok=True,
+            )
+        if "user" in file_name_list:
+            shutil.copytree(
+                os.path.join(old_version_data_dir, "user"),
+                os.path.join(root_dir, "data/user"),
+                dirs_exist_ok=True,
+            )
+        self.cfg_path = os.path.join(root_dir, "data/config/config.json")
+        if os.path.exists(self.cfg_path):
+            with open(self.cfg_path, "r", encoding="utf-8") as f:
+                self.configs = json.load(f)
+        self.refresh_login_user_list()
 
     def export_usersettings_config_btn_clicked(self):
         cfg_indices = [
@@ -1206,10 +1256,41 @@ class LoginWindow(QMainWindow):
         for main_window in copy_list:
             main_window.close()
 
+    def filter_cookie(self, cookie):
+        if cookie is None or len(cookie) == 0:
+            return ""
+        if cookie[0] == '"' and cookie[-1] == '"':
+            cookie = cookie[1:]
+        if cookie[0] == "'" and cookie[-1] == "'":
+            cookie = cookie[:-1]
+        if len(cookie) < 1000:
+            if "pvzol" in cookie:
+                cookie = cookie[cookie.find("pvzol") + len("pvzol=") :]
+            if "=" in cookie:
+                cookie = cookie[cookie.find("=") + 1 :]
+            if "<" in cookie:
+                cookie = cookie[: cookie.find("<")]
+        else:
+            cookie = cookie[cookie.find("UserCookies") + len("UserCookies>pvzol=") :]
+            cookie = cookie[: cookie.find("<")]
+        if len(cookie) == 0:
+            return cookie
+        cookie = "pvzol=" + cookie
+        return cookie
+
     def login_btn_clicked(self):
         # 取出当前选中的用户
         username = self.username_input.text()
         region_text = self.region_input.currentText()
+        cookie = self.cookie_input.text()
+        cookie = self.filter_cookie(cookie)
+        self.cookie_input.setText(cookie)
+        if len(username) == 0:
+            logging.warning("请先输入用户名")
+            return
+        if len(cookie) == 0:
+            logging.warning("请输入cookie或从cookie文件导入")
+            return
         if region_text == "测试服":
             region = 1
         else:
@@ -1225,11 +1306,6 @@ class LoginWindow(QMainWindow):
             server = "私服"
         else:
             raise ValueError(f"Unknown region text: {region_text}")
-        cookie = self.cookie_input.text()
-        if (cookie[0] == '"' and cookie[-1] == '"') or (
-            cookie[0] == "'" and cookie[-1] == "'"
-        ):
-            cookie = cookie[1:-1]
         cfg = {
             "username": username,
             "host": host,
