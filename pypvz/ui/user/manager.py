@@ -1490,7 +1490,10 @@ class ShopMan:
                     need_continue = True
 
                 if not result["success"]:
-                    if "今日还可购买" not in result['result']:
+                    if not (
+                        "今日还可购买" in result['result']
+                        or "道具异常" in result['result']
+                    ):
                         self.logger.log(result["result"])
                         return False
                     self.logger.log(
