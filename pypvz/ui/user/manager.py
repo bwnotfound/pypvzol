@@ -1460,8 +1460,10 @@ class ShopMan:
 
     def auto_buy(self, stop_channel: Queue):
         self.shop.refresh_shop()
+        continue_max_retry = 20
         while stop_channel.qsize() == 0:
             need_continue = False
+            success_buy = False
             for item_id, purchase_item in self.shop_auto_buy_dict.items():
                 if stop_channel.qsize() > 0:
                     return False
@@ -1519,7 +1521,12 @@ class ShopMan:
                         )
                     return False
                 self.logger.log("成功购买{}{}个".format(tool.name, buy_amount))
-            if not need_continue:
+                success_buy = True
+            if need_continue:
+                continue_max_retry -= 1
+            if continue_max_retry <= 0:
+                need_continue = False
+            if not need_continue and not success_buy:
                 break
             self.shop.refresh_shop()
         return False
