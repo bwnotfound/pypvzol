@@ -11,3 +11,4 @@ from .upgrade import UpgradeMan, SynthesisMan, HeritageMan
 from .arena import Arena
 from .serverbattle import Serverbattle
 from .fuben import WorldFubenRequest
+from .shop import Shop

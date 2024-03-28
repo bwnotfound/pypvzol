@@ -549,10 +549,12 @@ class ImageWindow(QMainWindow):
 
 
 class RequirePermissionWindow(QMainWindow):
-    def __init__(self, msg, finish_queue):
+    def __init__(self, msg, finish_queue, yes_msg="确认", no_msg="取消"):
         super().__init__()
         self.msg = msg
         self.finish_queue = finish_queue
+        self.yes_msg = yes_msg
+        self.no_msg = no_msg
         self.init_ui()
 
     def init_ui(self):
@@ -573,10 +575,10 @@ class RequirePermissionWindow(QMainWindow):
         main_layout.addWidget(msg_label)
 
         btn_layout = QHBoxLayout()
-        accept_btn = QPushButton("确认")
+        accept_btn = QPushButton(self.yes_msg)
         accept_btn.clicked.connect(self.accept_btn_clicked)
         btn_layout.addWidget(accept_btn)
-        refuse_btn = QPushButton("取消")
+        refuse_btn = QPushButton(self.no_msg)
         refuse_btn.clicked.connect(self.refuse_btn_clicked)
         btn_layout.addWidget(refuse_btn)
         main_layout.addLayout(btn_layout)
@@ -601,10 +603,10 @@ class RequirePermissionWindow(QMainWindow):
 _permission_window = []
 
 
-def require_permission(msg):
+def require_permission(msg, yes_msg="确认", no_msg="取消"):
     global _permission_window
     finish_queue = Queue()
-    window = RequirePermissionWindow(msg, finish_queue)
+    window = RequirePermissionWindow(msg, finish_queue, yes_msg=yes_msg, no_msg=no_msg)
     window.show()
     _permission_window = [w for w in _permission_window if w.isVisible()]
     _permission_window.append(window)

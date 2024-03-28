@@ -34,8 +34,18 @@ class Logger:
             if self.extra_logger is not None:
                 self.extra_logger.info(message)
 
-    def reverse_log(self, msg: str, log_info=True):
-        message = self._log_str_format(msg)
+    def reverse_log(self, msg, log_info=True):
+        if isinstance(msg, str):
+            msg = [(msg, None)]
+        msg = [(self._log_str_format(""), None)] + msg
+        new_msg = []
+        for data in msg:
+            if not (isinstance(data, list) or isinstance(data, tuple)):
+                data = (data, None)
+            assert len(data) == 2
+            new_msg.append(data)
+        msg = new_msg
+        message = "".join([item[0] for item in msg])
         self.logger.info(message)
         if self.extra_logger is not None:
             self.extra_logger.info(message)

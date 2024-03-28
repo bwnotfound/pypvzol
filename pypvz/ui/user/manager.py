@@ -15,13 +15,14 @@ from ... import (
     WebRequest,
 )
 from ..message import Logger
-from ... import WorldFubenRequest, Serverbattle, Arena, Command
+from ... import WorldFubenRequest, Serverbattle, Arena, Command, Shop
 from ...fuben import FubenCave
 from ...utils.recover import RecoverMan
 from ..wrapped import signal_block_emit
 from ...library import attribute2plant_attribute
 from . import load_data, save_data
 from ...utils.common import format_number
+from ...shop import PurchaseItem
 
 
 class AutoSynthesisMan:
@@ -227,13 +228,7 @@ class AutoSynthesisMan:
         return save_data(data, save_dir, "user_autosynthesisman")
 
     def load(self, load_dir):
-        load_path = os.path.join(load_dir, "user_autosynthesisman")
-        if os.path.exists(load_path):
-            with open(load_path, "rb") as f:
-                d = pickle.load(f)
-            for k, v in d.items():
-                if hasattr(self, k):
-                    setattr(self, k, v)
+        load_data(load_dir, "user_autosynthesisman", self)
         self.check_data(False)
 
 
@@ -243,6 +238,7 @@ class SingleFubenCave:
         cave: FubenCave,
         layer,
         number,
+        use_book,
         use_sand=False,
         enabled=True,
         global_layer=1,
@@ -250,6 +246,7 @@ class SingleFubenCave:
         self.cave = cave
         self.layer = layer
         self.number = number
+        self.use_book = use_book
         self.use_sand = use_sand
         self.enabled = enabled
         self.global_layer = global_layer
@@ -265,6 +262,13 @@ class SingleFubenCave:
     @property
     def rest_count(self):
         return self.cave.rest_count
+
+    def __eq__(self, __value: object) -> bool:
+        return (
+            isinstance(__value, SingleFubenCave)
+            and self.cave_id == __value.cave_id
+            and self.global_layer == __value.global_layer
+        )
 
 
 class FubenMan:
@@ -285,13 +289,14 @@ class FubenMan:
         self.current_fuben_layer = None
         self.has_challenged = False
         self.use_fuben_book_enabled = False
-        self.infinit_cave_min_challenge_amount = 10
+        self.infinit_cave_min_challenge_amount = 25
 
     def add_cave(
         self,
         cave: FubenCave,
         layer,
         number,
+        use_book,
         use_sand=False,
         enabled=True,
         global_layer=1,
@@ -299,7 +304,15 @@ class FubenMan:
         for sc in self.caves:
             if cave.cave_id == sc.cave_id and global_layer == sc.global_layer:
                 return
-        sc = SingleFubenCave(cave, layer, number, use_sand, enabled, global_layer)
+        sc = SingleFubenCave(
+            cave,
+            layer,
+            number,
+            use_book,
+            use_sand=use_sand,
+            enabled=enabled,
+            global_layer=global_layer,
+        )
         self.caves.append(sc)
 
     def delete_cave(self, sc: SingleFubenCave):
@@ -312,8 +325,10 @@ class FubenMan:
             )
         )
 
-    def get_caves(self, layer):
-        return self.fuben_request.get_caves(layer, self.logger)
+    def get_caves(self, layer, return_challenge_amount=False):
+        return self.fuben_request.get_caves(
+            layer, self.logger, return_challenge_amount=return_challenge_amount
+        )
 
     def _recover(self):
         cnt, max_retry = 0, 20
@@ -461,7 +476,7 @@ class FubenMan:
                 cave = get_fuben_cave(sc.layer, sc.number)
                 if cave.rest_count == 0:
                     break
-                if not self.use_fuben_book_enabled:
+                if not (self.use_fuben_book_enabled and sc.use_book):
                     if self.challenge_amount == 0:
                         return False
                 else:
@@ -534,7 +549,9 @@ class FubenMan:
                                 "挑战副本异常，异常类型：{}".format(type(e).__name__)
                             )
                             has_failure = True
-                if self.challenge_amount == 0 and not self.use_fuben_book_enabled:
+                if self.challenge_amount == 0 and not (
+                    self.use_fuben_book_enabled and sc.use_book
+                ):
                     self.logger.log("副本挑战次数用完了")
                     return False
                 if need_exit:
@@ -585,6 +602,9 @@ class FubenMan:
             sc = self.caves[0]
             if not hasattr(sc, "global_layer") or not hasattr(sc, "cave"):
                 self.caves = []
+        for sc in self.caves:
+            if not hasattr(sc, "use_book"):
+                sc.use_book = True
 
 
 class TerritoryUser:
@@ -1132,7 +1152,7 @@ class GardenMan:
             return False
         while True:
             failure = False
-            message = "挑战花园boss"
+            message = ["挑战花园boss"]
             cnt, max_retry = 0, 15
             while cnt < max_retry:
                 cnt += 1
@@ -1153,15 +1173,22 @@ class GardenMan:
                 continue
             if lottery_result["success"] and len(lottery_result["result"]["tools"]) > 0:
                 lottery_list = []
-                for item in lottery_result["result"]["tools"]:
+                for i, item in enumerate(lottery_result["result"]["tools"]):
                     id, amount = int(item["id"]), int(item["amount"])
                     lib_tool = self.lib.get_tool_by_id(id)
                     if lib_tool is None:
                         continue
-                    lottery_list.append("{}({})".format(lib_tool.name, amount))
-                message = message + "成功.\n\t战利品: {}".format(" ".join(lottery_list))
+                    tool_msg_list = []
+                    if i > 0:
+                        tool_msg_list.append(", ")
+                    color = (min(255, int(amount / 40)), 0, 0)
+                    tool_msg_list.extend(
+                        [f"{lib_tool.name}(", (f"{amount}", color), ")"]
+                    )
+                    lottery_list.extend(tool_msg_list)
+                message = message + ["成功.\n\t战利品: "] + lottery_list
             else:
-                message = message + "失败。没有花园挑战次数了"
+                message = message + ["失败。没有花园挑战次数了"]
                 failure = True
             self.logger.log(message)
             if stop_channel.qsize() > 0 or failure:
@@ -1421,3 +1448,94 @@ class SkillStoneMan:
 
     def load(self, load_dir):
         load_data(load_dir, "skill_man", self)
+
+
+class ShopMan:
+    def __init__(self, cfg: Config, lib: Library, logger: Logger):
+        self.lib = lib
+        self.cfg = cfg
+        self.logger = logger
+        self.shop = Shop(cfg)
+        self.shop_auto_buy_dict: dict[int, PurchaseItem] = {}
+
+    def auto_buy(self, stop_channel: Queue):
+        self.shop.refresh_shop()
+        continue_max_retry = 20
+        while stop_channel.qsize() == 0:
+            need_continue = False
+            success_buy = False
+            for item_id, purchase_item in self.shop_auto_buy_dict.items():
+                if stop_channel.qsize() > 0:
+                    return False
+                if purchase_item.target_amount is None:
+                    raise ValueError('"购买至目标数量"不能为空')
+                if item_id not in self.shop.good_id2good:
+                    continue
+                good = self.shop.good_id2good[item_id]
+                tool = self.lib.get_tool_by_id(good.p_id)
+                if tool is None:
+                    self.logger.log(
+                        "自动购买商品{}失败，道具id:{}不存在".format(item_id, good.p_id)
+                    )
+                    return False
+                buy_amount = good.num - purchase_item.target_amount
+                if buy_amount <= 0:
+                    continue
+                try:
+                    result = self.shop.buy(item_id, buy_amount)
+                except Exception as e:
+                    self.logger.log(
+                        "自动购买商品{}异常，异常类型：{}。将在稍后重新购买".format(
+                            tool.name, type(e).__name__
+                        )
+                    )
+                    need_continue = True
+
+                if not result["success"]:
+                    if not (
+                        "今日还可购买" in result['result']
+                        or "道具异常" in result['result']
+                    ):
+                        self.logger.log(result["result"])
+                        return False
+                    self.logger.log(
+                        "自动购买商品{}失败，原因是:{}。跳过该商品购买".format(
+                            tool.name, result['result']
+                        )
+                    )
+                    continue
+                if result['tool_id'] != good.p_id:
+                    real_buy_tool = self.lib.get_tool_by_id(result['tool_id'])
+                    if real_buy_tool is None:
+                        self.logger.log(
+                            "自动购买商品{}失败，购买的道具id:{}不存在".format(
+                                tool.name, result['tool_id']
+                            )
+                        )
+                    else:
+                        self.logger.log(
+                            "自动购买商品{}失败，购买的道具实际上是:{}".format(
+                                tool.name,
+                                real_buy_tool.name,
+                            )
+                        )
+                    return False
+                self.logger.log("成功购买{}{}个".format(tool.name, buy_amount))
+                success_buy = True
+            if need_continue:
+                continue_max_retry -= 1
+            if continue_max_retry <= 0:
+                need_continue = False
+            if not need_continue and not success_buy:
+                break
+            self.shop.refresh_shop()
+        return False
+
+    def save(self, save_dir=None):
+        data = {
+            "shop_auto_buy_dict": self.shop_auto_buy_dict,
+        }
+        return save_data(data, save_dir, "auto_buy_shop")
+
+    def load(self, load_dir):
+        load_data(load_dir, "auto_buy_shop", self)

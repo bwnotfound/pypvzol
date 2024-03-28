@@ -125,7 +125,12 @@ class Purchase(Pipeline):
         from ..windows import ShopAutoBuySetting
 
         return ShopAutoBuySetting(
-            self.lib, self.shop, self.logger, self.shop_auto_buy_dict, parent=parent
+            self.lib,
+            self.shop,
+            self.logger,
+            self.shop_auto_buy_dict,
+            False,
+            parent=parent,
         )
 
     def has_setting_window(self):
@@ -801,17 +806,20 @@ class PipelineScheme:
             Purchase(cfg, lib, repo, logger),
             OpenBox(cfg, lib, repo, logger),
         ]
-        self.pipeline1_choice_index = 0
+        self.pipeline1_choice_index = 1
 
-        self.pipeline2: list[Pipeline] = [AutoChallenge(cfg, lib, repo, user, logger)]
-        self.pipeline2_choice_index = 0
+        self.pipeline2: list[Pipeline] = [
+            AutoChallenge(cfg, lib, repo, user, logger),
+            SkipPipeline(),
+        ]
+        self.pipeline2_choice_index = 1
 
         self.pipeline3: list[Pipeline] = [
             UpgradeQuality(cfg, lib, repo, logger),
             SkipPipeline(),
             AutoUpgradeQuality(cfg, lib, repo, logger),
         ]
-        self.pipeline3_choice_index = 0
+        self.pipeline3_choice_index = 2
 
         self.pipeline4: list[Pipeline] = [AutoComponent(cfg, lib, repo, logger)]
         self.pipeline4_choice_index = 0

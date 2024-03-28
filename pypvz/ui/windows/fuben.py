@@ -15,6 +15,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from ..wrapped import QLabel
 from ..user import UserSettings
 from ...utils.common import format_plant_info
+from ..windows.common import require_permission
 
 
 class FubenSelectWindow(QMainWindow):
@@ -29,7 +30,7 @@ class FubenSelectWindow(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle("练级设置")
+        self.setWindowTitle("添加副本洞口")
 
         # 将窗口居中显示，宽度为显示器宽度的30%，高度为显示器高度的50%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
@@ -118,8 +119,16 @@ class FubenSelectWindow(QMainWindow):
 
     def cave_list_widget_clicked(self, item):
         global_layer, cave, layer, number = item.data(Qt.ItemDataRole.UserRole)
+        if cave.rest_count == -1 and not require_permission(
+            f"当前添加的副本:{cave.name} 的挑战次数无限，是否设置该副本使用挑战书。",
+            yes_msg="是",
+            no_msg="否",
+        ):
+            use_book = False
+        else:
+            use_book = True
         self.usersettings.fuben_man.add_cave(
-            cave, layer, number, global_layer=global_layer
+            cave, layer, number, use_book, global_layer=global_layer
         )
         self.refresh_signal.emit()
 
@@ -131,6 +140,7 @@ class FubenSettingWindow(QMainWindow):
         super().__init__(parent=parent)
         self.usersettings = usersettings
         self.last_focus_list_widget = None
+        self.current_cave = None
         self.init_ui()
         self.refresh_cave_list()
         self.refresh_plant_list()
@@ -198,7 +208,21 @@ class FubenSettingWindow(QMainWindow):
         widget5.setMinimumWidth(int(self.width() * 0.2))
         layout5 = QVBoxLayout()
         layout5.addStretch(1)
-        self.need_recovery_checkbox = QCheckBox("是否需要恢复:")
+        layout5.addWidget(QLabel("------------洞口设置--------------"))
+        self.cave_enabled_checkbox = QCheckBox("启用当前洞口")
+        self.cave_enabled_checkbox.setDisabled(True)
+        self.cave_enabled_checkbox.stateChanged.connect(
+            self.cave_enabled_checkbox_state_changed
+        )
+        layout5.addWidget(self.cave_enabled_checkbox)
+        self.cave_book_enabled_checkbox = QCheckBox("自动使用副本书")
+        self.cave_book_enabled_checkbox.setDisabled(True)
+        self.cave_book_enabled_checkbox.stateChanged.connect(
+            self.cave_book_enabled_checkbox_state_changed
+        )
+        layout5.addWidget(self.cave_book_enabled_checkbox)
+        layout5.addWidget(QLabel("------------全局设置--------------"))
+        self.need_recovery_checkbox = QCheckBox("是否需要恢复")
         self.need_recovery_checkbox.stateChanged.connect(
             self.need_recovery_checkbox_state_changed
         )
@@ -215,7 +239,7 @@ class FubenSettingWindow(QMainWindow):
             self.usersettings.fuben_man.recover_hp_choice
         )
         layout5.addWidget(self.recovery_combo)
-        self.use_fuben_book_enabled_checkbox = QCheckBox("是否自动使用副本书:")
+        self.use_fuben_book_enabled_checkbox = QCheckBox("是否允许自动使用副本书")
         self.use_fuben_book_enabled_checkbox.setChecked(
             self.usersettings.fuben_man.use_fuben_book_enabled
         )
@@ -281,12 +305,19 @@ class FubenSettingWindow(QMainWindow):
 
     def refresh_cave_list(self):
         self.fuben_list_widget.clear()
+        flag = False
         for sc in self.usersettings.fuben_man.caves:
+            if sc == self.current_cave:
+                flag = True
             item = QListWidgetItem(
                 sc.cave.format_info(lib=self.usersettings.lib, show_reward=True)
             )
             item.setData(Qt.ItemDataRole.UserRole, sc)
             self.fuben_list_widget.addItem(item)
+        if not flag:
+            self.current_cave = None
+            self.cave_book_enabled_checkbox.setDisabled(True)
+            self.cave_enabled_checkbox.setDisabled(True)
 
     def refresh_team_list(self):
         self.team_list_widget.clear()
@@ -298,8 +329,29 @@ class FubenSettingWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, plant.id)
             self.team_list_widget.addItem(item)
 
+    def cave_book_enabled_checkbox_state_changed(self):
+        if self.current_cave is None:
+            return
+        self.current_cave.use_book = self.cave_book_enabled_checkbox.isChecked()
+
+    def cave_enabled_checkbox_state_changed(self):
+        if self.current_cave is None:
+            return
+        self.current_cave.enabled = self.cave_enabled_checkbox.isChecked()
+
     def fuben_list_widget_clicked(self):
         self.last_focus_list_widget = self.fuben_list_widget
+        item = self.fuben_list_widget.currentItem()
+        if item is None:
+            return
+        data = item.data(Qt.ItemDataRole.UserRole)
+        if data is None:
+            return
+        self.current_cave = data
+        self.cave_book_enabled_checkbox.setChecked(data.use_book)
+        self.cave_enabled_checkbox.setChecked(data.enabled)
+        self.cave_book_enabled_checkbox.setEnabled(True)
+        self.cave_enabled_checkbox.setEnabled(True)
 
     def add_fuben_button_clicked(self):
         self.fuben_select_window = FubenSelectWindow(
@@ -340,3 +392,6 @@ class FubenSettingWindow(QMainWindow):
                 ]
                 self.refresh_team_list()
                 self.refresh_plant_list()
+            self.cave_book_enabled_checkbox.setDisabled(True)
+            self.cave_enabled_checkbox.setDisabled(True)
+            self.current_cave = None

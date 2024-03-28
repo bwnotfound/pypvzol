@@ -83,6 +83,8 @@ class Repository:
                 try:
                     self._refresh_repository(logger=logger)
                     break
+                except RuntimeError as e:
+                    raise e
                 except Exception as e:
                     msg = "刷新仓库出现异常，异常类型：{}".format(type(e).__name__)
                     if logger is not None:

@@ -202,6 +202,9 @@ class AutoUseItemSettingWindow(QMainWindow):
             self.usersettings.logger.log("请选择道具或植物")
             return
         selected_data = [item.data(Qt.ItemDataRole.UserRole) for item in selected_items]
+        if len(selected_data) == 0:
+            self.usersettings.logger.log("请先选中物品")
+            return
         if cur_index == 0:
             for tool_id in selected_data:
                 repo_tool = self.usersettings.repo.get_tool(tool_id)

@@ -64,7 +64,7 @@ class Cave:
                 + (garden_layer - 1) * garden_layer_offset
             )
         elif self.type == 4:
-            return self.layer * 100 + self.number
+            return self.id
         else:
             raise NotImplementedError
 

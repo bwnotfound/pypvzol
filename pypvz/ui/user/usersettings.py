@@ -30,6 +30,7 @@ from .manager import (
     ArenaMan,
     CommandMan,
     SkillStoneMan,
+    ShopMan,
 )
 from .open_fuben import OpenFubenMan
 from .compound import AutoCompoundMan
@@ -61,8 +62,7 @@ class UserSettings:
         self.challenge4Level_enabled = False
         self.shop_enabled = False
 
-        self.shop = Shop(cfg)
-        self.shop_auto_buy_dict: dict[int, PurchaseItem] = dict()
+        self.shop_man = ShopMan(cfg, lib, self.logger)
         self.plant_evolution = PlantEvolution(cfg, repo, lib)
         self.task = Task(cfg)
         self.enable_list = [False for _ in range(4)]
@@ -100,18 +100,16 @@ class UserSettings:
         while stop_channel.qsize() == 0:
             need_continue = False
             enter_time = perf_counter()
-            # if self.shop_enabled:
-            #     try:
-            #         shop_info = self.shop.buy_list(list(self.shop_auto_buy_set), 1)
-            #         for good_p_id, amount in shop_info:
-            #             self.logger.log(
-            #                 f"购买了{amount}个{self.lib.get_tool_by_id(good_p_id).name}"
-            #             )
-            #         self.logger.log("购买完成")
-            #     except Exception as e:
-            #         self.logger.log(f"购买失败，异常种类:{type(e).__name__}。跳过购买")
-            #     if stop_channel.qsize() > 0:
-            #         break
+            if self.shop_enabled:
+                try:
+                    self.shop_man.auto_buy(stop_channel)
+                    self.logger.log("每日商店购买完成")
+                except Exception as e:
+                    self.logger.log(
+                        f"每日商店购买失败，异常种类:{type(e).__name__}过自动每日商店购买"
+                    )
+                if stop_channel.qsize() > 0:
+                    break
             if self.daily_enabled:
                 try:
                     if self.daily_settings[0]:
@@ -274,7 +272,6 @@ class UserSettings:
                 {
                     "challenge4Level_enabled": self.challenge4Level_enabled,
                     "shop_enabled": self.shop_enabled,
-                    "shop_auto_buy_dict": self.shop_auto_buy_dict,
                     "garden_cave_list": self.garden_cave_list,
                     "enable_list": self.enable_list,
                     "rest_time": self.rest_time,
@@ -308,13 +305,13 @@ class UserSettings:
         self.serverbattle_man.save(self.save_dir)
         self.command_man.save(self.save_dir)
         self.open_fuben_man.save(self.save_dir)
+        self.shop_man.save(self.save_dir)
 
     def export_data(self, save_path=None):
         data = {
             "attrs": {
                 "challenge4Level_enabled": self.challenge4Level_enabled,
                 "shop_enabled": self.shop_enabled,
-                "shop_auto_buy_dict": self.shop_auto_buy_dict,
                 "garden_cave_list": self.garden_cave_list,
                 "enable_list": self.enable_list,
                 "rest_time": self.rest_time,
@@ -340,6 +337,7 @@ class UserSettings:
                 "garden_man": self.garden_man.save(),
                 "serverbattle_man": self.serverbattle_man.save(),
                 "command_man": self.command_man.save(),
+                "shop_man": self.shop_man.save(self.save_dir),
             },
         }
         data_bin = pickle.dumps(data)
@@ -391,6 +389,7 @@ class UserSettings:
         self.serverbattle_man.load(self.save_dir)
         self.command_man.load(self.save_dir)
         self.open_fuben_man.load(self.save_dir)
+        self.shop_man.load(self.save_dir)
 
 
 # class GetUsersettings(threading.Thread):
