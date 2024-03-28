@@ -1178,19 +1178,14 @@ class GardenMan:
                     lib_tool = self.lib.get_tool_by_id(id)
                     if lib_tool is None:
                         continue
-                    tool_msg_list = []
                     if i > 0:
-                        tool_msg_list.append(", ")
-                    color = (min(255, int(amount / 40)), 0, 0)
-                    tool_msg_list.extend(
-                        [f"{lib_tool.name}(", (f"{amount}", color), ")"]
-                    )
-                    lottery_list.extend(tool_msg_list)
-                message = message + ["成功.\n\t战利品: "] + lottery_list
+                        lottery_list.append(", ")
+                    lottery_list.append(f"{lib_tool.name}({amount})")
+                message = message + ["成功. 战利品: "] + lottery_list
             else:
                 message = message + ["失败。没有花园挑战次数了"]
                 failure = True
-            self.logger.log(message)
+            self.logger.log("".join(message))
             if stop_channel.qsize() > 0 or failure:
                 return False
 
