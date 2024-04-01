@@ -62,6 +62,7 @@ from pypvz.ui.windows import (
     # run_game_window,
 )
 from pypvz.ui.windows.common import delete_layout_children
+from pypvz.web import proxy_man
 
 
 class SettingWindow(QMainWindow):
@@ -921,6 +922,186 @@ class CustomMainWindow(QMainWindow):
         return super().closeEvent(event)
 
 
+class ProxyManagerWindow(QMainWindow):
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.init_ui()
+        self.item_id = None
+
+    def init_ui(self):
+        self.setWindowTitle("代理管理面板")
+
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.5), int(screen_size.height() * 0.7))
+        self.move(int(screen_size.width() * 0.25), int(screen_size.height() * 0.13))
+
+        main_widget = QWidget()
+        main_layout = QHBoxLayout()
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("代理列表"))
+        self.proxy_list = QListWidget()
+        self.proxy_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.proxy_list.itemClicked.connect(self.proxy_list_item_clicked)
+        layout.addWidget(self.proxy_list)
+        main_layout.addLayout(layout)
+        self.refresh_proxy_list()
+
+        layout = QVBoxLayout()
+        layout.addStretch(1)
+        layout.setSpacing(10)
+
+        layout1 = QHBoxLayout()
+        layout1.addWidget(QLabel("代理地址:"))
+        self.proxy_add_input = QLineEdit()
+        layout1.addWidget(self.proxy_add_input)
+        layout.addLayout(layout1)
+
+        layout1 = QHBoxLayout()
+        layout1.addWidget(QLabel("该代理最高并发量:"))
+        self.proxy_max_use_amount = QComboBox()
+        self.proxy_max_use_amount.addItems([str(i) for i in range(101)])
+        self.proxy_max_use_amount.setCurrentText(str(3))
+        self.proxy_max_use_amount.setValidator(QtGui.QIntValidator())
+        layout1.addWidget(self.proxy_max_use_amount)
+        layout.addLayout(layout1)
+        add_proxy_btn = QPushButton("添加代理")
+        add_proxy_btn.clicked.connect(self.add_proxy)
+        layout.addWidget(add_proxy_btn)
+
+        self.block_when_no_proxy_checkbox = QCheckBox("(全局)没有可用代理时是否阻塞")
+        self.block_when_no_proxy_checkbox.setChecked(proxy_man.block_when_no_proxy)
+        self.block_when_no_proxy_checkbox.stateChanged.connect(
+            self.block_when_no_proxy_checkbox_changed
+        )
+        layout.addWidget(self.block_when_no_proxy_checkbox)
+
+        reset_btn = QPushButton("重置代理池")
+        reset_btn.clicked.connect(self.reset_btn_clicked)
+        layout.addWidget(reset_btn)
+
+        self.proxy_max_use_amount_edit = QComboBox()
+        self.proxy_max_use_amount_edit.addItems([str(i) for i in range(101)])
+        self.proxy_max_use_amount_edit.setDisabled(True)
+        layout.addWidget(self.proxy_max_use_amount_edit)
+
+        set_proxy_max_use_amount_btn = QPushButton("设置该代理最大并发量")
+        set_proxy_max_use_amount_btn.clicked.connect(
+            self.set_proxy_item_max_use_count_btn_cliked
+        )
+        layout.addWidget(set_proxy_max_use_amount_btn)
+
+        layout.addStretch(1)
+        main_layout.addLayout(layout)
+
+    def proxy_list_item_clicked(self):
+        selected_item = self.proxy_list.currentItem()
+        if selected_item is None:
+            logging.warning("未选中代理")
+            return
+        item_id = selected_item.data(Qt.ItemDataRole.UserRole)
+        item = proxy_man.get_item(item_id)
+        if item is None:
+            logging.error("选中代理解析出错，请考虑重置代理池")
+            return
+        self.item_id = item_id
+        self.proxy_max_use_amount_edit.setCurrentText(str(item.max_use_count))
+        self.proxy_max_use_amount_edit.setEnabled(True)
+
+    def block_when_no_proxy_checkbox_changed(self):
+        proxy_man.block_when_no_proxy = self.block_when_no_proxy_checkbox.isChecked()
+        proxy_man.save(proxy_man_save_path)
+
+    def refresh_proxy_list(self):
+        self.proxy_list.clear()
+        for proxy_item in proxy_man.proxy_item_list:
+            item = QListWidgetItem()
+            item.setText(str(proxy_item))
+            item.setData(Qt.ItemDataRole.UserRole, proxy_item.item_id)
+            self.proxy_list.addItem(item)
+
+    def reset_btn_clicked(self):
+        proxy_man.reset_proxy_list()
+        proxy_man.save(proxy_man_save_path)
+        self.refresh_proxy_list()
+
+    def add_proxy(self):
+        proxy_error_msg = '代理地址格式出错，应当是"ip:port"的形式，同时只支持ipv4'
+        proxy_text = self.proxy_add_input.text()
+        max_use_amount = int(self.proxy_max_use_amount.currentText())
+        splited = proxy_text.split(":")
+        if len(splited) != 2:
+            logging.error(proxy_error_msg)
+            return
+        ip, port = splited
+        try:
+            port = int(port)
+            assert port >= 0 and port < 2**16
+        except:
+            logging.error(proxy_error_msg)
+            return
+        splited = ip.split(".")
+        if len(splited) != 4:
+            logging.error(proxy_error_msg)
+            return
+        try:
+            for part in splited:
+                int_part = int(part)
+                assert int_part >= 0 and int_part < 2**8
+        except:
+            logging.error(proxy_error_msg)
+            return
+        proxy_man.add_proxy_item(proxy_text, max_use_count=max_use_amount)
+        proxy_man.save(proxy_man_save_path)
+        self.refresh_proxy_list()
+
+    def delete_proxy_item(self, item_id):
+        proxy_man.delete_proxy_item(item_id)
+        proxy_man.save(proxy_man_save_path)
+
+    def move_up(self, item_id):
+        proxy_man.move_up_item(item_id)
+        proxy_man.save(proxy_man_save_path)
+
+    def move_down(self, item_id):
+        proxy_man.move_down_item(item_id)
+        proxy_man.save(proxy_man_save_path)
+
+    def set_proxy_item_max_use_count_btn_cliked(self):
+        if self.item_id is None:
+            logging.warning("未选中代理")
+            return
+        max_use_amount = int(self.proxy_max_use_amount_edit.currentText())
+        proxy_man.set_item_max_use_count(self.item_id, max_use_count=max_use_amount)
+        proxy_man.save(proxy_man_save_path)
+        self.refresh_proxy_list()
+
+    def keyPressEvent(self, event):
+        if (
+            event.key() == Qt.Key.Key_Backspace
+            or event.key() == Qt.Key.Key_Delete
+            or event.key() == Qt.Key.Key_Up
+            or event.key() == Qt.Key.Key_Down
+        ):
+            selected_item = self.proxy_list.currentItem()
+            if selected_item is None:
+                logging.warning("未选中代理列表内容")
+                return
+            item_id = selected_item.data(Qt.ItemDataRole.UserRole)
+            if event.key() == Qt.Key.Key_Backspace or event.key() == Qt.Key.Key_Delete:
+                self.delete_proxy_item(item_id)
+                self.proxy_max_use_amount_edit.setDisabled(True)
+                self.item_id = None
+            elif event.key() == Qt.Key.Key_Up:
+                self.move_up(item_id)
+            elif event.key() == Qt.Key.Key_Down:
+                self.move_down(item_id)
+            self.refresh_proxy_list()
+
+
 class LoginWindow(QMainWindow):
     get_usersettings_finish_signal = pyqtSignal(tuple)
     get_usersettings_finish_export_signal = pyqtSignal(tuple)
@@ -955,7 +1136,7 @@ class LoginWindow(QMainWindow):
 
         main_widget = QWidget()
         main_layout = QVBoxLayout()
-        
+
         layout = QHBoxLayout()
         layout.addWidget(QLabel("当前版本: pre27"))
         self.import_data_from_old_version_btn = QPushButton("从旧版本导入数据")
@@ -997,6 +1178,12 @@ class LoginWindow(QMainWindow):
         # pack_deal_layout.addWidget(game_start_btn)
         pack_deal_widget.setLayout(pack_deal_layout)
         main_layout.addWidget(pack_deal_widget)
+
+        layout = QHBoxLayout()
+        proxy_manager_window_btn = QPushButton("代理面板")
+        proxy_manager_window_btn.clicked.connect(self.proxy_manager_window_btn_clicked)
+        layout.addWidget(proxy_manager_window_btn)
+        main_layout.addLayout(layout)
 
         username_widget = QWidget()
         username_layout = QHBoxLayout()
@@ -1068,6 +1255,10 @@ class LoginWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def proxy_manager_window_btn_clicked(self):
+        window = ProxyManagerWindow(parent=self)
+        window.show()
 
     def import_cookie_btn_clicked(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -1466,6 +1657,9 @@ if __name__ == "__main__":
     data_dir = os.path.join(root_dir, "data")
     os.makedirs(data_dir, exist_ok=True)
     os.makedirs(os.path.join(data_dir, "config"), exist_ok=True)
+
+    proxy_man_save_path = os.path.join(data_dir, "config", "proxy.bin")
+    proxy_man.load(proxy_man_save_path)
 
     try:
         app = QApplication(sys.argv)

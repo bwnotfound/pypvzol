@@ -1,5 +1,7 @@
 import requests
 import concurrent.futures
+from threading import Lock
+import pickle
 import os
 from time import sleep
 from random import sample
@@ -16,6 +18,184 @@ from .config import Config
 
 proxies = {"http": None, "https": None}
 proxies = None
+
+
+class ProxyItem:
+    def __init__(self, item_id, proxy, max_use_count=3):
+        self.item_id = item_id
+        self.proxy = proxy
+        self.use_count = 0
+        self.max_use_count = max_use_count
+
+    def _form_proxy(self):
+        if self.proxy is None:
+            return None
+        return {"http": self.proxy, "https": self.proxy}
+
+    def __str__(self):
+        if self.proxy is None:
+            return f"本地直连({self.max_use_count}并发)"
+        return f"代理地址: {str(self.proxy)}({self.max_use_count}并发)"
+
+    def __enter__(self, *args, **kwargs):
+        self.use_count += 1
+        return self._form_proxy()
+
+    def __exit__(self, *args, **kwargs):
+        self.use_count -= 1
+        pass
+
+    @staticmethod
+    def get_local_proxy():
+        return ProxyItem(-1, None)
+
+    def serialize(self):
+        return {
+            "item_id": self.item_id,
+            "proxy": self.proxy,
+            "max_use_count": self.max_use_count,
+        }
+
+    @staticmethod
+    def deserialize(data):
+        item = ProxyItem(data["item_id"], data["proxy"], data["max_use_count"])
+        return item
+
+
+class ProxyManager:
+    def __init__(self):
+        self.proxy_item_list = [ProxyItem.get_local_proxy()]
+        self.block_when_no_proxy = (
+            False  # 没有可用代理后是否阻塞，不阻塞则不使用代理直接直连
+        )
+        self._lock = Lock()
+        self.id_set = set()
+
+    def reset_proxy_list(self):
+        with self._lock:
+            self.proxy_item_list = [ProxyItem.get_local_proxy()]
+
+    def get_proxy_item(self):
+        min_use_count = 99999
+        min_index = -1
+        while True:
+            with self._lock:
+                sleep(
+                    0.001
+                )  # 避免并发分配时同时分配了同一个item，提供约3ms的时间差用于改善并发分配
+                for item in self.proxy_item_list:
+                    if (
+                        item.max_use_count is not None
+                        and item.use_count >= item.max_use_count
+                    ):
+                        continue
+                    if item.use_count < min_use_count:
+                        min_use_count = item.use_count
+                        min_index = self.proxy_item_list.index(item)
+            if min_index == -1:
+                if self.block_when_no_proxy:
+                    sleep(0.05)
+                    continue
+                return ProxyItem.get_local_proxy()
+            break
+        return self.proxy_item_list[min_index]
+
+    def _get_unique_item_id(self):
+        with self._lock:
+            for item in self.proxy_item_list:
+                self.id_set.add(item.item_id)
+            for i in range(999999):
+                if i not in self.id_set:
+                    break
+            else:
+                raise RuntimeError("无法分配item_id")
+            self.id_set.add(i)
+            return i
+
+    def get_item(self, item_id):
+        with self._lock:
+            for item in self.proxy_item_list:
+                if item.item_id == item_id:
+                    return item
+            return None
+
+    def set_item_proxy(self, item_id, proxy):
+        item = self.get_item(item_id)
+        if item is None:
+            return
+        with self._lock:
+            item.proxy = proxy
+
+    def set_item_max_use_count(self, item_id, max_use_count):
+        item = self.get_item(item_id)
+        if item is None:
+            return
+        with self._lock:
+            item.max_use_count = max_use_count
+
+    def add_proxy_item(self, proxy, max_use_count=3):
+        item_id = self._get_unique_item_id()
+        with self._lock:
+            self.proxy_item_list.append(
+                ProxyItem(item_id, proxy, max_use_count=max_use_count)
+            )
+        return item_id
+
+    def delete_proxy_item(self, item_id):
+        with self._lock:
+            for i, item in enumerate(self.proxy_item_list):
+                if item.item_id == item_id:
+                    self.proxy_item_list.pop(i)
+                    break
+
+    def move_up_item(self, item_id):
+        with self._lock:
+            for i in range(1, len(self.proxy_item_list)):
+                if i == 0:
+                    continue
+                if self.proxy_item_list[i].item_id == item_id:
+                    self.proxy_item_list[i], self.proxy_item_list[i - 1] = (
+                        self.proxy_item_list[i - 1],
+                        self.proxy_item_list[i],
+                    )
+                    return
+
+    def move_down_item(self, item_id):
+        with self._lock:
+            for i in range(len(self.proxy_item_list) - 1):
+                if i == len(self.proxy_item_list) - 1:
+                    continue
+                if self.proxy_item_list[i].item_id == item_id:
+                    self.proxy_item_list[i], self.proxy_item_list[i + 1] = (
+                        self.proxy_item_list[i + 1],
+                        self.proxy_item_list[i],
+                    )
+                    return
+
+    def save(self, save_path):
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        data = {
+            "block_when_no_proxy": self.block_when_no_proxy,
+            "proxy_item_list": [item.serialize() for item in self.proxy_item_list],
+        }
+        with open(save_path, "wb") as f:
+            f.write(pickle.dumps(data))
+
+    def load(self, load_path):
+        if not os.path.exists(load_path):
+            return
+        with open(load_path, "rb") as f:
+            data = pickle.loads(f.read())
+        with self._lock:
+            if "block_when_no_proxy" in data:
+                self.block_when_no_proxy = data["block_when_no_proxy"]
+            if "proxy_item_list" in data:
+                self.proxy_item_list = [
+                    ProxyItem.deserialize(item) for item in data["proxy_item_list"]
+                ]
+
+
+proxy_man = ProxyManager()
 
 
 class TimeCounter(object):
@@ -172,7 +352,9 @@ class WebRequest:
 
             if not use_cache:
                 with LogTimeDecorator(url):
-                    resp = self.session.get(url, **kwargs, proxies=proxies)
+                    proxy_item = proxy_man.get_proxy_item()
+                    with proxy_item as proxy:
+                        resp = self.session.get(url, **kwargs, proxies=proxy)
                 check_status(resp.status_code)
                 return resp.content
 
@@ -183,7 +365,9 @@ class WebRequest:
                     content = f.read()
             else:
                 with LogTimeDecorator(url):
-                    resp = self.session.get(url, **kwargs, proxies=proxies)
+                    proxy_item = proxy_man.get_proxy_item()
+                    with proxy_item as proxy:
+                        resp = self.session.get(url, **kwargs, proxies=proxy)
                 check_status(resp.status_code)
                 content = resp.content
                 with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
@@ -259,16 +443,20 @@ class WebRequest:
             if not use_cache:
                 if not exit_response:
                     with LogTimeDecorator(url):
-                        resp = self.session.post(url, **kwargs, proxies=proxies)
+                        proxy_item = proxy_man.get_proxy_item()
+                        with proxy_item as proxy:
+                            resp = self.session.post(url, **kwargs, proxies=proxy)
                     check_status(resp.status_code)
                     return resp.content
                 with LogTimeDecorator(url):
-                    resp = self.session.post(
-                        url,
-                        stream=True,
-                        **kwargs,
-                        proxies=proxies,
-                    )
+                    proxy_item = proxy_man.get_proxy_item()
+                    with proxy_item as proxy:
+                        resp = self.session.post(
+                            url,
+                            stream=True,
+                            **kwargs,
+                            proxies=proxy,
+                        )
                 check_status(resp.status_code)
                 for _ in resp.iter_content(chunk_size=16):
                     break
@@ -281,7 +469,9 @@ class WebRequest:
                     content = f.read()
             else:
                 with LogTimeDecorator(url):
-                    resp = self.session.post(url, **kwargs, proxies=proxies)
+                    proxy_item = proxy_man.get_proxy_item()
+                    with proxy_item as proxy:
+                        resp = self.session.post(url, **kwargs, proxies=proxy)
                 check_status(resp.status_code)
                 content = resp.content
                 with open(os.path.join(self.cache_dir, url_hash), "wb") as f:
