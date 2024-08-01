@@ -172,27 +172,27 @@ class OpenFubenWindow(QMainWindow):
 
         layout = QHBoxLayout()
         world_fuben_layout.addLayout(layout)
-        self.need_recover_checkbox = QCheckBox("需要回复")
-        self.need_recover_checkbox.setChecked(
+        self.fuben_need_recover_checkbox = QCheckBox("需要回复")
+        self.fuben_need_recover_checkbox.setChecked(
             self.usersettings.open_fuben_man.need_recover
         )
-        self.need_recover_checkbox.stateChanged.connect(
-            self.need_recover_checkbox_stateChanged
+        self.fuben_need_recover_checkbox.stateChanged.connect(
+            self.fuben_need_recover_checkbox_stateChanged
         )
-        layout.addWidget(self.need_recover_checkbox)
+        layout.addWidget(self.fuben_need_recover_checkbox)
         layout1 = QHBoxLayout()
         layout1.addStretch(1)
         # 创建正浮点数输入框，要求值在0~100之间
-        self.recover_threshold_input = QSpinBox()
-        self.recover_threshold_input.setMinimum(0)
-        self.recover_threshold_input.setMaximum(99)
-        self.recover_threshold_input.setValue(
+        self.fuben_recover_threshold_input = QSpinBox()
+        self.fuben_recover_threshold_input.setMinimum(0)
+        self.fuben_recover_threshold_input.setMaximum(99)
+        self.fuben_recover_threshold_input.setValue(
             int(self.usersettings.open_fuben_man.recover_threshold * 100)
         )
-        self.recover_threshold_input.valueChanged.connect(
-            self.recover_threshold_input_valueChanged
+        self.fuben_recover_threshold_input.valueChanged.connect(
+            self.fuben_recover_threshold_input_valueChanged
         )
-        layout1.addWidget(self.recover_threshold_input)
+        layout1.addWidget(self.fuben_recover_threshold_input)
         layout1.addWidget(QLabel("%"))
         layout1.addStretch(1)
         layout.addLayout(layout1)
@@ -244,29 +244,32 @@ class OpenFubenWindow(QMainWindow):
         stone_fuben_layout.addLayout(layout)
         layout.addWidget(QLabel("起始关:"))
         self.start_level = QComboBox()
-        self.start_level.addItems([str(i) for i in range(1, 36 + 1)])
+        self.start_level.addItems([str(i) for i in range(1, 12 * 5 + 1)])
         self.start_level.setCurrentIndex(0)
         layout.addWidget(self.start_level)
         layout.addWidget(QLabel("终点关:"))
         self.end_level = QComboBox()
-        self.end_level.addItems([str(i) for i in range(1, 36 + 1)])
+        self.end_level.addItems([str(i) for i in range(1, 12 * 5 + 1)])
         self.end_level.setCurrentIndex(0)
         layout.addWidget(self.end_level)
 
-        self.need_recover_checkbox = QCheckBox("需要回复")
-        self.need_recover_checkbox.setChecked(True)
-        layout.addWidget(self.need_recover_checkbox)
+        self.stone_need_recover_checkbox = QCheckBox("需要回复")
+        self.stone_need_recover_checkbox.setChecked(self.usersettings.open_fuben_man.need_recover)
+        self.stone_need_recover_checkbox.stateChanged.connect(
+            self.stone_need_recover_checkbox_stateChanged
+        )
+        layout.addWidget(self.stone_need_recover_checkbox)
         layout1 = QHBoxLayout()
         layout1.addStretch(1)
         # 创建正浮点数输入框，要求值在0~100之间
-        self.recover_threshold_input = QSpinBox()
-        self.recover_threshold_input.setMinimum(0)
-        self.recover_threshold_input.setMaximum(99)
-        self.recover_threshold_input.setValue(0)
-        self.recover_threshold_input.valueChanged.connect(
-            self.recover_threshold_input_valueChanged
+        self.stone_recover_threshold_input = QSpinBox()
+        self.stone_recover_threshold_input.setMinimum(0)
+        self.stone_recover_threshold_input.setMaximum(99)
+        self.stone_recover_threshold_input.setValue(0)
+        self.stone_recover_threshold_input.valueChanged.connect(
+            self.stone_recover_threshold_input_valueChanged
         )
-        layout1.addWidget(self.recover_threshold_input)
+        layout1.addWidget(self.stone_recover_threshold_input)
         layout1.addWidget(QLabel("%"))
         layout1.addStretch(1)
         layout.addLayout(layout1)
@@ -293,13 +296,29 @@ class OpenFubenWindow(QMainWindow):
             msg += " 专属:{}({}级)".format(spec_skill["name"], spec_skill['grade'])
         return msg
 
-    def need_recover_checkbox_stateChanged(self):
+    def fuben_need_recover_checkbox_stateChanged(self):
         self.usersettings.open_fuben_man.need_recover = (
-            self.need_recover_checkbox.isChecked()
+            self.fuben_need_recover_checkbox.isChecked()
+        )
+        self.stone_need_recover_checkbox.setChecked(
+            self.fuben_need_recover_checkbox.isChecked()
+        )
+    
+    def stone_need_recover_checkbox_stateChanged(self):
+        self.usersettings.open_fuben_man.need_recover = (
+            self.stone_need_recover_checkbox.isChecked()
+        )
+        self.fuben_need_recover_checkbox.setChecked(
+            self.stone_need_recover_checkbox.isChecked()
         )
 
-    def recover_threshold_input_valueChanged(self, value):
+    def fuben_recover_threshold_input_valueChanged(self, value):
         self.usersettings.open_fuben_man.recover_threshold = value / 100
+        self.stone_recover_threshold_input.setValue(value)
+    
+    def stone_recover_threshold_input_valueChanged(self, value):
+        self.usersettings.open_fuben_man.recover_threshold = value / 100
+        self.fuben_recover_threshold_input.setValue(value)
 
     def recover_choice_box_currentIndexChanged(self):
         text = self.recover_choice_box.currentText()
@@ -467,7 +486,7 @@ class OpenFubenWindow(QMainWindow):
                 self.stone_fuben_start_btn.setText("暂停")
                 recover_threshold = (
                     self.recover_threshold_input.value() / 100
-                    if self.need_recover_checkbox.isChecked()
+                    if self.fuben_need_recover_checkbox.isChecked()
                     else None
                 )
                 self.stone_fuben_run_thread = StoneChallengeThread(
