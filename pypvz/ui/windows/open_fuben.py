@@ -485,7 +485,7 @@ class OpenFubenWindow(QMainWindow):
                     return
                 self.stone_fuben_start_btn.setText("暂停")
                 recover_threshold = (
-                    self.recover_threshold_input.value() / 100
+                    self.fuben_recover_threshold_input.value() / 100
                     if self.fuben_need_recover_checkbox.isChecked()
                     else None
                 )
