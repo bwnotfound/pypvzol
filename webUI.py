@@ -930,7 +930,7 @@ class ProxyManagerWindow(QMainWindow):
         self.item_id = None
 
     def init_ui(self):
-        self.setWindowTitle("代理管理面板")
+        self.setWindowTitle("网络管理面板")
 
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
         self.resize(int(screen_size.width() * 0.5), int(screen_size.height() * 0.7))
@@ -945,7 +945,7 @@ class ProxyManagerWindow(QMainWindow):
         layout.addWidget(QLabel("代理列表"))
         self.proxy_list = QListWidget()
         self.proxy_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self.proxy_list.itemClicked.connect(self.proxy_list_item_clicked)
+        self.proxy_list.itemPressed.connect(self.proxy_list_item_clicked)
         layout.addWidget(self.proxy_list)
         main_layout.addLayout(layout)
         self.refresh_proxy_list()
@@ -953,6 +953,11 @@ class ProxyManagerWindow(QMainWindow):
         layout = QVBoxLayout()
         layout.addStretch(1)
         layout.setSpacing(10)
+        
+        self.use_dns_cache = QCheckBox("使用DNS缓存(建议开启，可能可以解决超时问题)")
+        self.use_dns_cache.setChecked(proxy_man.use_dns_cache)
+        self.use_dns_cache.stateChanged.connect(self.use_dns_cache_stateChanged)
+        layout.addWidget(self.use_dns_cache)
 
         layout1 = QHBoxLayout()
         layout1.addWidget(QLabel("代理地址:"))
@@ -972,7 +977,7 @@ class ProxyManagerWindow(QMainWindow):
         add_proxy_btn.clicked.connect(self.add_proxy)
         layout.addWidget(add_proxy_btn)
 
-        self.block_when_no_proxy_checkbox = QCheckBox("(全局)没有可用代理时是否阻塞")
+        self.block_when_no_proxy_checkbox = QCheckBox("没有空闲代理时阻塞(不阻塞则本地直连无限制并发)")
         self.block_when_no_proxy_checkbox.setChecked(proxy_man.block_when_no_proxy)
         self.block_when_no_proxy_checkbox.stateChanged.connect(
             self.block_when_no_proxy_checkbox_changed
@@ -993,9 +998,24 @@ class ProxyManagerWindow(QMainWindow):
             self.set_proxy_item_max_use_count_btn_cliked
         )
         layout.addWidget(set_proxy_max_use_amount_btn)
+        
+        warning_label = QLabel("-----使用须知-----\n"
+                               "1. 默认状态是本地直连无限制并发\n"
+                               "2. 打开DNS缓存可能可以解决ReadTimeout和ConnectError问题\n"
+                               "3. 代理池原理是均分并发\n"
+                               "4. 代理地址格式为\"ip:port\"，例如127.0.0.1:8080\n"
+                               "5. 以上设置均为全局设置")
+        layout.addWidget(warning_label)
 
         layout.addStretch(1)
         main_layout.addLayout(layout)
+    
+    def save(self):
+        proxy_man.save(proxy_man_save_path)
+
+    def use_dns_cache_stateChanged(self):
+        proxy_man.use_dns_cache = self.use_dns_cache.isChecked()
+        self.save()
 
     def proxy_list_item_clicked(self):
         selected_item = self.proxy_list.currentItem()
@@ -1013,7 +1033,7 @@ class ProxyManagerWindow(QMainWindow):
 
     def block_when_no_proxy_checkbox_changed(self):
         proxy_man.block_when_no_proxy = self.block_when_no_proxy_checkbox.isChecked()
-        proxy_man.save(proxy_man_save_path)
+        self.save()
 
     def refresh_proxy_list(self):
         self.proxy_list.clear()
@@ -1025,7 +1045,7 @@ class ProxyManagerWindow(QMainWindow):
 
     def reset_btn_clicked(self):
         proxy_man.reset_proxy_list()
-        proxy_man.save(proxy_man_save_path)
+        self.save()
         self.refresh_proxy_list()
 
     def add_proxy(self):
@@ -1055,20 +1075,20 @@ class ProxyManagerWindow(QMainWindow):
             logging.error(proxy_error_msg)
             return
         proxy_man.add_proxy_item(proxy_text, max_use_count=max_use_amount)
-        proxy_man.save(proxy_man_save_path)
+        self.save()
         self.refresh_proxy_list()
 
     def delete_proxy_item(self, item_id):
         proxy_man.delete_proxy_item(item_id)
-        proxy_man.save(proxy_man_save_path)
+        self.save()
 
     def move_up(self, item_id):
         proxy_man.move_up_item(item_id)
-        proxy_man.save(proxy_man_save_path)
+        self.save()
 
     def move_down(self, item_id):
         proxy_man.move_down_item(item_id)
-        proxy_man.save(proxy_man_save_path)
+        self.save()
 
     def set_proxy_item_max_use_count_btn_cliked(self):
         if self.item_id is None:
@@ -1076,7 +1096,7 @@ class ProxyManagerWindow(QMainWindow):
             return
         max_use_amount = int(self.proxy_max_use_amount_edit.currentText())
         proxy_man.set_item_max_use_count(self.item_id, max_use_count=max_use_amount)
-        proxy_man.save(proxy_man_save_path)
+        self.save()
         self.refresh_proxy_list()
 
     def keyPressEvent(self, event):
@@ -1138,7 +1158,7 @@ class LoginWindow(QMainWindow):
         main_layout = QVBoxLayout()
 
         layout = QHBoxLayout()
-        layout.addWidget(QLabel("当前版本: pre27"))
+        layout.addWidget(QLabel("当前版本: pre28"))
         self.import_data_from_old_version_btn = QPushButton("从旧版本导入数据")
         self.import_data_from_old_version_btn.clicked.connect(
             self.import_data_from_old_version_btn_clicked
@@ -1180,7 +1200,7 @@ class LoginWindow(QMainWindow):
         main_layout.addWidget(pack_deal_widget)
 
         layout = QHBoxLayout()
-        proxy_manager_window_btn = QPushButton("代理面板")
+        proxy_manager_window_btn = QPushButton("网络面板")
         proxy_manager_window_btn.clicked.connect(self.proxy_manager_window_btn_clicked)
         layout.addWidget(proxy_manager_window_btn)
         main_layout.addLayout(layout)
@@ -1657,9 +1677,13 @@ if __name__ == "__main__":
     data_dir = os.path.join(root_dir, "data")
     os.makedirs(data_dir, exist_ok=True)
     os.makedirs(os.path.join(data_dir, "config"), exist_ok=True)
-
     proxy_man_save_path = os.path.join(data_dir, "config", "proxy.bin")
-    proxy_man.load(proxy_man_save_path)
+    proxy_man_save_path = os.path.join(data_dir, "config", "proxy.bin")
+    if os.path.exists(proxy_man_save_path):
+        try:
+            proxy_man.load(proxy_man_save_path)
+        except Exception as e:
+            logging.warning(f"代理配置文件解析错误，Exception: {str(e)}")
 
     try:
         app = QApplication(sys.argv)

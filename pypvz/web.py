@@ -1,15 +1,16 @@
 import requests
+from requests.adapters import HTTPAdapter
+from urllib.parse import urlparse
+import dns.resolver
 import concurrent.futures
 from threading import Lock
 import pickle
 import os
-from time import sleep
 from random import sample
 from hashlib import sha256
 import shutil
-from time import perf_counter
+from time import perf_counter, sleep
 import logging
-from time import sleep
 import threading
 from queue import Queue
 from pyamf import remoting, AMF3
@@ -47,7 +48,7 @@ class ProxyItem:
 
     @staticmethod
     def get_local_proxy():
-        return ProxyItem(-1, None)
+        return ProxyItem(-1, None, max_use_count=99)
 
     def serialize(self):
         return {
@@ -62,6 +63,85 @@ class ProxyItem:
         return item
 
 
+class DNSResolveThread(threading.Thread):
+    def __init__(self, hostname, dns_cache):
+        super().__init__()
+        self.hostname = hostname
+        self.dns_cache = dns_cache
+
+    def run(self):
+        try:
+            answers = self.dns_cache.resolver.resolve(self.hostname)
+            ip_list = [i.address for i in answers]
+            # 将结果添加到缓存中
+            current_time = perf_counter()
+            self.dns_cache.cache[self.hostname] = (ip_list, current_time)
+        except Exception as e:
+            logging.error(f"Failed to resolve {self.hostname}. Exception: {str(e)}")
+            raise e
+
+
+class DNSCache:
+    def __init__(self, ttl=30):
+        self.resolver = dns.resolver.Resolver()
+        self.resolver.nameservers = [
+            "180.76.76.76",
+            "223.5.5.5",
+            "223.6.6.6",
+            "119.29.29.29",
+        ]
+        self.ttl = ttl
+        self.cache = {}
+
+    def resolve(self, hostname):
+        current_time = perf_counter()
+        # 检查缓存是否存在并且没有过期
+        if hostname in self.cache:
+            ip_list, timestamp = self.cache[hostname]
+            try:
+                ip = ip_list[0]
+            except Exception as e:
+                logging.error(
+                    f"Failed to resolve {hostname} with ip_list{ip_list}. Exception: {str(e)}"
+                )
+                raise e
+            if current_time - timestamp >= self.ttl:
+                DNSResolveThread(hostname, self).start()
+            return ip
+        else:
+            try:
+                answers = self.resolver.resolve(hostname)
+                ip_list = [i.address for i in answers]
+                # 将结果添加到缓存中
+                current_time = perf_counter()
+                self.cache[hostname] = (ip_list, current_time)
+                return self.resolve(hostname)
+            except Exception as e:
+                logging.error(f"Failed to resolve {hostname}. Exception: {str(e)}")
+                raise e
+
+
+dns_cache = DNSCache()
+dns_cache_lock = Lock()
+
+
+class DNSCacheAdapter(HTTPAdapter):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def get_connection(self, url, proxies=None):
+        # 解析主机名并使用缓存的IP地址
+        host = self.get_host(url)
+        with dns_cache_lock:
+            ip = dns_cache.resolve(host)
+        url = url.replace(host, ip)
+        return super().get_connection(url, proxies)
+
+    def get_host(self, url):
+        # 提取URL中的主机名
+        return urlparse(url).hostname
+
+
 class ProxyManager:
     def __init__(self):
         self.proxy_item_list = [ProxyItem.get_local_proxy()]
@@ -70,6 +150,10 @@ class ProxyManager:
         )
         self._lock = Lock()
         self.id_set = set()
+        self.use_dns_cache = False
+
+    def get_adapter(self):
+        return DNSCacheAdapter() if self.use_dns_cache else HTTPAdapter()
 
     def reset_proxy_list(self):
         with self._lock:
@@ -78,11 +162,10 @@ class ProxyManager:
     def get_proxy_item(self):
         min_use_count = 99999
         min_index = -1
+        if len(self.proxy_item_list) == 0:
+            raise RuntimeError("没有可用代理")
         while True:
             with self._lock:
-                sleep(
-                    0.001
-                )  # 避免并发分配时同时分配了同一个item，提供约3ms的时间差用于改善并发分配
                 for item in self.proxy_item_list:
                     if (
                         item.max_use_count is not None
@@ -96,8 +179,10 @@ class ProxyManager:
                 if self.block_when_no_proxy:
                     sleep(0.05)
                     continue
+                # logging.info("没有可用代理，使用本地直连")
                 return ProxyItem.get_local_proxy()
             break
+        # logging.info(f"使用代理: {self.proxy_item_list[min_index]}")
         return self.proxy_item_list[min_index]
 
     def _get_unique_item_id(self):
@@ -177,6 +262,7 @@ class ProxyManager:
         data = {
             "block_when_no_proxy": self.block_when_no_proxy,
             "proxy_item_list": [item.serialize() for item in self.proxy_item_list],
+            "use_dns_cache": self.use_dns_cache,
         }
         with open(save_path, "wb") as f:
             f.write(pickle.dumps(data))
@@ -193,6 +279,8 @@ class ProxyManager:
                 self.proxy_item_list = [
                     ProxyItem.deserialize(item) for item in data["proxy_item_list"]
                 ]
+            if "use_dns_cache" in data:
+                self.use_dns_cache = data["use_dns_cache"]
 
 
 proxy_man = ProxyManager()
@@ -293,16 +381,14 @@ def logTimeDecorator(log_level=logging.INFO):
     return decorator
 
 
-def async_gather(future_list):
-    pass
-
-
 class WebRequest:
     def __init__(self, cfg: Config, cache_dir=None):
         self.cfg = cfg
         self.user_agent = ""
         self.cache_dir = cache_dir
         self.session = requests.Session()
+        if proxy_man.use_dns_cache:
+            self.session.mount("http://", proxy_man.get_adapter())
 
     def init_header(self, header):
         user_agent = [

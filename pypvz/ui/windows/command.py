@@ -70,7 +70,7 @@ class CommandSettingWindow(QMainWindow):
         layout = QHBoxLayout()
         layout.addWidget(QLabel("关卡序号:"))
         self.crystal_level_combobox = QComboBox()
-        self.crystal_level_combobox.addItems([str(i) for i in range(1, 36 + 1)])
+        self.crystal_level_combobox.addItems([str(i) for i in range(1, 12 * 5 + 1)])
         self.crystal_level_combobox.setCurrentIndex(0)
         layout.addWidget(self.crystal_level_combobox)
         crystal_layout.addLayout(layout)
