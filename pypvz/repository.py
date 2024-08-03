@@ -147,6 +147,7 @@ class Repository:
         self.id2plant = {plant.id: plant for plant in self.plants}
         self.id2tool = {tool['id']: tool for tool in self.tools}
         self.organism_grid_amount = int(warehouse.get("organism_grid_amount"))
+        self.organism_grid_rest_amount = self.organism_grid_amount - len(self.plants)
 
     def hp_below(self, high, id_only=False):
         with self._lock:

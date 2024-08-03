@@ -1,6 +1,7 @@
 from os import path
 from threading import Event
 import re
+import logging
 import os
 from typing import Literal
 from xml.etree.ElementTree import fromstring
@@ -15,8 +16,12 @@ from ..repository import Repository
 class EvolutionPathItem:
     def __init__(self, start_pid, lib: Library):
         self.lib = lib
-        self.start_plant = self.lib.get_plant_by_id(start_pid)
+        if start_pid is not None:
+            self.start_plant = self.lib.get_plant_by_id(start_pid)
+        else:
+            self.start_plant = None
         self.next_plant = None
+        self.choice = None
 
     def link(self, choice: Literal[1, 2]):
         assert choice in [1, 2]
@@ -41,15 +46,29 @@ class EvolutionPathItem:
             "target_pid": self.evolution_path["target_id"],
         }
 
+    def serialize(self):
+        return {
+            "start_pid": self.start_plant.id,
+            "next_pid": self.next_plant.id if self.next_plant is not None else None,
+            "choice": self.choice,
+        }
+
+    def deserialize(self, data):
+        self.start_plant = self.lib.get_plant_by_id(data["start_pid"])
+        if data["next_pid"] is not None:
+            self.next_plant = self.lib.get_plant_by_id(data["next_pid"])
+        self.choice = data["choice"]
+
 
 class PlantEvolution:
-    def __init__(self, cfg: Config, repo: Repository, lib: Library):
+    def __init__(self, cfg: Config, repo: Repository, lib: Library, only_one=False):
         self.cfg = cfg
         self.repo = repo
         self.lib = lib
         self.wr = WebRequest(cfg)
 
         self.saved_evolution_paths: list[list[EvolutionPathItem]] = []
+        self.only_one = only_one
 
     def evolution(self, id, pathItem: EvolutionPathItem):
         url = (
@@ -90,6 +109,9 @@ class PlantEvolution:
         }
 
     def create_new_path(self, start_pid):
+        if self.only_one:
+            logging.warning("当前模式是唯一进化路径模式，已经设置了一条进化路线，请先删除当前路线再添加新路线")
+            return
         self.saved_evolution_paths.append([EvolutionPathItem(start_pid, self.lib)])
 
     def remove_path(self, index):
@@ -140,9 +162,6 @@ class PlantEvolution:
             "result": "删除了",
         }
 
-    def evolution_info(self, pid):
-        pass
-
     def plant_evolution_all(self, path_index, id, interrupt_event: Event = None):
         assert (
             path_index < len(self.saved_evolution_paths)
@@ -176,22 +195,40 @@ class PlantEvolution:
         }
 
     def load(self, save_dir):
-        save_path = os.path.join(save_dir, "evolution")
-        if not path.exists(save_path):
-            return
-        with open(save_path, "rb") as f:
-            self.saved_evolution_paths = pickle.load(f)
-        for saved_path in self.saved_evolution_paths:
-            for item in saved_path:
-                item.lib = self.lib
+        if isinstance(save_dir, str):
+            save_path = os.path.join(save_dir, "evolution")
+            if not path.exists(save_path):
+                return
+        try:
+            if isinstance(save_dir, str):
+                with open(save_path, "rb") as f:
+                    data = pickle.load(f)
+            else:
+                data = save_dir
+            self.saved_evolution_paths = [
+                [
+                    EvolutionPathItem(None, self.lib).deserialize(item_data)
+                    for item_data in item_list
+                ]
+                for item_list in data["saved_evolution_paths"]
+            ]
+            if "only_one" in data:
+                self.only_one = data["only_one"]
+        except Exception:
+            pass
 
-    def save(self, save_dir):
-        save_path = os.path.join(save_dir, "evolution")
-        for saved_path in self.saved_evolution_paths:
-            for item in saved_path:
-                item.lib = None
-        with open(save_path, "wb") as f:
-            f.write(pickle.dumps(self.saved_evolution_paths))
-        for saved_path in self.saved_evolution_paths:
-            for item in saved_path:
-                item.lib = self.lib
+    def save(self, save_dir=None):
+        if save_dir is not None:
+            save_path = os.path.join(save_dir, "evolution")
+        data = {
+            "saved_evolution_paths": [
+                [item.serialize() for item in item_list]
+                for item_list in self.saved_evolution_paths
+            ],
+            "only_one": self.only_one,
+        }
+        if save_dir is not None:
+            with open(save_path, "wb") as f:
+                f.write(pickle.dumps(data))
+        else:
+            return data

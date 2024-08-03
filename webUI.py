@@ -656,7 +656,11 @@ class FunctionPanelWindow(QMainWindow):
 
     def evolution_panel_btn_clicked(self):
         self.evolution_panel_window = EvolutionPanelWindow(
-            self.usersettings, parent=self
+            self.usersettings.repo,
+            self.usersettings.lib,
+            self.usersettings.logger,
+            self.usersettings.plant_evolution,
+            parent=self,
         )
         self.evolution_panel_window.show()
 
@@ -953,7 +957,7 @@ class ProxyManagerWindow(QMainWindow):
         layout = QVBoxLayout()
         layout.addStretch(1)
         layout.setSpacing(10)
-        
+
         self.use_dns_cache = QCheckBox("使用DNS缓存(建议开启，可能可以解决超时问题)")
         self.use_dns_cache.setChecked(proxy_man.use_dns_cache)
         self.use_dns_cache.stateChanged.connect(self.use_dns_cache_stateChanged)
@@ -977,7 +981,9 @@ class ProxyManagerWindow(QMainWindow):
         add_proxy_btn.clicked.connect(self.add_proxy)
         layout.addWidget(add_proxy_btn)
 
-        self.block_when_no_proxy_checkbox = QCheckBox("没有空闲代理时阻塞(不阻塞则本地直连无限制并发)")
+        self.block_when_no_proxy_checkbox = QCheckBox(
+            "没有空闲代理时阻塞(不阻塞则本地直连无限制并发)"
+        )
         self.block_when_no_proxy_checkbox.setChecked(proxy_man.block_when_no_proxy)
         self.block_when_no_proxy_checkbox.stateChanged.connect(
             self.block_when_no_proxy_checkbox_changed
@@ -998,18 +1004,20 @@ class ProxyManagerWindow(QMainWindow):
             self.set_proxy_item_max_use_count_btn_cliked
         )
         layout.addWidget(set_proxy_max_use_amount_btn)
-        
-        warning_label = QLabel("-----使用须知-----\n"
-                               "1. 默认状态是本地直连无限制并发\n"
-                               "2. 打开DNS缓存可能可以解决ReadTimeout和ConnectError问题\n"
-                               "3. 代理池原理是均分并发\n"
-                               "4. 代理地址格式为\"ip:port\"，例如127.0.0.1:8080\n"
-                               "5. 以上设置均为全局设置")
+
+        warning_label = QLabel(
+            "-----使用须知-----\n"
+            "1. 默认状态是本地直连无限制并发\n"
+            "2. 打开DNS缓存可能可以解决ReadTimeout和ConnectError问题\n"
+            "3. 代理池原理是均分并发\n"
+            "4. 代理地址格式为\"ip:port\"，例如127.0.0.1:8080\n"
+            "5. 以上设置均为全局设置"
+        )
         layout.addWidget(warning_label)
 
         layout.addStretch(1)
         main_layout.addLayout(layout)
-    
+
     def save(self):
         proxy_man.save(proxy_man_save_path)
 
