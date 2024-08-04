@@ -16,6 +16,7 @@ attribute2plant_attribute = {
     "HP特": "hp_max",
     "攻击特": "attack",
     "战力": "fight",
+    "速度": "speed",
 }
 talent_name_list = [
     "猛攻",
@@ -27,6 +28,17 @@ talent_name_list = [
     "破击",
     "毒雾",
     "净化",
+]
+stone_name_list = [
+    "红宝石",
+    "蓝宝石",
+    "白宝石",
+    "烟晶石",
+    "绿宝石",
+    "日光石",
+    "黑曜石",
+    "紫晶石",
+    "天河石",
 ]
 
 

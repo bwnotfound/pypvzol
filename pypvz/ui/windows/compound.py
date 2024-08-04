@@ -16,8 +16,8 @@ from PyQt6.QtWidgets import (
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ..wrapped import QLabel, WaitEventThread
-from ...utils.common import format_number, format_plant_info
+from ..wrapped import QLabel
+from ...utils.common import format_plant_info, WaitEventThread
 from ...repository import Plant
 from ...library import attribute_list, attribute2plant_attribute
 from .common import ImageWindow, require_permission

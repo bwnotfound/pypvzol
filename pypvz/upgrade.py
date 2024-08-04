@@ -233,3 +233,35 @@ class HeritageMan:
             for k, v in d.items():
                 if hasattr(self, k):
                     setattr(self, k, v)
+
+class StoneMan:
+    def __init__(self, cfg: Config):
+        self.cfg = cfg
+        self.wr = WebRequest(cfg)
+        self.pool_size = 3
+
+    def upgrade_stone(self, plant_id, stone_index):
+        '''
+        stone_index: [0,9)
+        
+        return: None代表升到10级了，道具异常表示没道具了
+        '''
+        body = [
+            float(plant_id),
+            "talent_" + str(stone_index + 1),
+        ]
+        response = self.wr.amf_post_retry(
+            body,
+            'api.apiorganism.upgradeTalent',
+            "/pvz/amf/",
+            "升级宝石",
+            allow_empty=True,
+        )
+        if response is None:
+            return response
+        if response.status == 1:
+            return {
+                "success": False,
+                "result": response.body.description,
+            }
+        return {"success": True, "result": response.body}

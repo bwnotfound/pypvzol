@@ -18,9 +18,9 @@ from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from ...library import attribute_list, attribute2plant_attribute
-from ..wrapped import QLabel, WaitEventThread
+from ..wrapped import QLabel
 from ..user import UserSettings
-from ...utils.common import format_number
+from ...utils.common import format_number, WaitEventThread
 from ...repository import Plant
 from .common import require_permission
 

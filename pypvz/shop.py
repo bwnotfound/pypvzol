@@ -89,11 +89,14 @@ class Shop:
         response = self.wr.amf_post_retry(body, "api.shop.buy", "/pvz/amf/", "购买物品")
         if response.status == 0:
             if response.body['status'] == 'success':
-                return {
-                    "success": True,
-                    "amount": int(response.body['tool']['amount']),
-                    "tool_id": int(response.body['tool']['id']),
-                }
+                if "tool" in response.body:
+                    return {
+                        "success": True,
+                        "amount": int(response.body['tool']['amount']),
+                        "tool_id": int(response.body['tool']['id']),
+                    }
+                else:
+                    return {"success": True}
             return {"success": False, "result": response.body['status']}
         else:
             return {"success": False, "result": response.body.description}

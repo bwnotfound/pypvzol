@@ -22,6 +22,7 @@ class EvolutionPathItem:
             self.start_plant = None
         self.next_plant = None
         self.choice = None
+        self.evolution_path = None
 
     def link(self, choice: Literal[1, 2]):
         assert choice in [1, 2]
@@ -51,6 +52,7 @@ class EvolutionPathItem:
             "start_pid": self.start_plant.id,
             "next_pid": self.next_plant.id if self.next_plant is not None else None,
             "choice": self.choice,
+            "evolution_path": self.evolution_path,
         }
 
     def deserialize(self, data):
@@ -58,6 +60,7 @@ class EvolutionPathItem:
         if data["next_pid"] is not None:
             self.next_plant = self.lib.get_plant_by_id(data["next_pid"])
         self.choice = data["choice"]
+        self.evolution_path = data["evolution_path"]
 
 
 class PlantEvolution:
@@ -109,8 +112,10 @@ class PlantEvolution:
         }
 
     def create_new_path(self, start_pid):
-        if self.only_one:
-            logging.warning("当前模式是唯一进化路径模式，已经设置了一条进化路线，请先删除当前路线再添加新路线")
+        if self.only_one and len(self.saved_evolution_paths) > 0:
+            logging.warning(
+                "当前模式是唯一进化路径模式，已经设置了一条进化路线，请先删除当前路线再添加新路线"
+            )
             return
         self.saved_evolution_paths.append([EvolutionPathItem(start_pid, self.lib)])
 
@@ -205,13 +210,14 @@ class PlantEvolution:
                     data = pickle.load(f)
             else:
                 data = save_dir
-            self.saved_evolution_paths = [
-                [
-                    EvolutionPathItem(None, self.lib).deserialize(item_data)
-                    for item_data in item_list
-                ]
-                for item_list in data["saved_evolution_paths"]
-            ]
+            self.saved_evolution_paths = []
+            for item_list in data["saved_evolution_paths"]:
+                l = []
+                for item_data in item_list:
+                    item = EvolutionPathItem(None, self.lib)
+                    item.deserialize(item_data)
+                    l.append(item)
+                self.saved_evolution_paths.append(l)
             if "only_one" in data:
                 self.only_one = data["only_one"]
         except Exception:

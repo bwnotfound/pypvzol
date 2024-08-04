@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QListWidget,
     QListWidgetItem,
+    QPlainTextEdit,
 )
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt
@@ -20,12 +21,14 @@ from ...user.auto_pipeline import (
     OpenBox,
     AutoUpgradeQuality,
     CustomProcessChain,
-    AutoStoneTalent,
+    AutoStone,
     AutoEvolution,
+    AutoSynthesis,
     Pipeline,
 )
 from ..common import delete_layout_children
-from ..evolution import EvolutionPanelWindow
+from ....library import talent_name_list, stone_name_list
+from ....utils.common import format_plant_info
 
 
 class SinglePipelineSettingWidget(QWidget):
@@ -235,11 +238,164 @@ class EvolutionWidget(QWidget):
         self.pipeline.pool_size = self.pool_size_combobox.currentIndex() + 1
 
 
+class StoneSettingWindow(QMainWindow):
+    def __init__(self, pipeline: AutoStone, parent=None):
+        super().__init__(parent=parent)
+        self.pipeline = pipeline
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("升宝石设置")
+
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.4), int(screen_size.height() * 0.4))
+        self.move(int(screen_size.width() * 0.3), int(screen_size.height() * 0.3))
+
+        self.main_widget = QWidget()
+        self.main_layout = QHBoxLayout()
+        self.main_layout.setSpacing(10)
+        self.main_widget.setLayout(self.main_layout)
+        self.setCentralWidget(self.main_widget)
+        self.main_layout.addStretch(1)
+
+        for i in range(9):
+            widget = QWidget()
+            layout = QVBoxLayout()
+            widget.setLayout(layout)
+            self.main_layout.addWidget(widget)
+
+            layout.addWidget(
+                QLabel("{}({})".format(talent_name_list[i], stone_name_list[i]))
+            )
+            combo = QComboBox()
+            combo.addItems([str(j) for j in range(1 + 10)])
+            combo.setCurrentIndex(self.pipeline.target_stone_level[i])
+
+            def clicked(index, j=i):
+                self.pipeline.target_stone_level[j] = index
+
+            combo.currentIndexChanged.connect(clicked)
+            layout.addWidget(combo)
+        self.main_layout.addStretch(1)
+
+
+class AutoSynthesisSettingWindow(QMainWindow):
+    def __init__(self, pipeline: AutoSynthesis, parent=None):
+        super().__init__(parent=parent)
+        self.pipeline = pipeline
+        self.init_ui()
+        self.refresh()
+
+    def init_ui(self):
+        self.setWindowTitle("自动吃速度设置")
+
+        screen_size = QtGui.QGuiApplication.primaryScreen().size()
+        self.resize(int(screen_size.width() * 0.4), int(screen_size.height() * 0.6))
+        self.move(int(screen_size.width() * 0.3), int(screen_size.height() * 0.2))
+
+        self.main_widget = QWidget()
+        self.main_layout = QHBoxLayout()
+        self.main_layout.setSpacing(10)
+        self.main_widget.setLayout(self.main_layout)
+        self.setCentralWidget(self.main_widget)
+
+        plant_show_panel = QWidget()
+        plant_show_panel_layout = QVBoxLayout()
+        plant_show_panel.setLayout(plant_show_panel_layout)
+        self.main_layout.addWidget(plant_show_panel)
+        plant_show_panel_layout.addWidget(QLabel("植物列表"))
+
+        self.plant_list = QListWidget()
+        plant_show_panel_layout.addWidget(self.plant_list)
+        self.plant_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+
+        set_main_plant_btn = QPushButton("设为主力植物")
+        set_main_plant_btn.clicked.connect(self.set_main_plant_btn_clicked)
+        plant_show_panel_layout.addWidget(set_main_plant_btn)
+
+        main_plant_show_panel = QWidget()
+        main_plant_show_panel_layout = QVBoxLayout()
+        main_plant_show_panel.setLayout(main_plant_show_panel_layout)
+        self.main_layout.addWidget(main_plant_show_panel)
+        main_plant_show_panel_layout.addWidget(QLabel("主力植物"))
+
+        self.main_plant_info_panel = QPlainTextEdit()
+        main_plant_show_panel_layout.addWidget(self.main_plant_info_panel)
+        self.main_plant_info_panel.setReadOnly(True)
+
+        rest_panel = QWidget()
+        rest_panel_layout = QVBoxLayout()
+        rest_panel.setLayout(rest_panel_layout)
+        self.main_layout.addWidget(rest_panel)
+
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("增强卷轴数量: "))
+        reinforce_number_combo = QComboBox()
+        reinforce_number_combo.addItems([str(i) for i in range(1 + 10)])
+        reinforce_number_combo.setCurrentIndex(self.pipeline.reinforce_number)
+        reinforce_number_combo.currentIndexChanged.connect(
+            self.reinforce_number_combo_current_index_changed
+        )
+        layout.addWidget(reinforce_number_combo)
+        rest_panel_layout.addLayout(layout)
+
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("并发数: "))
+        pool_size_combo = QComboBox()
+        pool_size_combo.addItems([str(i) for i in range(1, 41)])
+        pool_size_combo.setCurrentIndex(self.pipeline.pool_size - 1)
+        pool_size_combo.currentIndexChanged.connect(
+            self.pool_size_combo_current_index_changed
+        )
+        layout.addWidget(pool_size_combo)
+        rest_panel_layout.addLayout(layout)
+
+    def reinforce_number_combo_current_index_changed(self, index):
+        self.pipeline.reinforce_number = index
+
+    def pool_size_combo_current_index_changed(self, index):
+        self.pipeline.pool_size = index + 1
+
+    def refresh(self):
+        self.plant_list.clear()
+        for plant in self.pipeline.repo.plants:
+            if plant.id == self.pipeline.main_plant_id:
+                continue
+            item = QListWidgetItem(
+                format_plant_info(
+                    plant,
+                    self.pipeline.lib,
+                    chosen_attribute="速度",
+                )
+            )
+            item.setData(Qt.ItemDataRole.UserRole, plant.id)
+            self.plant_list.addItem(item)
+        if self.pipeline.main_plant_id is not None:
+            self.main_plant_info_panel.setPlainText(
+                format_plant_info(
+                    self.pipeline.repo.get_plant(self.pipeline.main_plant_id),
+                    self.pipeline.lib,
+                    show_normal_attribute=True,
+                )
+            )
+        else:
+            self.main_plant_info_panel.setPlainText("")
+    
+    def set_main_plant_btn_clicked(self):
+        selected_items = self.plant_list.selectedItems()
+        if len(selected_items) == 0:
+            return
+        plant_id = selected_items[0].data(Qt.ItemDataRole.UserRole)
+        self.pipeline.main_plant_id = plant_id
+        self.refresh()
+
+
 class CustomProcessWidget(QMainWindow):
     def __init__(self, base_pipeline: CustomProcessChain, parent=None):
         super().__init__(parent=parent)
         self.base_pipeline = base_pipeline
         self.init_ui()
+        self.refresh()
 
     def init_ui(self):
         self.setWindowTitle("全自动流水线设置")
@@ -262,7 +418,7 @@ class CustomProcessWidget(QMainWindow):
         self.main_layout.addWidget(widget)
         self.main_layout.addStretch(1)
 
-        pipeline_list_layout.addWidget(QLabel("处理列表"))
+        pipeline_list_layout.addWidget(QLabel("处理列表，处理顺序从上到下"))
         self.pipeline_list = QListWidget()
         self.pipeline_list.setFixedHeight(int(self.height() * 0.7))
         self.pipeline_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
@@ -290,16 +446,18 @@ class CustomProcessWidget(QMainWindow):
     def refresh(self):
         self.pipeline_list.clear()
         delete_layout_children(self.pipeline_show_layout)
-        for pipeline in self.base_pipeline.chosen_pipelines:
+        self.pipeline_show_layout.addStretch(1)
+        for i, pipeline in enumerate(self.base_pipeline.chosen_pipelines):
+            if i > 0:
+                self.pipeline_show_layout.addWidget(QLabel("-->"))
             item = QListWidgetItem(pipeline.name)
             item.setData(Qt.ItemDataRole.UserRole, pipeline)
             self.pipeline_list.addItem(item)
 
             widget = SinglePipelineSettingWidget(pipeline, self)
-            widget.setFixedWidth(
-                int(self.show_widget.width() / len(self.base_pipeline.chosen_pipelines))
-            )
             self.pipeline_show_layout.addWidget(widget)
+
+        self.pipeline_show_layout.addStretch(1)
 
     def add_pipeline_btn_clicked(self):
         pipeline_name = self.availabel_pipeline_combobox.currentText()

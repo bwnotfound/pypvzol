@@ -18,10 +18,9 @@ from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from ...wrapped import QLabel
-from ...user import UserSettings
-from ...user import PipelineScheme, Pipeline
+from ...user import UserSettings, PipelineScheme, Pipeline
 from .run_thread import RunSchemeThread
-from ...wrapped import WaitEventThread
+from ....utils.common import WaitEventThread
 
 
 class PipelineSettingWindow(QMainWindow):

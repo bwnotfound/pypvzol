@@ -15,11 +15,12 @@ from PyQt6.QtWidgets import (
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 
-from ..wrapped import QLabel, signal_block_emit, WaitEventThread
-from ...utils.common import format_plant_info
+from ..wrapped import QLabel
+from ...utils.common import signal_block_emit, format_plant_info, WaitEventThread
 from ... import Library, Repository
 from ..message import Logger
 from ...utils.evolution import PlantEvolution
+
 
 class EvolutionPanelWindow(QMainWindow):
     refresh_path_panel_signal = pyqtSignal()
@@ -27,7 +28,14 @@ class EvolutionPanelWindow(QMainWindow):
     evolution_finish_signal = pyqtSignal()
     evolution_stop_signal = pyqtSignal()
 
-    def __init__(self, repo: Repository, lib: Library, logger: Logger, plant_evolution: PlantEvolution, parent=None):
+    def __init__(
+        self,
+        repo: Repository,
+        lib: Library,
+        logger: Logger,
+        plant_evolution: PlantEvolution,
+        parent=None,
+    ):
         super().__init__(parent=parent)
         self.plant_evolution = plant_evolution
         self.repo = repo
@@ -148,11 +156,14 @@ class EvolutionPanelWindow(QMainWindow):
 
     def refresh_evolution_path_list(self):
         self.evolution_path_list.clear()
-        for i, path in enumerate(
-            self.plant_evolution.saved_evolution_paths
-        ):
+        for i, path in enumerate(self.plant_evolution.saved_evolution_paths):
             item = QListWidgetItem(
-                f"{path[0].start_plant.name}({path[0].start_plant.use_condition})->{path[-1].start_plant.name}({path[-1].start_plant.use_condition})|||"
+                "{}({})->{}({})|||".format(
+                    path[0].start_plant.name,
+                    path[0].start_plant.use_condition,
+                    path[-1].start_plant.name,
+                    path[-1].start_plant.use_condition,
+                )
                 + "->".join([item.start_plant.name for item in path])
             )
             item.setData(Qt.ItemDataRole.UserRole, i)
@@ -311,7 +322,9 @@ class EvolutionPanelThread(QThread):
                     plant = self.repo.get_plant(plant_id_list[i])
                     if plant is None:
                         self.logger.log(
-                            "进化植物不存在并出现异常，异常种类：{}".format(type(e).__name__)
+                            "进化植物不存在并出现异常，异常种类：{}".format(
+                                type(e).__name__
+                            )
                         )
                     else:
                         self.logger.log(
@@ -389,9 +402,7 @@ class EvolutionPathSetting(QMainWindow):
         self.evolution_chain.clear()
         self.evolution_choice.clear()
         for i, evolution_path_item in enumerate(
-            self.plant_evolution.saved_evolution_paths[
-                self.evolution_path_index
-            ]
+            self.plant_evolution.saved_evolution_paths[self.evolution_path_index]
         ):
             item = QListWidgetItem(
                 f"{evolution_path_item.start_plant.name}({evolution_path_item.start_plant.use_condition})"
@@ -402,9 +413,7 @@ class EvolutionPathSetting(QMainWindow):
             self.evolution_path_index
         ][-1].start_plant
         for i, evolution_item in enumerate(start_plant.evolution_path.evolutions):
-            target_plant = self.lib.get_plant_by_id(
-                evolution_item["target_id"]
-            )
+            target_plant = self.lib.get_plant_by_id(evolution_item["target_id"])
             item = QListWidgetItem(f"{target_plant.name}({target_plant.use_condition})")
             item.setData(Qt.ItemDataRole.UserRole, i + 1)
             self.evolution_choice.addItem(item)
@@ -431,9 +440,9 @@ class EvolutionPathSetting(QMainWindow):
                 return
             result = self.plant_evolution.remove_evolution(
                 self.evolution_path_index,
-                self.plant_evolution.saved_evolution_paths[
-                    self.evolution_path_index
-                ][selected_evolution_item_index].start_plant.id,
+                self.plant_evolution.saved_evolution_paths[self.evolution_path_index][
+                    selected_evolution_item_index
+                ].start_plant.id,
             )
             logging.info(result["result"])
             self.refresh_evolution_panel()

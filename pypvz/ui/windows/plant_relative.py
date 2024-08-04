@@ -1,5 +1,3 @@
-from queue import Queue
-from copy import deepcopy
 import concurrent.futures
 from threading import Thread, Event
 from PyQt6.QtWidgets import (
@@ -12,24 +10,18 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QPlainTextEdit,
     QComboBox,
-    QCheckBox,
     QApplication,
     QTabWidget,
 )
-from PyQt6.QtGui import QPixmap
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ...repository import Repository
-from ...library import Library, attribute2plant_attribute, talent_name_list
-from ..wrapped import QLabel, WaitEventThread
+from ...library import talent_name_list
+from ..wrapped import QLabel
 from ..user import UserSettings
-from ...utils.common import format_number, format_plant_info
+from ...utils.common import format_plant_info, WaitEventThread
 from ...repository import Plant
-from ..message import Logger
-from ..user.auto_challenge import Challenge4Level
 
-from ... import Config, Library, User
 
 
 class PlantRelativeWindow(QMainWindow):

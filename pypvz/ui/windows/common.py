@@ -1,4 +1,5 @@
 from queue import Queue
+
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -17,13 +18,14 @@ from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from ...repository import Repository
-from ...library import Library, attribute2plant_attribute
+from ...library import Library
 from ..wrapped import QLabel
 from ..user import UserSettings
 from ...utils.common import format_number, format_plant_info
 from ...repository import Plant
 from ..message import Logger
 from ..user.auto_challenge import Challenge4Level
+from ...utils.common import signal_block_emit
 
 from ... import Config, Library, User
 

@@ -18,7 +18,8 @@ from PyQt6.QtWidgets import (
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ..wrapped import QLabel, signal_block_emit, WaitEventThread
+from ..wrapped import QLabel
+from ...utils.common import signal_block_emit, WaitEventThread
 from ..user import UserSettings
 from ...utils.common import format_plant_info
 from ... import Repository, UpgradeMan, Library

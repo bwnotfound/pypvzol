@@ -7,7 +7,7 @@ from .garden import GardenMan
 from .user import User, FriendMan
 from .cave import CaveMan
 from .task import Task
-from .upgrade import UpgradeMan, SynthesisMan, HeritageMan
+from .upgrade import UpgradeMan, SynthesisMan, HeritageMan, StoneMan
 from .arena import Arena
 from .serverbattle import Serverbattle
 from .fuben import WorldFubenRequest

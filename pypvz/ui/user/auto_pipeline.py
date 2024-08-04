@@ -10,13 +10,15 @@ from ... import (
     User,
 )
 from ..message import Logger
-from ... import UpgradeMan
+from ... import UpgradeMan, StoneMan
 from .auto_challenge import Challenge4Level
 from ...shop import PurchaseItem
 from .compound import AutoCompoundMan
-from ...upgrade import quality_name_list
+from ...upgrade import quality_name_list, SynthesisMan
 from ...repository import Plant
 from ...utils.evolution import PlantEvolution
+from ...library import stone_name_list
+from ...utils.common import CommonAsyncThread
 
 
 class Pipeline:
@@ -72,6 +74,22 @@ class Purchase(Pipeline):
 
         self.shop = Shop(cfg)
         self.shop_auto_buy_dict: dict[int, PurchaseItem] = dict()
+
+    def check_requirements(self):
+        if len(self.shop_auto_buy_dict) != 1:
+            return [
+                "购买植物pipeline购买方案有误，设置购买{}种物品，应当设置购买1种植物".format(
+                    len(self.shop_auto_buy_dict)
+                )
+            ]
+        amount = list(self.shop_auto_buy_dict.values())[0].amount
+        if self.repo.organism_grid_rest_amount < amount:
+            return [
+                "购买植物pipeline条件不满足：需要购买{}个植物，但仓库只有{}个空位".format(
+                    amount, self.repo.organism_grid_rest_amount
+                )
+            ]
+        return []
 
     def purchase(self, item: PurchaseItem):
         return self.shop.buy(item.good.id, item.amount)
@@ -139,6 +157,7 @@ class Purchase(Pipeline):
             self.logger,
             self.shop_auto_buy_dict,
             False,
+            only_one=True,
             parent=parent,
         )
 
@@ -151,7 +170,7 @@ class Purchase(Pipeline):
 
 class OpenBox(Pipeline):
     def __init__(self, cfg: Config, lib: Library, repo: Repository, logger: Logger):
-        super().__init__("开魔神箱")
+        super().__init__("开植物箱")
         self.cfg = cfg
         self.lib = lib
         self.repo = repo
@@ -696,7 +715,7 @@ class AutoUpgradeQuality(Pipeline):  # 智能升品，仅适用于开魔神箱
                 setattr(self, k, v)
 
 
-class AutoStoneTalent(Pipeline):
+class AutoStone(Pipeline):
     def __init__(self, cfg: Config, lib: Library, repo: Repository, logger: Logger):
         super().__init__("升宝石")
         self.cfg = cfg
@@ -704,14 +723,90 @@ class AutoStoneTalent(Pipeline):
         self.repo = repo
         self.logger = logger
         self.target_stone_level = [0 for _ in range(9)]
+        self.stone_man = StoneMan(cfg)
+        self.interrupt_event = Event()
+        self.rest_event = Event()
+        self.pool_size = 3
+        self.msg = "自动处理-宝石升级"
+        self.interrupt_when_failed = False
+
+    def check_requirements(self):  # 一个很弱的检查，检查有无对应宝石
+        result = []
+        for i in range(9):
+            for j in range(1, self.target_stone_level[i] + 1):
+                name = f"{j}级{stone_name_list[i]}"
+                tool_id = self.lib.name2tool[name].id
+                tool_amount = self.repo.get_tool(tool_id, return_amount=True)
+                if tool_amount == 0:
+                    result.append(f"{name}数量不足")
+        return result
+
+    def upgrade_stone(self, plant_id, stone_index):
+        plant = self.repo.get_plant(plant_id)
+        if plant is None:
+            if self.interrupt_when_failed:
+                raise Exception("植物不存在")
+            self.logger.log(f"{self.msg}: 植物不存在")
+            return True
+        result = self.stone_man.upgrade_stone(plant_id, stone_index)
+        if result is None:
+            if self.interrupt_when_failed:
+                raise Exception(
+                    "{}: {}不足".format(self.msg, stone_name_list[stone_index])
+                )
+            self.logger.log("{}: {}不足".format(self.msg, stone_name_list[stone_index]))
+        if not result["success"]:
+            if self.interrupt_when_failed:
+                raise Exception(f"{self.msg}: {result['result']}")
+            self.logger.log(f"{self.msg}: {result['result']}")
+        return True
 
     def run(self, plant_list: list[Plant], stop_channel: Queue):
-        pass
+        run_args = []
+        for plant in plant_list:
+            for i in range(9):
+                for _ in range(plant.stone_level_list[i], self.target_stone_level[i]):
+                    run_args.append((plant.id, i))
+        self.rest_event.clear()
+        self.interrupt_event.clear()
+        error_channel = []
+        self.run_thread = CommonAsyncThread(
+            self.upgrade_stone,
+            run_args,
+            "自动处理-宝石升级",
+            self.repo,
+            self.logger,
+            self.interrupt_event,
+            self.rest_event,
+            error_channel=error_channel,
+            pool_size=self.pool_size,
+        )
+        self.run_thread.start()
+        while stop_channel.qsize() == 0 and not self.rest_event.is_set():
+            sleep(0.1)
+        if stop_channel.qsize() > 0:
+            self.interrupt_event.set()
+            self.rest_event.wait()
+            return {
+                "success": False,
+                "info": "用户终止",
+            }
+        if len(error_channel) > 0:
+            return {
+                "success": False,
+                "info": "升宝石失败，原因：{}".format(error_channel[0]),
+            }
+        self.repo.refresh_repository()
+        return {
+            "success": True,
+            "info": "升宝石成功",
+            "result": plant_list,
+        }
 
     def setting_window(self, parent=None):
-        from ..windows.auto_pipeline.setting_panel import CustomProcessWidget
+        from ..windows.auto_pipeline.setting_panel import StoneSettingWindow
 
-        return CustomProcessWidget(
+        return StoneSettingWindow(
             self,
             parent=parent,
         )
@@ -720,7 +815,10 @@ class AutoStoneTalent(Pipeline):
         return True
 
     def serialize(self):
-        return {}
+        return {
+            "target_stone_level": self.target_stone_level,
+            "pool_size": self.pool_size,
+        }
 
 
 class AutoEvolution(Pipeline):
@@ -742,6 +840,7 @@ class AutoEvolution(Pipeline):
             return ["自定义方案中: 进化pipeline设置了多个进化方案"]
         if len(self.plant_evolution.saved_evolution_paths[0]) == 0:
             return ["自定义方案中: 进化pipeline设置的进化方案为空"]
+        return []
 
     def run(self, plant_list: list[Plant], stop_channel: Queue):
         plant_id_list = [plant.id for plant in plant_list]
@@ -826,8 +925,15 @@ class CustomProcessChain(Pipeline):
         self.name2class = {
             "刷品": UpgradeQuality,
             "进化": AutoEvolution,
-            "升宝石": AutoStoneTalent,
+            "升宝石": AutoStone,
         }
+        self.class2name = {v: k for k, v in self.name2class.items()}
+
+    def check_requirements(self):
+        result = []
+        for pipeline in self.chosen_pipelines:
+            result.extend(pipeline.check_requirements())
+        return result
 
     def add_pipeline(self, name):
         if name not in self.name2class:
@@ -875,7 +981,11 @@ class CustomProcessChain(Pipeline):
     def serialize(self):
         return {
             "chosen_pipelines": [
-                (pipeline.serialize()) for pipeline in self.chosen_pipelines
+                {
+                    "name": self.class2name[pipeline.__class__],
+                    "data": pipeline.serialize(),
+                }
+                for pipeline in self.chosen_pipelines
             ]
         }
 
@@ -885,16 +995,145 @@ class CustomProcessChain(Pipeline):
                 pipeline_class = self.name2class[pipeline_data["name"]]
             except ValueError:
                 self.logger.log(f"无法解析的pipeline名称: {pipeline_data['name']}")
-            if isinstance(pipeline_class, UpgradeQuality):
-                pipeline = UpgradeQuality(self.cfg, self.lib, self.repo, self.logger)
-            elif isinstance(pipeline_class, AutoEvolution):
-                pipeline = AutoEvolution(self.cfg, self.lib, self.repo, self.logger)
-            elif isinstance(pipeline_class, AutoStoneTalent):
-                pipeline = AutoStoneTalent(self.cfg, self.lib, self.repo, self.logger)
-            else:
-                raise ValueError(f"未知pipeline类别: {pipeline_class.__name__}")
-            pipeline.deserialize(pipeline_data)
-            self.chosen_pipelines.append(pipeline)
+            try:
+                pipeline: Pipeline = pipeline_class(
+                    self.cfg, self.lib, self.repo, self.logger
+                )
+                pipeline.deserialize(pipeline_data["data"])
+                self.chosen_pipelines.append(pipeline)
+            except Exception as e:
+                self.logger.log(
+                    "解析pipeline{}失败，跳过此pipeline: {}".format(
+                        pipeline_data["name"], str(e)
+                    )
+                )
+
+
+class AutoSynthesis(Pipeline):
+    def __init__(self, cfg: Config, lib: Library, repo: Repository, logger: Logger):
+        super().__init__("自动吃速度")
+        self.cfg = cfg
+        self.lib = lib
+        self.repo = repo
+        self.logger = logger
+        self.synthesis_man = SynthesisMan(cfg, lib)
+        self.main_plant_id = None
+
+        self.interrupt_event = Event()
+        self.rest_event = Event()
+        self.pool_size = 3
+        self.speed_book_id = self.lib.name2tool["速度合成书"].id
+        self.reinforce_tool_id = self.lib.name2tool["增强卷轴"].id
+        self.reinforce_number = 0
+
+    def check_requirements(self):
+        if self.main_plant_id is None:
+            return ["自动吃速度未设置主植物"]
+        if self.repo.get_plant(self.main_plant_id) is None:
+            return ["自动吃速度设置的主植物不存在"]
+        result = []
+        if self.repo.get_tool(self.speed_book_id, return_amount=True) == 0:
+            result.append("速度合成书不足")
+        if (
+            self.repo.get_tool(self.reinforce_tool_id, return_amount=True)
+            < self.reinforce_number
+        ):
+            result.append("增强卷轴不足")
+        return result
+
+    def eat(self, plant_id):
+        try:
+            result = self.synthesis_man.synthesis(
+                self.main_plant_id,
+                plant_id,
+                self.speed_book_id,
+                self.reinforce_number,
+            )
+        except Exception as e:
+            if "amf返回结果为空" in str(e):
+                msg = (
+                    "可能由以下原因引起：参与合成的植物不见了、增强卷轴不够、合成书不够"
+                )
+                raise Exception("合成异常，已跳出合成。{}".format(msg))
+            self.repo.refresh_repository()
+            main_plant, eaten_plant = self.repo.get_plant(
+                self.main_plant_id
+            ), self.repo.get_plant(plant_id)
+            if main_plant is None:
+                raise Exception("合成异常，主植物不存在")
+            if eaten_plant is None:
+                return True
+        if not result["success"]:
+            raise Exception(result["result"])
+        return True
+
+    def run(self, plant_list: list[Plant], stop_channel: Queue):
+        run_args = [plant.id for plant in plant_list]
+        self.rest_event.clear()
+        self.interrupt_event.clear()
+        error_channel = []
+        self.run_thread = CommonAsyncThread(
+            self.eat,
+            run_args,
+            "自动吃速度",
+            self.repo,
+            self.logger,
+            self.interrupt_event,
+            self.rest_event,
+            error_channel=error_channel,
+            pool_size=self.pool_size,
+        )
+        self.run_thread.start()
+        while stop_channel.qsize() == 0 and not self.rest_event.is_set():
+            sleep(0.1)
+        if stop_channel.qsize() > 0:
+            self.interrupt_event.set()
+            self.rest_event.wait()
+            return {
+                "success": False,
+                "info": "用户终止",
+            }
+        if len(error_channel) > 0:
+            return {
+                "success": False,
+                "info": "自动吃速度失败，原因：{}".format(error_channel[0]),
+            }
+        self.repo.refresh_repository()
+        rest_plant_list = [
+            plant for plant in plant_list if self.repo.get_plant(plant.id) is not None
+        ]
+        if len(rest_plant_list) > 0:
+            return {
+                "success": False,
+                "info": "自动吃速度失败，原因：以下植物未被吃：{}".format(
+                    ", ".join([plant.name(self.lib) for plant in rest_plant_list])
+                ),
+            }
+        return {"success": True, "info": "自动吃速度成功"}
+
+    def setting_window(self, parent=None):
+        from ..windows.auto_pipeline.setting_panel import AutoSynthesisSettingWindow
+
+        return AutoSynthesisSettingWindow(
+            self,
+            parent=parent,
+        )
+
+    def has_setting_window(self):
+        return True
+
+    def serialize(self):
+        return {
+            "pool_size": self.pool_size,
+            "main_plant_id": self.main_plant_id,
+            "reinforce_number": self.reinforce_number,
+        }
+
+    def deserialize(self, d):
+        super().deserialize(d)
+        plant = self.repo.get_plant(self.main_plant_id)
+        if plant is None:
+            self.main_plant_id = None
 
 
 class AutoComponent(Pipeline):
@@ -1047,7 +1286,10 @@ class PipelineScheme:
         ]
         self.pipeline3_choice_index = 2
 
-        self.pipeline4: list[Pipeline] = [AutoComponent(cfg, lib, repo, logger)]
+        self.pipeline4: list[Pipeline] = [
+            AutoComponent(cfg, lib, repo, logger),
+            AutoSynthesis(cfg, lib, repo, logger),
+        ]
         self.pipeline4_choice_index = 0
 
         self.register_openbox()
@@ -1186,7 +1428,6 @@ class PipelineScheme:
             if stop_channel.qsize() != 0:
                 self.logger.log("用户终止")
                 return
-            self.repo.refresh_repository()
             result = self.check_requirements()
             if len(result) > 0:
                 self.logger.log(
@@ -1292,29 +1533,30 @@ class PipelineMan:
 
     def save(self, save_dir):
         save_path = os.path.join(save_dir, "auto_pipeline")
+        data = {
+            "scheme_list_serilized": [
+                scheme.serialize() for scheme in self.scheme_list
+            ],
+            "current_scheme_index": self.current_scheme_index,
+            "stop_after_finish": self.stop_after_finish,
+        }
         with open(save_path, "wb") as f:
-            pickle.dump(
-                {
-                    "scheme_list_serilized": [
-                        scheme.serialize() for scheme in self.scheme_list
-                    ],
-                    "current_scheme_index": self.current_scheme_index,
-                    "stop_after_finish": self.stop_after_finish,
-                },
-                f,
-            )
+            pickle.dump(data, f)
 
     def load(self, load_dir):
         load_path = os.path.join(load_dir, "auto_pipeline")
-        if os.path.exists(load_path):
-            with open(load_path, "rb") as f:
-                d = pickle.load(f)
-            for k, v in d.items():
-                if hasattr(self, k):
-                    setattr(self, k, v)
-            for scheme_serilized in d['scheme_list_serilized']:
-                scheme = PipelineScheme(
-                    self.cfg, self.lib, self.repo, self.user, self.logger
-                )
-                scheme.deserialize(scheme_serilized)
-                self.scheme_list.append(scheme)
+        try:
+            if os.path.exists(load_path):
+                with open(load_path, "rb") as f:
+                    d = pickle.load(f)
+                for k, v in d.items():
+                    if hasattr(self, k):
+                        setattr(self, k, v)
+                for scheme_serilized in d['scheme_list_serilized']:
+                    scheme = PipelineScheme(
+                        self.cfg, self.lib, self.repo, self.user, self.logger
+                    )
+                    scheme.deserialize(scheme_serilized)
+                    self.scheme_list.append(scheme)
+        except:
+            pass

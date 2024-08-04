@@ -14,7 +14,7 @@ from ..message import Logger
 from ...shop import Shop
 from ...fuben import FubenCave
 from ...utils.recover import RecoverMan
-from ..wrapped import signal_block_emit
+from ...utils.common import signal_block_emit
 
 
 class OpenFubenMan:

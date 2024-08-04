@@ -72,11 +72,16 @@ class Repository:
         self.cfg = cfg
         self.wr = WebRequest(cfg)
         self._lock = Lock()
+        self._refresh_lock = Lock()
         self.refresh_repository()
 
     def refresh_repository(self, logger=None):
         try:
+            is_requiring = self._refresh_lock.locked()
             self._lock.acquire()
+            self._refresh_lock.acquire()
+            if is_requiring:    # 锁释放，说明已经是新data了
+                return            
             cnt, max_retry = 0, 20
             while cnt < max_retry:
                 cnt += 1
@@ -94,6 +99,7 @@ class Repository:
                     continue
         finally:
             self._lock.release()
+            self._refresh_lock.release()
 
     def _refresh_repository(self, logger=None):
         url = "/pvz/index.php/Warehouse/index/sig/0"

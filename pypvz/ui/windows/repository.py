@@ -24,7 +24,7 @@ from ..user import UserSettings
 from ..message import Logger
 
 from ... import Library
-from ..wrapped import signal_block_emit, WaitEventThread
+from ...utils.common import signal_block_emit, WaitEventThread
 
 
 class AutoUseItemSettingWindow(QMainWindow):

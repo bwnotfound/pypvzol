@@ -1,6 +1,6 @@
 import math
-from threading import Event
-from queue import Queue
+from threading import Thread, Event
+import concurrent.futures
 
 from ..repository import Plant
 from .. import Library, Repository
@@ -101,6 +101,7 @@ def format_plant_info(
             "闪避",
             "穿透",
             "护甲",
+            "速度",
         ]
     for attr_name in attribute_list:
         msg += "\n{}{}:{}".format(
@@ -110,3 +111,125 @@ def format_plant_info(
         )
 
     return msg
+
+
+def signal_block_emit(refresh_signal, *args):
+    if refresh_signal is None:
+        return
+    event = Event()
+    refresh_signal.emit(*args, event)
+    event.wait()
+
+
+class CommonAsyncThread(Thread):
+    def __init__(
+        self,
+        run_func,
+        func_args: list,
+        msg,
+        repo: Repository,
+        logger,
+        interrupt_event: Event,
+        rest_event: Event,
+        finish_signal=None,
+        refresh_signal=None,
+        error_channel: list=None,
+        pool_size=3,
+        retry_when_failed=False,
+        loop_refresh=True,
+    ):
+        super().__init__()
+        self.func_args = func_args
+        self.repo = repo
+        self.logger = logger
+        self.run_func = self.wrap_run_func(run_func)
+        self.msg = msg
+        self.finish_signal = finish_signal
+        self.interrupt_event = interrupt_event
+        self.refresh_signal = refresh_signal
+        self.rest_event = rest_event
+        self.pool_size = pool_size
+        self.retry_when_failed = retry_when_failed
+        self.loop_refresh = loop_refresh
+        self.error_channel = error_channel
+
+    def wrap_run_func(self, run_func):
+        def _run_func(*args, **kwargs):
+            result = run_func(*args, **kwargs)
+            if self.refresh_signal is not None:
+                signal_block_emit(self.refresh_signal)
+            return result
+
+        return _run_func
+
+    def _run(self):
+        func_args_index_set = set(range(len(self.func_args)))
+        while not self.interrupt_event.is_set() and len(func_args_index_set) > 0:
+            func_args_index_list = list(func_args_index_set)
+            need_unpack = isinstance(
+                self.func_args[func_args_index_list[0]], (list, tuple)
+            )
+            if need_unpack:
+                futures = [
+                    self.pool.submit(self.run_func, *self.func_args[func_args_index])
+                    for func_args_index in func_args_index_list
+                ]
+            else:
+                futures = [
+                    self.pool.submit(self.run_func, self.func_args[func_args_index])
+                    for func_args_index in func_args_index_list
+                ]
+            for i, result in enumerate(futures):
+                if self.interrupt_event.is_set():
+                    break
+                try:
+                    success = True
+                    ret = result.result()
+                    if isinstance(ret, dict):
+                        if "success" in ret:
+                            success = ret["success"]
+                        elif "result" in ret:
+                            success = ret["result"]
+                        if not isinstance(success, bool):
+                            success = True
+                    if isinstance(ret, bool):
+                        success = ret
+                    if success:
+                        func_args_index_set.remove(func_args_index_list[i])
+                except Exception as e:
+                    self.logger.log("{}: 出现异常：{}".format(self.msg, str(e)))
+                    if not self.retry_when_failed and self.error_channel is not None:
+                        self.error_channel.append(
+                            "{}: 出现异常：{}".format(self.msg, str(e))
+                        )
+            if self.loop_refresh:
+                self.repo.refresh_repository()
+            if self.refresh_signal is not None:
+                signal_block_emit(self.refresh_signal)
+            if len(func_args_index_set) == 0:
+                break
+            if not self.retry_when_failed:
+                break
+
+    def run(self):
+        try:
+            self.pool = concurrent.futures.ThreadPoolExecutor(
+                max_workers=self.pool_size
+            )
+            self._run()
+        finally:
+            self.pool.shutdown()
+            if self.finish_signal is not None:
+                self.finish_signal.emit()
+            self.rest_event.set()
+
+
+class WaitEventThread(Thread):
+    def __init__(self, event, signal):
+        super().__init__()
+        self.event = event
+        self.signal = signal
+
+    def run(self):
+        self.event.wait()
+        self.signal.emit()
