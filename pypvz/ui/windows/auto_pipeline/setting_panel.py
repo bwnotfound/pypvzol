@@ -237,6 +237,28 @@ class EvolutionWidget(QWidget):
     def pool_size_combobox_current_index_changed(self):
         self.pipeline.pool_size = self.pool_size_combobox.currentIndex() + 1
 
+class StoneWidget(QWidget):
+    def __init__(self, pipeline: AutoStone, parent=None):
+        super().__init__(parent=parent)
+        self.pipeline = pipeline
+        self.init_ui()
+
+    def init_ui(self):
+        self.main_layout = QHBoxLayout()
+        self.setLayout(self.main_layout)
+
+        self.main_layout.addWidget(QLabel("并发数:"))
+        self.pool_size_combobox = QComboBox()
+        self.pool_size_combobox.addItems([str(i) for i in range(1, 41)])
+        self.pool_size_combobox.setCurrentIndex(self.pipeline.pool_size - 1)
+        self.pool_size_combobox.currentIndexChanged.connect(
+            self.pool_size_combobox_current_index_changed
+        )
+        self.main_layout.addWidget(self.pool_size_combobox)
+
+    def pool_size_combobox_current_index_changed(self):
+        self.pipeline.pool_size = self.pool_size_combobox.currentIndex() + 1
+
 
 class StoneSettingWindow(QMainWindow):
     def __init__(self, pipeline: AutoStone, parent=None):
@@ -406,7 +428,7 @@ class CustomProcessWidget(QMainWindow):
 
         self.main_widget = QWidget()
         self.main_layout = QHBoxLayout()
-        self.main_layout.setSpacing(10)
+        # self.main_layout.setSpacing(10)
         self.main_widget.setLayout(self.main_layout)
         self.setCentralWidget(self.main_widget)
 

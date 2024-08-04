@@ -813,6 +813,14 @@ class AutoStone(Pipeline):
 
     def has_setting_window(self):
         return True
+    
+    def setting_widget(self, parent=None):
+        from ..windows.auto_pipeline.setting_panel import StoneWidget
+
+        return StoneWidget(self, parent=parent)
+
+    def has_setting_widget(self):
+        return True
 
     def serialize(self):
         return {

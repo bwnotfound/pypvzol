@@ -798,13 +798,12 @@ class Challenge4Level:
             "show_series_success": self.show_series_success,
             "series_success_exit": self.series_success_exit,
             "stone_book_per_use": self.stone_book_per_use,
+            "pop_grade": self.pop_grade,
         }
         return save_data(data, save_dir, "user_challenge4level")
 
     def load(self, load_dir):
         load_data(load_dir, "user_challenge4level", self)
-        if self.advanced_challenge_book_amount > 5:
-            self.advanced_challenge_book_amount = 5
         main_plant_list = list(
             filter(
                 lambda x: x is not None,
