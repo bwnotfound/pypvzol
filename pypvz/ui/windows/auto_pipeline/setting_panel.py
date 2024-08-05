@@ -89,7 +89,7 @@ class OpenBoxWidget(QWidget):
     def init_ui(self):
         self.main_layout = QVBoxLayout()
 
-        self.main_layout.addWidget(QLabel("设置一次开魔神箱的数量"))
+        self.main_layout.addWidget(QLabel("设置一次开箱的数量"))
         self.inputbox = QLineEdit()
         self.inputbox.setText(str(self.pipeline.amount))
         self.inputbox.setValidator(QtGui.QIntValidator(1, 99999))

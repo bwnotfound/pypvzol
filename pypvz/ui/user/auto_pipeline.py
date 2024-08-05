@@ -2,6 +2,7 @@ import pickle
 from queue import Queue
 import os
 from threading import Event
+from requests import ConnectionError, ReadTimeout
 from time import sleep
 from ... import (
     Config,
@@ -192,11 +193,11 @@ class OpenBox(Pipeline):
         self.box_type_quality_str_list = [
             "魔神",
             "战神",
-            "劣质",
+            None,
             "战神",
             "战神",
-            "极品",
-            "极品",
+            None,
+            None,
             "战神",
             "无极",
         ]
@@ -210,6 +211,10 @@ class OpenBox(Pipeline):
     @property
     def box_quality(self):
         return self.box_type_quality_str_list[self.current_box_type_index]
+
+    @property
+    def box_quality_name(self):
+        return self.box_quality if self.box_quality is not None else "未知品质"
 
     @property
     def box_name(self):
@@ -328,7 +333,9 @@ class OpenBox(Pipeline):
         self.repo.refresh_repository()
         plant_list = []
         for plant in self.repo.plants:
-            if plant.id in pre_id2plant or plant.quality_str != self.box_quality:
+            if plant.id in pre_id2plant:
+                continue
+            if self.box_quality is not None and plant.quality_str != self.box_quality:
                 continue
             plant_list.append(plant)
         if self.amount != len(plant_list):
@@ -337,9 +344,9 @@ class OpenBox(Pipeline):
                 "info": "打开{}失败，原因：预计获得{}个{}，实际获得{}个{}".format(
                     self.box_name,
                     self.amount,
-                    self.box_quality,
+                    self.box_quality_name,
                     len(plant_list),
-                    self.box_quality,
+                    self.box_quality_name,
                 ),
             }
         return {
@@ -748,7 +755,11 @@ class AutoStone(Pipeline):
                 raise Exception("植物不存在")
             self.logger.log(f"{self.msg}: 植物不存在")
             return True
-        result = self.stone_man.upgrade_stone(plant_id, stone_index)
+        try:
+            result = self.stone_man.upgrade_stone(plant_id, stone_index)
+        except (ConnectionError, ReadTimeout) as e:
+            self.logger.log(f"{self.msg}: {type(e).__name__}. 视作成功升级宝石")
+            return True
         if result is None:
             if self.interrupt_when_failed:
                 raise Exception(
@@ -813,7 +824,7 @@ class AutoStone(Pipeline):
 
     def has_setting_window(self):
         return True
-    
+
     def setting_widget(self, parent=None):
         from ..windows.auto_pipeline.setting_panel import StoneWidget
 
@@ -1033,6 +1044,7 @@ class AutoSynthesis(Pipeline):
         self.speed_book_id = self.lib.name2tool["速度合成书"].id
         self.reinforce_tool_id = self.lib.name2tool["增强卷轴"].id
         self.reinforce_number = 0
+        self.msg = "自动吃速度"
 
     def check_requirements(self):
         if self.main_plant_id is None:
@@ -1050,29 +1062,47 @@ class AutoSynthesis(Pipeline):
         return result
 
     def eat(self, plant_id):
-        try:
-            result = self.synthesis_man.synthesis(
-                self.main_plant_id,
-                plant_id,
-                self.speed_book_id,
-                self.reinforce_number,
-            )
-        except Exception as e:
-            if "amf返回结果为空" in str(e):
-                msg = (
-                    "可能由以下原因引起：参与合成的植物不见了、增强卷轴不够、合成书不够"
+        cnt, max_retry = 0, 10
+        while cnt < max_retry:
+            cnt += 1
+            try:
+                result = self.synthesis_man.synthesis(
+                    self.main_plant_id,
+                    plant_id,
+                    self.speed_book_id,
+                    self.reinforce_number,
                 )
-                raise Exception("合成异常，已跳出合成。{}".format(msg))
-            self.repo.refresh_repository()
-            main_plant, eaten_plant = self.repo.get_plant(
-                self.main_plant_id
-            ), self.repo.get_plant(plant_id)
-            if main_plant is None:
-                raise Exception("合成异常，主植物不存在")
-            if eaten_plant is None:
-                return True
+                break
+            except (ConnectionError, ReadTimeout) as e:
+                msg = f"{self.msg}: {type(e).__name__}. "
+                self.repo.refresh_repository()
+                main_plant, eaten_plant = self.repo.get_plant(
+                    self.main_plant_id
+                ), self.repo.get_plant(plant_id)
+                if main_plant is None:
+                    raise Exception("自动吃速度异常，原因：主植物不存在")
+                if eaten_plant is None:
+                    return True
+                msg += "还能重试{}次".format(max_retry - cnt)
+                self.logger.log(msg)
+                continue
+            except Exception as e:
+                if "amf返回结果为空" in str(e):
+                    msg = "可能由以下原因引起：参与合成的植物不见了、增强卷轴不够、合成书不够"
+                    raise Exception("自动吃速度异常，已跳出合成。{}".format(msg))
+                self.repo.refresh_repository()
+                main_plant, eaten_plant = self.repo.get_plant(
+                    self.main_plant_id
+                ), self.repo.get_plant(plant_id)
+                if main_plant is None:
+                    raise Exception("自动吃速度异常，原因：主植物不存在")
+                if eaten_plant is None:
+                    return True
+                continue
+        else:
+            raise Exception("自动吃速度异常，原因：被吃植物仍存在")
         if not result["success"]:
-            raise Exception(result["result"])
+            raise Exception("自动吃速度异常，原因：{}".format(result["result"]))
         return True
 
     def run(self, plant_list: list[Plant], stop_channel: Queue):
