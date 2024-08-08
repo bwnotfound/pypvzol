@@ -68,7 +68,6 @@ from pypvz.ui.windows import (
 from pypvz.ui.windows.common import delete_layout_children
 from pypvz.web import proxy_man
 
-import requests
 class SettingWindow(QMainWindow):
     def __init__(self, usersettings: UserSettings, parent=None):
         super().__init__(parent=parent)
@@ -1018,8 +1017,6 @@ class ProxyManagerWindow(QMainWindow):
                                "3. 代理池原理是均分并发\n"
                                "4. 代理地址格式为\"ip:port\"，例如127.0.0.1:8080\n"
                                "5. 以上设置均为全局设置\n"
-                               "6. 代理提取API可去各代理网站上购买,将本机IP加入白名单即可正常使用\n"
-                               "7. 某些代理网站会限制访问外网IP，注意查看代理网站规则\n"
                                )
         layout.addWidget(warning_label)
 
