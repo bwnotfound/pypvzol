@@ -28,10 +28,14 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QLineEdit,
     QFileDialog,
+
+    QTextEdit,
 )
 from PyQt6.QtGui import QImage, QPixmap, QTextCursor, QTextCharFormat, QColor
 from PyQt6.QtCore import Qt, pyqtSignal
 from PIL import Image
+
+from pypvz.utils.common import test_proxy_alive
 
 from pypvz import WebRequest, Config, User, Repository, Library
 from pypvz.ui.message import IOLogger
@@ -63,7 +67,6 @@ from pypvz.ui.windows import (
 )
 from pypvz.ui.windows.common import delete_layout_children
 from pypvz.web import proxy_man
-
 
 class SettingWindow(QMainWindow):
     def __init__(self, usersettings: UserSettings, parent=None):
@@ -603,6 +606,7 @@ class FunctionPanelWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
+
     def open_fuben_btn_clicked(self):
         self.open_fuben_window = OpenFubenWindow(self.usersettings, parent=self)
         self.open_fuben_window.show()
@@ -965,7 +969,7 @@ class ProxyManagerWindow(QMainWindow):
 
         layout1 = QHBoxLayout()
         layout1.addWidget(QLabel("代理地址:"))
-        self.proxy_add_input = QLineEdit()
+        self.proxy_add_input = QTextEdit()
         layout1.addWidget(self.proxy_add_input)
         layout.addLayout(layout1)
 
@@ -981,6 +985,15 @@ class ProxyManagerWindow(QMainWindow):
         add_proxy_btn.clicked.connect(self.add_proxy)
         layout.addWidget(add_proxy_btn)
 
+        remove_proxy_btn = QPushButton("测试已添加代理")
+        remove_proxy_btn.clicked.connect(self.test_proxy)
+        layout.addWidget(remove_proxy_btn)
+
+        export_proxy_btn = QPushButton("导出已添加代理")
+        export_proxy_btn.clicked.connect(self.export_proxy)
+        layout.addWidget(export_proxy_btn)
+        
+        self.block_when_no_proxy_checkbox = QCheckBox("没有空闲代理时阻塞(不阻塞则本地直连无限制并发)")
         self.block_when_no_proxy_checkbox = QCheckBox(
             "没有空闲代理时阻塞(不阻塞则本地直连无限制并发)"
         )
@@ -1004,7 +1017,7 @@ class ProxyManagerWindow(QMainWindow):
             self.set_proxy_item_max_use_count_btn_cliked
         )
         layout.addWidget(set_proxy_max_use_amount_btn)
-
+        
         warning_label = QLabel(
             "-----使用须知-----\n"
             "1. 默认状态是本地直连无限制并发\n"
@@ -1055,34 +1068,64 @@ class ProxyManagerWindow(QMainWindow):
         proxy_man.reset_proxy_list()
         self.save()
         self.refresh_proxy_list()
+    def add_tunnel_proxy(self):
+        pass
+    def test_proxy(self):
+        def test_proxy_thread(proxy_item):
+            alive = test_proxy_alive(proxy_item.proxy, 5)
+            logging.info("代理地址：{} {}".format(proxy_item.proxy, alive))
 
+        threads = []
+        for proxy_item in proxy_man.proxy_item_list:
+            if proxy_item.item_id == -1: #本地
+                continue
+            
+            thread = threading.Thread(target=test_proxy_thread, args=(proxy_item,))
+            threads.append(thread)
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+        
+        self.save()
+        self.refresh_proxy_list()
+    def export_proxy(self):
+        with open("proxy.txt", "w") as f:
+            for proxy_item in proxy_man.proxy_item_list:
+                if proxy_item.item_id == -1: #本地
+                    continue
+                f.write(proxy_item.proxy + "\n")
+            
+            logging.info("导出完成")
     def add_proxy(self):
-        proxy_error_msg = '代理地址格式出错，应当是"ip:port"的形式，同时只支持ipv4'
-        proxy_text = self.proxy_add_input.text()
-        max_use_amount = int(self.proxy_max_use_amount.currentText())
-        splited = proxy_text.split(":")
-        if len(splited) != 2:
-            logging.error(proxy_error_msg)
-            return
-        ip, port = splited
-        try:
-            port = int(port)
-            assert port >= 0 and port < 2**16
-        except:
-            logging.error(proxy_error_msg)
-            return
-        splited = ip.split(".")
-        if len(splited) != 4:
-            logging.error(proxy_error_msg)
-            return
-        try:
-            for part in splited:
-                int_part = int(part)
-                assert int_part >= 0 and int_part < 2**8
-        except:
-            logging.error(proxy_error_msg)
-            return
-        proxy_man.add_proxy_item(proxy_text, max_use_count=max_use_amount)
+        proxy_error_msg = ' 格式出错，应当是"ip:port"的形式，同时只支持ipv4'
+        # 多行
+        proxy_text_split = self.proxy_add_input.toPlainText().split("\n")
+        for proxy_text in proxy_text_split:
+            max_use_amount = int(self.proxy_max_use_amount.currentText())
+            splited = proxy_text.split(":")
+            if len(splited) != 2:
+                logging.error(proxy_text + proxy_error_msg)
+                continue
+            ip, port = splited
+            try:
+                port = int(port)
+                assert port >= 0 and port < 2**16
+            except:
+                logging.error(proxy_text + proxy_error_msg)
+                continue
+            splited = ip.split(".")
+            if len(splited) != 4:
+                logging.error(proxy_text + proxy_error_msg)
+                continue
+            try:
+                for part in splited:
+                    int_part = int(part)
+                    assert int_part >= 0 and int_part < 2**8
+            except:
+                logging.error(proxy_text + proxy_error_msg)
+                continue
+            proxy_man.add_proxy_item(proxy_text, max_use_count=max_use_amount)
         self.save()
         self.refresh_proxy_list()
 

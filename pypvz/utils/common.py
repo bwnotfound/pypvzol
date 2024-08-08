@@ -1,4 +1,5 @@
 import math
+import requests
 from threading import Thread, Event
 import concurrent.futures
 
@@ -112,6 +113,22 @@ def format_plant_info(
 
     return msg
 
+def test_proxy_alive(proxy,test_times):
+    s_num = 0
+    f_num = 0
+    for i in range(test_times):
+        try:
+            r = requests.get("http://httpbin.org/ip",proxies={
+                    "http": f"http://{proxy}",
+                    "https": f"https://{proxy}",
+                },timeout=3)
+            if r.status_code == 200:
+                s_num+=1
+            else:
+                f_num+=1
+        except:
+            f_num+=1
+    return f"成功次数 {s_num}  失败次数 {f_num}"
 
 def signal_block_emit(refresh_signal, *args):
     if refresh_signal is None:
