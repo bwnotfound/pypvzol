@@ -18,11 +18,12 @@ from PyQt6.QtWidgets import (
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ..wrapped import QLabel, WaitEventThread
+from ..wrapped import QLabel
 from ..message import Logger
 from ..user import UserSettings
 from ... import WebRequest, Repository
 from ...utils.recover import RecoverMan
+from ...utils.common import WaitEventThread
 
 
 class OpenFubenWindow(QMainWindow):

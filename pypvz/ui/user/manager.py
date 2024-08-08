@@ -18,7 +18,7 @@ from ..message import Logger
 from ... import WorldFubenRequest, Serverbattle, Arena, Command, Shop
 from ...fuben import FubenCave
 from ...utils.recover import RecoverMan
-from ..wrapped import signal_block_emit
+from ...utils.common import signal_block_emit
 from ...library import attribute2plant_attribute
 from . import load_data, save_data
 from ...utils.common import format_number

@@ -11,7 +11,7 @@ from ... import (
     HeritageMan,
 )
 from ..message import Logger
-from ..wrapped import signal_block_emit
+from ...utils.common import signal_block_emit
 from .manager import AutoSynthesisMan
 from ...library import attribute2plant_attribute
 

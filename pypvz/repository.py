@@ -72,11 +72,16 @@ class Repository:
         self.cfg = cfg
         self.wr = WebRequest(cfg)
         self._lock = Lock()
+        self._refresh_lock = Lock()
         self.refresh_repository()
 
     def refresh_repository(self, logger=None):
         try:
+            is_requiring = self._refresh_lock.locked()
             self._lock.acquire()
+            self._refresh_lock.acquire()
+            if is_requiring:    # 锁释放，说明已经是新data了
+                return            
             cnt, max_retry = 0, 20
             while cnt < max_retry:
                 cnt += 1
@@ -94,6 +99,7 @@ class Repository:
                     continue
         finally:
             self._lock.release()
+            self._refresh_lock.release()
 
     def _refresh_repository(self, logger=None):
         url = "/pvz/index.php/Warehouse/index/sig/0"
@@ -147,6 +153,7 @@ class Repository:
         self.id2plant = {plant.id: plant for plant in self.plants}
         self.id2tool = {tool['id']: tool for tool in self.tools}
         self.organism_grid_amount = int(warehouse.get("organism_grid_amount"))
+        self.organism_grid_rest_amount = self.organism_grid_amount - len(self.plants)
 
     def hp_below(self, high, id_only=False):
         with self._lock:

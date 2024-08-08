@@ -231,13 +231,26 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         widget1 = QWidget()
         widget1_layout = QHBoxLayout()
-        widget1_layout.addWidget(QLabel("100级后弹出:"))
+        widget1_layout.addWidget(QLabel("炮灰等级大于等于设定后弹出:"))
         self.pop_checkbox = QCheckBox()
         self.pop_checkbox.setChecked(self.challenge4Level.pop_after_100)
         self.pop_checkbox.stateChanged.connect(self.pop_checkbox_stateChanged)
         widget1_layout.addWidget(self.pop_checkbox)
         widget1.setLayout(widget1_layout)
         right_panel_layout.addWidget(widget1)
+        
+        widget = QWidget()
+        widget_layout = QHBoxLayout()
+        widget_layout.addWidget(QLabel("弹出等级:"))
+        self.pop_grade_edit = QLineEdit()
+        validator = QtGui.QIntValidator()
+        validator.setRange(0, 999)
+        self.pop_grade_edit.setValidator(validator)
+        self.pop_grade_edit.setText(str(self.challenge4Level.pop_grade))
+        self.pop_grade_edit.textChanged.connect(self.pop_grade_edit_textChanged)
+        widget_layout.addWidget(self.pop_grade_edit)
+        widget.setLayout(widget_layout)
+        right_panel_layout.addWidget(widget)        
 
         exit_no_trash_plant_layout = QHBoxLayout()
         exit_no_trash_plant_layout.addWidget(QLabel("没炮灰才停止挑战:"))
@@ -414,6 +427,9 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def pop_grade_edit_textChanged(self):
+        self.challenge4Level.pop_grade = int(self.pop_grade_edit.text())
 
     def stone_book_per_use_textChanged(self):
         self.challenge4Level.stone_book_per_use = int(self.stone_book_per_use.text())

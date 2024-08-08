@@ -27,6 +27,7 @@ class ShopAutoBuySetting(QMainWindow):
         logger: Logger,
         shop_auto_buy_dict: dict[int, PurchaseItem],
         target_mode,
+        only_one=False,
         parent=None,
     ):
         super().__init__(parent=parent)
@@ -35,6 +36,7 @@ class ShopAutoBuySetting(QMainWindow):
         self.logger = logger
         self.shop_auto_buy_dict = shop_auto_buy_dict
         self.target_mode = target_mode
+        self.only_one = only_one
         self.shop.refresh_shop()
         self.init_ui()
         self.refresh_auto_buy_list()
@@ -209,7 +211,10 @@ class ShopAutoBuySetting(QMainWindow):
             item.data(Qt.ItemDataRole.UserRole) for item in selected_items
         ]
         if len(selected_goods) == 0:
-            self.logger.log("请先选择一个商品", True)
+            self.logger.log("请先选择一个商品")
+            return
+        if self.only_one and len(selected_goods) + len(self.shop_auto_buy_dict) > 1:
+            self.logger.log("当前模式为唯一模式，只能设置购买一个商品")
             return
         amount = self.set_auto_buy_amount_inputbox.text()
         amount = int(amount) if amount != "" else 1
