@@ -8,6 +8,7 @@ import threading
 import shutil
 import warnings
 import pickle
+import subprocess
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -773,6 +774,10 @@ class CustomMainWindow(QMainWindow):
         refresh_user_info_btn.clicked.connect(self.refresh_user_info_btn_clicked)
         left_layout.addWidget(refresh_user_info_btn)
 
+        open_game_window_btn = QPushButton("打开游戏窗口")
+        open_game_window_btn.clicked.connect(self.open_game_window)
+        left_layout.addWidget(open_game_window_btn)
+
         left_layout.addStretch(1)
         # left_layout.setSpacing(10)
 
@@ -843,7 +848,18 @@ class CustomMainWindow(QMainWindow):
     def refresh_user_info_btn_clicked(self):
         self.refresh_user_info(refresh_all=True)
         self.usersettings.logger.log("用户信息刷新完成")
-
+    def open_game_window(self):
+        #遍历config.json文件，找出与当前用户名匹配的cookie，并写出索引
+        configs = []
+        cfg_path = os.path.join(root_dir, "data/config/config.json")
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            configs = json.load(f)
+        for index,user in enumerate(configs):
+            if user["username"] == self.usersettings.cfg.username:
+                with open('game_window/open_user_index.ini', "w", encoding="utf-8") as f:
+                    f.write(str(index))
+                break
+        subprocess.Popen('game_window/game_window.exe')
     def update_text_box(self):
         if self.textbox_lock.locked():
             return
