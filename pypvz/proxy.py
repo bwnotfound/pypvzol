@@ -60,7 +60,7 @@ def receive_full_data(client, data=None, timeout=0.03, buff_size=10240):
     if data is None:
         data = b""
     if isinstance(data, str):
-        data = data.encode()
+        data = data.encode('iso-8859-1')
     cnt, max_retry = 0, 10
     while cnt < max_retry:
         try:
@@ -102,7 +102,7 @@ def process(request_data, client, self):
         if method == "CONNECT":
             # response_start_line = "HTTP/1.1 200 Connection Established\r\n\r\n"
             # # response = "HTTP/1.1 407 Unauthorized\r\n"
-            # client.send(response_start_line.encode())
+            # client.send(response_start_line.encode('iso-8859-1'))
             Addr = getAddr(request_data)
             server = socket(AF_INET, SOCK_STREAM)
             try:
@@ -110,21 +110,21 @@ def process(request_data, client, self):
             except:
                 server.close()
                 return
-            server.send(request_data.encode())
-            # server.sendall(request_data.encode())
+            server.send(request_data.encode('iso-8859-1'))
+            # server.sendall(request_data.encode('iso-8859-1'))
             interBoth(client, server)
             return
         if header_line.find("http://") != -1 and method in ['GET', 'POST', 'HEAD']:
             # 此处为GET、POST请求方式实现
             Thread(
                 target=self.handle_request,
-                args=(request_data.encode(), client),
+                args=(request_data.encode('iso-8859-1'), client),
             ).start()
             return
         elif header_line.find("http://") != -1:
             Thread(
                 target=self.handle_other_request,
-                args=(request_data.encode(), client),
+                args=(request_data.encode('iso-8859-1'), client),
             ).start()
         else:
             raise NotImplementedError
@@ -143,7 +143,11 @@ def local(serverIP, serverPort, stop_event: Event, self):
             if len(data) == 0:
                 tmp.close()
                 continue
-            data = data.decode()
+            try:
+                data = data.decode('iso-8859-1')
+            except:
+                logging.error(e)
+                raise e
         except Exception as e:
             try:
                 tmp.close()
@@ -189,7 +193,7 @@ class GameWindowProxyServer:
             response_headers += f"{header}: {value}\r\n"
         content = response.content
         response_data = (
-            response_line.encode() + response_headers.encode() + b"\r\n" + content
+            response_line.encode('iso-8859-1') + response_headers.encode('iso-8859-1') + b"\r\n" + content
         )
         client.sendall(response_data)
         client.close()
@@ -203,8 +207,8 @@ class GameWindowProxyServer:
         if is_head:
             data = b""
         response_data = (
-            response_line.encode()
-            + "\r\n".join([f"{k}: {v}" for k, v in response_headers.items()]).encode()
+            response_line.encode('iso-8859-1')
+            + "\r\n".join([f"{k}: {v}" for k, v in response_headers.items()]).encode('iso-8859-1')
             + b"\r\n\r\n"
             + data
         )
@@ -227,9 +231,9 @@ class GameWindowProxyServer:
             self.send_data(data, client, is_head=request.command == "HEAD")
             return
         if request.command == "GET":
-            response = requests.get(url, headers=header, proxies=self.proxy)
+            response = requests.get(url, headers=header)
         elif request.command == "POST":
-            response = requests.post(url, headers=header, proxies=self.proxy, data=post_data)
+            response = requests.post(url, headers=header, data=post_data)
         else:
             raise NotImplementedError
         self.send(response, client)
@@ -237,7 +241,7 @@ class GameWindowProxyServer:
     def handle_other_request(self, data, client):
         request = Request(data)
         url, header = request.path, request.headers
-        response = requests.request(request.command, url, headers=header, proxies=self.proxy)
+        response = requests.request(request.command, url, headers=header)
         self.send(response, client)
         
     def _get_cache_file_path(self, url):
