@@ -1,4 +1,5 @@
 import sys
+import argparse
 import json
 from io import BytesIO
 import os
@@ -9,6 +10,7 @@ import shutil
 import warnings
 import pickle
 import subprocess
+import multiprocessing
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -29,14 +31,11 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QLineEdit,
     QFileDialog,
-
     QTextEdit,
 )
 from PyQt6.QtGui import QImage, QPixmap, QTextCursor, QTextCharFormat, QColor
 from PyQt6.QtCore import Qt, pyqtSignal
 from PIL import Image
-
-from pypvz.utils.common import test_proxy_alive
 
 from pypvz import WebRequest, Config, User, Repository, Library
 from pypvz.ui.message import IOLogger
@@ -67,7 +66,9 @@ from pypvz.ui.windows import (
     # run_game_window,
 )
 from pypvz.ui.windows.common import delete_layout_children
-from pypvz.web import proxy_man
+from pypvz.web import proxy_man, test_proxy_alive
+from pypvz.proxy import GameWindowProxyServer
+
 
 class SettingWindow(QMainWindow):
     def __init__(self, usersettings: UserSettings, parent=None):
@@ -607,7 +608,6 @@ class FunctionPanelWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
-
     def open_fuben_btn_clicked(self):
         self.open_fuben_window = OpenFubenWindow(self.usersettings, parent=self)
         self.open_fuben_window.show()
@@ -801,6 +801,25 @@ class CustomMainWindow(QMainWindow):
         self.setCentralWidget(main_widget)
         self.setWindowTitle("Custom Window")
 
+    def open_game_window(self):
+        # 遍历config.json文件，找出与当前用户名匹配的cookie，并写出索引
+        data = {
+            "cookie": self.usersettings.cfg.cookie,
+            "username": self.usersettings.user.name,
+            "start_url": f"http://{self.usersettings.cfg.host}/pvz/index.php/default/main",
+            "host": self.usersettings.cfg.host,
+            "port": str(GAME_PORT),
+        }
+        with open(
+            os.path.join(game_window_dir, 'start_config.json'), "w", encoding="utf-8"
+        ) as f:
+            f.write(json.dumps(data, ensure_ascii=False))
+        # start_game_window_proxy()
+        exe_path = os.path.join(game_window_dir, 'game_window.exe')
+        if not os.path.exists(exe_path):
+            logging.error(f"找不到游戏窗口程序，可能是因为杀毒程序把对应exe删除了: {exe_path}")
+        subprocess.Popen(exe_path)
+
     def refresh_user_info(self, refresh_all=False):
         delete_layout_children(self.user_info_1)
         delete_layout_children(self.user_info_2)
@@ -848,18 +867,7 @@ class CustomMainWindow(QMainWindow):
     def refresh_user_info_btn_clicked(self):
         self.refresh_user_info(refresh_all=True)
         self.usersettings.logger.log("用户信息刷新完成")
-    def open_game_window(self):
-        #遍历config.json文件，找出与当前用户名匹配的cookie，并写出索引
-        configs = []
-        cfg_path = os.path.join(root_dir, "data/config/config.json")
-        with open(cfg_path, "r", encoding="utf-8") as f:
-            configs = json.load(f)
-        for index,user in enumerate(configs):
-            if user["username"] == self.usersettings.cfg.username:
-                with open('game_window/open_user_index.ini', "w", encoding="utf-8") as f:
-                    f.write(str(index))
-                break
-        subprocess.Popen('game_window/game_window.exe')
+
     def update_text_box(self):
         if self.textbox_lock.locked():
             return
@@ -1008,8 +1016,7 @@ class ProxyManagerWindow(QMainWindow):
         export_proxy_btn = QPushButton("导出已添加代理")
         export_proxy_btn.clicked.connect(self.export_proxy)
         layout.addWidget(export_proxy_btn)
-        
-        self.block_when_no_proxy_checkbox = QCheckBox("没有空闲代理时阻塞(不阻塞则本地直连无限制并发)")
+
         self.block_when_no_proxy_checkbox = QCheckBox(
             "没有空闲代理时阻塞(不阻塞则本地直连无限制并发)"
         )
@@ -1033,7 +1040,7 @@ class ProxyManagerWindow(QMainWindow):
             self.set_proxy_item_max_use_count_btn_cliked
         )
         layout.addWidget(set_proxy_max_use_amount_btn)
-        
+
         warning_label = QLabel(
             "-----使用须知-----\n"
             "1. 默认状态是本地直连无限制并发\n"
@@ -1084,8 +1091,10 @@ class ProxyManagerWindow(QMainWindow):
         proxy_man.reset_proxy_list()
         self.save()
         self.refresh_proxy_list()
+
     def add_tunnel_proxy(self):
         pass
+
     def test_proxy(self):
         def test_proxy_thread(proxy_item):
             alive = test_proxy_alive(proxy_item.proxy, 5)
@@ -1093,31 +1102,34 @@ class ProxyManagerWindow(QMainWindow):
 
         threads = []
         for proxy_item in proxy_man.proxy_item_list:
-            if proxy_item.item_id == -1: #本地
+            if proxy_item.item_id == -1:  # 本地
                 continue
-            
+
             thread = threading.Thread(target=test_proxy_thread, args=(proxy_item,))
             threads.append(thread)
             thread.start()
 
         for thread in threads:
             thread.join()
-        
+
         self.save()
         self.refresh_proxy_list()
+
     def export_proxy(self):
         with open("proxy.txt", "w") as f:
             for proxy_item in proxy_man.proxy_item_list:
-                if proxy_item.item_id == -1: #本地
+                if proxy_item.item_id == -1:  # 本地
                     continue
                 f.write(proxy_item.proxy + "\n")
-            
+
             logging.info("导出完成")
+
     def add_proxy(self):
-        proxy_error_msg = ' 格式出错，应当是"ip:port"的形式，同时只支持ipv4'
+        proxy_error_msg = '格式出错，应当是"ip:port"的形式，同时只支持ipv4'
         # 多行
         proxy_text_split = self.proxy_add_input.toPlainText().split("\n")
         for proxy_text in proxy_text_split:
+            proxy_text = proxy_text.strip()
             max_use_amount = int(self.proxy_max_use_amount.currentText())
             splited = proxy_text.split(":")
             if len(splited) != 2:
@@ -1225,7 +1237,7 @@ class LoginWindow(QMainWindow):
         main_layout = QVBoxLayout()
 
         layout = QHBoxLayout()
-        layout.addWidget(QLabel("当前版本: pre29"))
+        layout.addWidget(QLabel("当前版本: pre30"))
         self.import_data_from_old_version_btn = QPushButton("从旧版本导入数据")
         self.import_data_from_old_version_btn.clicked.connect(
             self.import_data_from_old_version_btn_clicked
@@ -1733,8 +1745,16 @@ def get_usersettings(cfg: Config, logger: IOLogger, setting_dir):
 
     return usersettings
 
-
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    # 解析命令行，获取debug参数
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", action="store_true", help="debug模式")
+    args = parser.parse_args()
+    DEBUG = False
+    if args.debug:
+        DEBUG = True
+    GAME_PORT = 20413
     # 设置logging监听等级为INFO
     logging.basicConfig(
         level=logging.INFO
@@ -1744,8 +1764,16 @@ if __name__ == "__main__":
     data_dir = os.path.join(root_dir, "data")
     os.makedirs(data_dir, exist_ok=True)
     os.makedirs(os.path.join(data_dir, "config"), exist_ok=True)
+    CACHE_DIR = os.path.join(data_dir, "cache")
     proxy_man_save_path = os.path.join(data_dir, "config", "proxy.bin")
-    proxy_man_save_path = os.path.join(data_dir, "config", "proxy.bin")
+    GameWindowProxyServer(CACHE_DIR, GAME_PORT).start()
+    # start_game_window_proxy()
+
+    if DEBUG:
+        game_window_dir = os.path.join(root_dir, "game_window/build")
+    else:
+        game_window_dir = os.path.join(root_dir, "game_window/")
+
     if os.path.exists(proxy_man_save_path):
         try:
             proxy_man.load(proxy_man_save_path)
