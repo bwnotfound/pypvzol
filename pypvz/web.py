@@ -24,11 +24,12 @@ proxies = None
 
 
 class ProxyItem:
-    def __init__(self, item_id, proxy, max_use_count=3):
+    def __init__(self, item_id, proxy, max_use_count=3,test_info=""):
         self.item_id = item_id
         self.proxy = proxy
         self.use_count = 0
         self.max_use_count = max_use_count
+        self.test_info = test_info
 
     def _form_proxy(self):
         if self.proxy is None:
@@ -38,7 +39,7 @@ class ProxyItem:
     def __str__(self):
         if self.proxy is None:
             return f"本地直连({self.max_use_count}并发)"
-        return f"代理地址: {str(self.proxy)}({self.max_use_count}并发)"
+        return f"代理地址: {str(self.proxy)}({self.max_use_count}并发) {self.test_info}"
 
     def __enter__(self, *args, **kwargs):
         self.use_count += 1
@@ -288,7 +289,7 @@ class ProxyManager:
 proxy_man = ProxyManager()
 
 
-def test_proxy_alive(proxy, test_times):
+def test_proxy_alive(proxy,item_id, test_times):
     s_num = 0
     f_num = 0
     for i in range(test_times):
@@ -307,6 +308,9 @@ def test_proxy_alive(proxy, test_times):
                 f_num += 1
         except:
             f_num += 1
+    
+    proxy_man.get_item(item_id).test_info = f"成功 {s_num}  失败 {f_num}"
+
     return f"成功次数 {s_num}  失败次数 {f_num}"
 
 class WebRequest:

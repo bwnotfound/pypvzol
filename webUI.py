@@ -1009,9 +1009,19 @@ class ProxyManagerWindow(QMainWindow):
         add_proxy_btn.clicked.connect(self.add_proxy)
         layout.addWidget(add_proxy_btn)
 
+        layout1 = QHBoxLayout()
+        layout1.addWidget(QLabel("测试次数(最大10):"))
+        self.test_times = QLineEdit()
+        self.test_times.setValidator(QtGui.QIntValidator(1, 10))
+        self.test_times.setText("5")
+        self.test_times.textChanged.connect(
+            self.test_times_textChanged
+        )
+        layout1.addWidget(self.test_times)
         remove_proxy_btn = QPushButton("测试已添加代理")
         remove_proxy_btn.clicked.connect(self.test_proxy)
-        layout.addWidget(remove_proxy_btn)
+        layout1.addWidget(remove_proxy_btn)
+        layout.addLayout(layout1)
 
         export_proxy_btn = QPushButton("导出已添加代理")
         export_proxy_btn.clicked.connect(self.export_proxy)
@@ -1060,7 +1070,12 @@ class ProxyManagerWindow(QMainWindow):
     def use_dns_cache_stateChanged(self):
         proxy_man.use_dns_cache = self.use_dns_cache.isChecked()
         self.save()
-
+    def test_times_textChanged(self):
+        text = self.test_times.text()
+        if text:
+            value = int(text)
+            if value < 1 or value > 10:
+                self.test_times.setText(str(max(1, min(value, 10))))
     def proxy_list_item_clicked(self):
         selected_item = self.proxy_list.currentItem()
         if selected_item is None:
@@ -1097,8 +1112,8 @@ class ProxyManagerWindow(QMainWindow):
 
     def test_proxy(self):
         def test_proxy_thread(proxy_item):
-            alive = test_proxy_alive(proxy_item.proxy, 5)
-            logging.info("代理地址：{} {}".format(proxy_item.proxy, alive))
+            alive = test_proxy_alive(proxy_item.proxy,proxy_item.item_id, int(self.test_times.text()))
+            #logging.info("代理地址：{} {}".format(proxy_item.proxy, alive))
 
         threads = []
         for proxy_item in proxy_man.proxy_item_list:
