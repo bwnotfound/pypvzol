@@ -1,4 +1,4 @@
-from xml.etree.ElementTree import Element, fromstring
+from xml.etree.ElementTree import Element, fromstring, ParseError
 import logging
 from time import sleep, time
 
@@ -78,6 +78,8 @@ class User:
                 root = fromstring(resp.decode("utf-8"))
                 assert root.find("response").find("status").text == "success"
                 break
+            except ParseError:
+                raise Exception("刷新用户信息失败，视为登录状态失效，请重新登录")
             except Exception as e:
                 cnt += 1
                 msg = "刷新用户信息出现异常，异常类型：{}。选择等待3秒后重试。最多再等待{}次".format(
@@ -85,6 +87,8 @@ class User:
                 )
                 logging.info(msg)
                 sleep(3)
+        else:
+            raise Exception("刷新用户信息失败，已达最大重试次数")
         self.friendMan.refresh(root)
 
         user = root.find("user")

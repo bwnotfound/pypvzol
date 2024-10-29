@@ -426,6 +426,8 @@ def get_usersettings(cfg, user_dir, extra_logger=None, need_logs=True) -> UserSe
 
         concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
 
+        if futures[0].exception() is not None:
+            raise futures[0].exception()
         user: User = futures[0].result()
         lib: Library = futures[1].result()
         repo: Repository = futures[2].result()

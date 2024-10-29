@@ -156,7 +156,7 @@ class AssistantManager:
             )
             return usersettings
         except Exception as e:
-            # self.logger.warning(e)
+            self.logger.warning(e)
             return None
 
     def run_user(self, account: AssistantAccount, settings=None):
@@ -174,6 +174,7 @@ class AssistantManager:
                 usersettings.challenge4Level_enabled = False
             if "disable_fuben" in settings and settings["disable_fuben"]:
                 usersettings.fuben_enabled = False
+        usersettings.arena_challenge_mode = 0
         usersettings._start(account.usersettings_stop_channel)
 
     def get_user_extra_data(self, data: bytes):
@@ -211,6 +212,11 @@ class AssistantManager:
         return {"code": 0, "message": "所有日志读取成功", "result": result}
 
     def _run_one_cycle(self, settings):
+        if settings is None:
+            settings = {
+                "disable_cave": True,
+                "disable_fuben": True,
+            }
         if self.stop_circle_event.is_set():
             return
         future_list = []
