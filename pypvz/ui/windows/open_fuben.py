@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
     QSpinBox,
+    QLineEdit,
 )
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -225,7 +226,8 @@ class OpenFubenWindow(QMainWindow):
             "原理是挑战设定的起始关到终止关\n"
             "挑战失败后会自动回复并继续挑战\n"
             "挑战成功一关后会自动挑战下一关\n"
-            "直到选中的关卡都被挑战通过"
+            "直到选中的关卡都被挑战通过\n"
+            "挑战成功指连续通关指定次数"
         )
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         stone_fuben_layout.addWidget(label)
@@ -241,16 +243,21 @@ class OpenFubenWindow(QMainWindow):
         self.end_layer.addItems([str(i) for i in range(1, 9 + 1)])
         self.end_layer.setCurrentIndex(0)
         layout.addWidget(self.end_layer)
+        layout.addWidget(QLabel("连胜次数:"))
+        self.series_success_amount_inputbox = QLineEdit()
+        self.series_success_amount_inputbox.setText("30")
+        self.series_success_amount_inputbox.setValidator(QtGui.QIntValidator(1, 1000))
+        layout.addWidget(self.series_success_amount_inputbox)
         layout = QHBoxLayout()
         stone_fuben_layout.addLayout(layout)
         layout.addWidget(QLabel("起始关:"))
         self.start_level = QComboBox()
-        self.start_level.addItems([str(i) for i in range(1, 12 * 5 + 1)])
+        self.start_level.addItems([str(i) for i in range(1, 12 * 6 + 1)])
         self.start_level.setCurrentIndex(0)
         layout.addWidget(self.start_level)
         layout.addWidget(QLabel("终点关:"))
         self.end_level = QComboBox()
-        self.end_level.addItems([str(i) for i in range(1, 12 * 5 + 1)])
+        self.end_level.addItems([str(i) for i in range(1, 12 * 6 + 1)])
         self.end_level.setCurrentIndex(0)
         layout.addWidget(self.end_level)
 
@@ -490,6 +497,7 @@ class OpenFubenWindow(QMainWindow):
                     if self.fuben_need_recover_checkbox.isChecked()
                     else None
                 )
+                series_success_amount = int(self.series_success_amount_inputbox.text())
                 self.stone_fuben_run_thread = StoneChallengeThread(
                     self.usersettings.cfg,
                     self.usersettings.repo,
@@ -497,6 +505,7 @@ class OpenFubenWindow(QMainWindow):
                     challenge_list,
                     self.usersettings.open_fuben_man.team,
                     recover_threshold,
+                    series_success_amount,
                     self.stone_fuben_finish_signal,
                     self.stone_fuben_interrupt_event,
                     self.stone_fuben_rest_event,
@@ -576,6 +585,7 @@ class StoneChallengeThread(Thread):
         challenge_list,  # (layer, level, difficulty)
         plant_id_list,
         recover_threshold,
+        series_success_amount,
         finish_signal,
         interrupt_event: Event,
         rest_event: Event,
@@ -591,6 +601,7 @@ class StoneChallengeThread(Thread):
         self.challenge_list = challenge_list
         self.plant_id_list = plant_id_list
         self.recover_threshold = recover_threshold
+        self.series_success_amount = series_success_amount
         assert len(plant_id_list) > 0, "未设置出战植物"
         assert len(challenge_list) > 0, "未设置挑战列表"
 
@@ -650,6 +661,7 @@ class StoneChallengeThread(Thread):
         }
 
     def challenge(self, layer, level, difficulty):
+        series_success_cnt = 0
         while True:
             if self.interrupt_event.is_set():
                 return False
@@ -660,10 +672,14 @@ class StoneChallengeThread(Thread):
             is_winning = result["result"]["is_winning"]
             msg = "挑战宝石关卡{}-{}".format(layer * 100 + level, difficulty)
             if is_winning:
-                self.logger.log(msg + "成功")
-                return True
+                series_success_cnt += 1
+                self.logger.log("{}成功，连胜次数：{}".format(msg, series_success_cnt))
+                if series_success_cnt >= self.series_success_amount:
+                    self.logger.log("连胜次数达到{}".format(self.series_success_amount))
+                    return True
             else:
-                self.logger.log(msg + "失败")
+                series_success_cnt = 0
+                self.logger.log("{}失败，连胜次数：{}".format(msg, series_success_cnt))
                 if not self.recover():
                     self.logger.log("尝试恢复植物血量失败，退出运行")
                     return False

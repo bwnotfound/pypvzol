@@ -59,9 +59,9 @@ class Cave:
             return (
                 user_id * 1000
                 + [1, 6, 3][self.type - 1] * 100
+                + (garden_layer - 1) * garden_layer_offset
                 + (self.layer - 1) * layer_offset
                 + self.number
-                + (garden_layer - 1) * garden_layer_offset
             )
         elif self.type == 4:
             return self.id
@@ -254,7 +254,7 @@ class CaveMan:
 
         洞口已切换到第{}层
         '''
-        target_char = "一二三四五六"[target_layer - 1]
+        target_char = "一二三四五六七八九"[target_layer - 1]
         body = [float(1), float(0), float(0), []]
         while True:
             response = self.wr.amf_post_retry(

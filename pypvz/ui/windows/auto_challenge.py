@@ -63,8 +63,8 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         # 将窗口居中显示，宽度为显示器宽度的40%，高度为显示器高度的60%
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.4), int(screen_size.height() * 0.85))
-        self.move(int(screen_size.width() * 0.3), int(screen_size.height() * 0.03))
+        self.resize(int(screen_size.width() * 0.4), int(screen_size.height() * 0.95))
+        self.move(int(screen_size.width() * 0.3), int(screen_size.height() * 0.01))
 
         main_widget = QWidget()
         main_layout = QHBoxLayout()
@@ -238,7 +238,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         widget1_layout.addWidget(self.pop_checkbox)
         widget1.setLayout(widget1_layout)
         right_panel_layout.addWidget(widget1)
-        
+
         widget = QWidget()
         widget_layout = QHBoxLayout()
         widget_layout.addWidget(QLabel("弹出等级:"))
@@ -250,7 +250,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         self.pop_grade_edit.textChanged.connect(self.pop_grade_edit_textChanged)
         widget_layout.addWidget(self.pop_grade_edit)
         widget.setLayout(widget_layout)
-        right_panel_layout.addWidget(widget)        
+        right_panel_layout.addWidget(widget)
 
         exit_no_trash_plant_layout = QHBoxLayout()
         exit_no_trash_plant_layout.addWidget(QLabel("没炮灰才停止挑战:"))
@@ -277,7 +277,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         right_panel_layout.addLayout(show_series_success_layout)
 
         series_success_exit_layout = QHBoxLayout()
-        series_success_exit_layout.addWidget(QLabel("连胜20次停止:"))
+        series_success_exit_layout.addWidget(QLabel("连胜指定次数后停止:"))
         self.series_success_exit_checkbox = QCheckBox()
         self.series_success_exit_checkbox.setChecked(
             self.challenge4Level.series_success_exit
@@ -287,6 +287,33 @@ class Challenge4levelSettingWindow(QMainWindow):
         )
         series_success_exit_layout.addWidget(self.series_success_exit_checkbox)
         right_panel_layout.addLayout(series_success_exit_layout)
+
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("连胜次数:"))
+        self.series_success_exit_amount_inputbox = QLineEdit()
+        self.series_success_exit_amount_inputbox.setValidator(
+            QtGui.QIntValidator(1, 1000)
+        )
+        self.series_success_exit_amount_inputbox.setText(
+            f"{self.challenge4Level.series_success_exit_amount}"
+        )
+        self.series_success_exit_amount_inputbox.textChanged.connect(
+            self.series_success_exit_amount_inputbox_changed
+        )
+        layout.addWidget(self.series_success_exit_amount_inputbox)
+        right_panel_layout.addLayout(layout)
+
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("连胜洞口后自动下一个洞口:"))
+        self.switch_to_next_after_series_success_checkbox = QCheckBox()
+        self.switch_to_next_after_series_success_checkbox.setChecked(
+            self.challenge4Level.switch_to_next_after_series_success
+        )
+        self.switch_to_next_after_series_success_checkbox.stateChanged.connect(
+            self.switch_to_next_after_series_success_checkbox_stateChanged
+        )
+        layout.addWidget(self.switch_to_next_after_series_success_checkbox)
+        right_panel_layout.addLayout(layout)
 
         layout = QHBoxLayout()
         layout.addWidget(QLabel("每次自动使用宝石书数量:"))
@@ -319,7 +346,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         self.use_advanced_challenge_book_count_box = QSpinBox()
         self.use_advanced_challenge_book_count_box.setMinimum(1)
         self.use_advanced_challenge_book_count_box.setMaximum(
-            5 if self.cfg.server == "官服" else 2250 // 5
+            5 if self.cfg.server == "官服" else 10000
         )
         self.use_advanced_challenge_book_count_box.setValue(
             self.challenge4Level.advanced_challenge_book_amount
@@ -337,7 +364,7 @@ class Challenge4levelSettingWindow(QMainWindow):
         self.use_normal_challenge_book_count_box = QSpinBox()
         self.use_normal_challenge_book_count_box.setMinimum(1)
         self.use_normal_challenge_book_count_box.setMaximum(
-            25 if self.cfg.server == "官服" else 2250
+            25 if self.cfg.server == "官服" else 10000
         )
         self.use_normal_challenge_book_count_box.setValue(
             self.challenge4Level.normal_challenge_book_amount
@@ -427,6 +454,20 @@ class Challenge4levelSettingWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+    def switch_to_next_after_series_success_checkbox_stateChanged(self):
+        self.challenge4Level.switch_to_next_after_series_success = (
+            self.switch_to_next_after_series_success_checkbox.isChecked()
+        )
+
+    def series_success_exit_amount_inputbox_changed(self):
+        amount = int(self.series_success_exit_amount_inputbox.text())
+        if amount < 1:
+            amount = 1
+        if amount > 1000:
+            amount = 1000
+        self.series_success_exit_amount_inputbox.setText(str(amount))
+        self.challenge4Level.series_success_exit_amount = amount
 
     def pop_grade_edit_textChanged(self):
         self.challenge4Level.pop_grade = int(self.pop_grade_edit.text())

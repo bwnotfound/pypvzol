@@ -774,9 +774,10 @@ class CustomMainWindow(QMainWindow):
         refresh_user_info_btn.clicked.connect(self.refresh_user_info_btn_clicked)
         left_layout.addWidget(refresh_user_info_btn)
 
-        open_game_window_btn = QPushButton("打开游戏窗口")
-        open_game_window_btn.clicked.connect(self.open_game_window)
-        left_layout.addWidget(open_game_window_btn)
+        if ENABLE_GAME_WINDOW:
+            open_game_window_btn = QPushButton("打开游戏窗口")
+            open_game_window_btn.clicked.connect(self.open_game_window)
+            left_layout.addWidget(open_game_window_btn)
 
         left_layout.addStretch(1)
         # left_layout.setSpacing(10)
@@ -1765,6 +1766,7 @@ if __name__ == "__main__":
     # 解析命令行，获取debug参数
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", help="debug模式")
+    ENABLE_GAME_WINDOW = False
     args = parser.parse_args()
     DEBUG = False
     if args.debug:
@@ -1781,13 +1783,15 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(data_dir, "config"), exist_ok=True)
     CACHE_DIR = os.path.join(data_dir, "cache")
     proxy_man_save_path = os.path.join(data_dir, "config", "proxy.bin")
-    GameWindowProxyServer(CACHE_DIR, GAME_PORT).start()
+    if ENABLE_GAME_WINDOW:
+        GameWindowProxyServer(CACHE_DIR, GAME_PORT).start()
     # start_game_window_proxy()
 
-    if DEBUG:
-        game_window_dir = os.path.join(root_dir, "game_window/build")
-    else:
-        game_window_dir = os.path.join(root_dir, "game_window/")
+    if ENABLE_GAME_WINDOW:
+        if DEBUG:
+            game_window_dir = os.path.join(root_dir, "game_window/build")
+        else:
+            game_window_dir = os.path.join(root_dir, "game_window/")
 
     if os.path.exists(proxy_man_save_path):
         try:

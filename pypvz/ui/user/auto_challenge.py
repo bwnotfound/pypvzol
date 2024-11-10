@@ -1,5 +1,6 @@
 import pickle
 import os
+from copy import deepcopy
 import time
 from queue import Queue
 
@@ -15,6 +16,8 @@ from ...utils.recover import RecoverMan
 from ..message import Logger
 from . import load_data, save_data
 
+MAX_CAVE_GARDEN_LAYER = {1: 7, 2: 5, 3: 5, 4: 6}
+
 
 class SingleCave:
     def __init__(self, cave: Cave, difficulty=3, garden_layer=None, use_sand=False):
@@ -25,6 +28,47 @@ class SingleCave:
         self.friend_id_list: list[int] = []
         self.cave = cave
         self.friend_id2cave_id = {}
+
+    def get_next_cave(self):
+        new_cave = deepcopy(self.cave)
+        new_cave.id += 1
+        if hasattr(new_cave, "cave_id"):
+            new_cave.cave_id += 1
+        new_cave.number += 1
+        new_sc_garden_layer = self.garden_layer
+        if new_sc_garden_layer is not None:
+            new_sc_garden_layer = min(
+                new_sc_garden_layer, MAX_CAVE_GARDEN_LAYER[new_cave.type]
+            )
+        if new_cave.type <= 3:
+            if new_cave.type == 1:
+                garden_layer_offset = 3
+                layer_offset = 9
+            else:
+                garden_layer_offset = 4
+                layer_offset = 12
+            if new_cave.number > layer_offset:
+                new_cave.number = 1
+                new_cave.layer += 1
+                if new_cave.layer > garden_layer_offset:
+                    new_cave.layer = 1
+                    new_sc_garden_layer += 1
+            if new_sc_garden_layer > MAX_CAVE_GARDEN_LAYER[new_cave.type]:
+                return None
+        else:
+            if (new_cave.id % 100 - 1) % 12 == 0:
+                new_cave.layer += 1
+                new_cave.number = 1
+            if new_cave.layer > MAX_CAVE_GARDEN_LAYER[new_cave.type]:
+                return None
+        if new_cave.type == 4:
+            new_cave.name = "{}-{}(自动生成)".format(new_cave.layer, new_cave.number)
+        else:
+            new_cave.name = "{}{}(自动生成)".format(
+                ["暗", "公", "个"][new_cave.type - 1],
+                str(int(self.cave.name[1:].replace("(自动生成)", "")) + 1),
+            )
+        return SingleCave(new_cave, self.difficulty, new_sc_garden_layer, self.use_sand)
 
 
 class Challenge4Level:
@@ -55,8 +99,8 @@ class Challenge4Level:
         self.pop_after_100 = True
         self.pop_grade = 100
         self.auto_use_challenge_book = False
-        self.normal_challenge_book_amount = 1
-        self.advanced_challenge_book_amount = 1
+        self.normal_challenge_book_amount = 100
+        self.advanced_challenge_book_amount = 20
         self.enable_sand = False
         self.show_lottery = False
         self.enable_stone = True
@@ -64,6 +108,8 @@ class Challenge4Level:
         self.exit_no_trash_plant = False
         self.show_series_success = False
         self.series_success_exit = False
+        self.series_success_exit_amount = 30
+        self.switch_to_next_after_series_success = True
 
         self.disable_cave_info_fetch = False
         self.need_recover = True
@@ -78,6 +124,21 @@ class Challenge4Level:
         self.cooldown_cave_id_set = set()
         self.stone_book_per_use = 0
 
+    def switch_to_next_cave(self, sc: SingleCave):
+        next_sc = sc.get_next_cave()
+        if next_sc is None:
+            return False
+        self.add_cave(
+            next_sc.cave,
+            self.friendMan.friends[0].id,
+            sc.difficulty,
+            sc.enabled,
+            sc.garden_layer,
+            sc.use_sand,
+        )
+        self.remove_cave(sc.cave, sc.garden_layer)
+        return True
+
     def add_cave(
         self,
         cave: Cave,
@@ -87,10 +148,10 @@ class Challenge4Level:
         garden_layer=None,
         use_sand=False,
     ):
-        for c in self.caves:
+        for sc in self.caves:
             if (
-                cave.id == c.cave.id and cave.name == c.cave.name
-            ) and garden_layer == c.garden_layer:
+                cave.id == sc.cave.id and cave.name == sc.cave.name
+            ) and garden_layer == sc.garden_layer:
                 self.logger.log("洞口已经存在了")
                 return
         if cave.type <= 3:
@@ -578,9 +639,27 @@ class Challenge4Level:
                     self.pop_trash_plant()
                 if stop_channel.qsize() > 0:
                     return False
-                if self.series_success_exit and sc.series_success_count >= 20:
-                    self.logger.log("连胜次数达到20，终止运行")
-                    return False
+                if (
+                    self.series_success_exit
+                    and sc.series_success_count >= self.series_success_exit_amount
+                ):
+                    if not self.switch_to_next_after_series_success:
+                        self.logger.log(
+                            f"连胜次数达到{self.series_success_exit_amount}，终止运行"
+                        )
+                        return False
+                    else:
+                        self.logger.log(
+                            f"连胜次数达到{self.series_success_exit_amount}，尝试自动切换到下一个洞口"
+                        )
+                        if self.switch_to_next_cave(sc):
+                            self.logger.log(
+                                f"成功切换到{sc.cave.format_name(sc.difficulty)}"
+                            )
+                            return "continue"
+                        else:
+                            self.logger.log("识别到已经刷到最后一个洞口，终止刷洞")
+                            return False
         return True
 
     def challenge_stone_fuben(self, stop_channel: Queue):
@@ -678,6 +757,17 @@ class Challenge4Level:
                 message = message + "挑战结果：{}".format(
                     "胜利" if result['is_winning'] else "失败"
                 )
+                if self.show_series_success or self.series_success_exit:
+                    if not hasattr(sc, 'series_success_count'):
+                        sc.series_success_count = 0
+                    if result['is_winning']:
+                        sc.series_success_count += 1
+                    else:
+                        sc.series_success_count = 0
+                    if self.show_series_success:
+                        message = message + "，连胜次数：{}".format(
+                            sc.series_success_count
+                        )
                 message = message + self.format_upgrade_message(
                     team, result, sc.cave.grade
                 )
@@ -686,6 +776,27 @@ class Challenge4Level:
                     self.pop_trash_plant()
                 if stop_channel.qsize() > 0:
                     return
+                if (
+                    self.series_success_exit
+                    and sc.series_success_count >= self.series_success_exit_amount
+                ):
+                    if not self.switch_to_next_after_series_success:
+                        self.logger.log(
+                            f"连胜次数达到{self.series_success_exit_amount}，跳出宝石挑战"
+                        )
+                        return False
+                    else:
+                        self.logger.log(
+                            f"连胜次数达到{self.series_success_exit_amount}，尝试自动切换到下一个宝石洞口"
+                        )
+                        if self.switch_to_next_cave(sc):
+                            self.logger.log(
+                                f"成功切换到{sc.cave.format_name(sc.difficulty)}"
+                            )
+                            return "continue"
+                        else:
+                            self.logger.log("识别到已经刷到最后一个宝石洞口，终止宝石挑战")
+                            return False
             if not has_challenged:
                 self.logger.log("没有可以挑战的宝石副本，跳出挑战宝石副本")
                 break
@@ -735,13 +846,19 @@ class Challenge4Level:
         if self.pop_after_100:
             self.pop_trash_plant()
         if self.enable_stone:
-            self.challenge_stone_fuben(stop_channel)
+            while True:
+                enter_time = time.perf_counter()
+                status = self.challenge_stone_fuben(stop_channel)
+                if status != "continue":
+                    break
+                time.sleep(max(0, 0.2 - (time.perf_counter() - enter_time)))
         if self.cfg.server == "官服":
             raise NotImplementedError("助手不支持官服")
         elif self.cfg.server != "私服":
             raise NotImplementedError("助手不支持服务器:{}".format(self.cfg.server))
         while True:
             enter_time = time.perf_counter()
+            continue_challenge = False
             for garden_layer in self.garden_layer_caves.keys():
                 if stop_channel.qsize() > 0:
                     break
@@ -755,8 +872,12 @@ class Challenge4Level:
                         if not self.switch_garden_layer(garden_layer):
                             continue
                 try:
-                    if not self.challenge_cave(stop_channel):
+                    status = self.challenge_cave(stop_channel)
+                    if status == False:
                         return False
+                    if status == "continue":
+                        continue_challenge = True
+                        break
                 except Exception as e:
                     self.logger.log(
                         "挑战第{}层洞口异常，异常种类:{}。跳过该层".format(
@@ -767,6 +888,8 @@ class Challenge4Level:
             if stop_channel.qsize() > 0:
                 break
             if self.exit_no_trash_plant and len(self.trash_plant_list) != 0:
+                continue
+            if continue_challenge:
                 continue
             break
         self.logger.log("挑战完成")
@@ -797,6 +920,8 @@ class Challenge4Level:
             "exit_no_trash_plant": self.exit_no_trash_plant,
             "show_series_success": self.show_series_success,
             "series_success_exit": self.series_success_exit,
+            "series_success_exit_amount": self.series_success_exit_amount,
+            "switch_to_next_after_series_success": self.switch_to_next_after_series_success,
             "stone_book_per_use": self.stone_book_per_use,
             "pop_grade": self.pop_grade,
         }

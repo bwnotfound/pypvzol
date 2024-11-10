@@ -24,7 +24,7 @@ proxies = None
 
 
 class ProxyItem:
-    def __init__(self, item_id, proxy, max_use_count=3,test_info=""):
+    def __init__(self, item_id, proxy, max_use_count=3, test_info=""):
         self.item_id = item_id
         self.proxy = proxy
         self.use_count = 0
@@ -124,7 +124,11 @@ class DNSCache:
                 raise e
 
 
-dns_cache = DNSCache()
+try:
+    dns_cache = DNSCache()
+except Exception as e:
+    logging.warning("DNS缓存初始化失败，将不使用DNS缓存。报错信息: {}".format(str(e)))
+    dns_cache = None
 dns_cache_lock = Lock()
 
 
@@ -156,7 +160,10 @@ class ProxyManager:
         self.use_dns_cache = False
 
     def get_adapter(self):
-        return DNSCacheAdapter() if self.use_dns_cache else HTTPAdapter()
+        if self.use_dns_cache and dns_cache is not None:
+            return DNSCacheAdapter()
+        else:
+            return HTTPAdapter()
 
     def reset_proxy_list(self):
         with self._lock:
@@ -289,7 +296,7 @@ class ProxyManager:
 proxy_man = ProxyManager()
 
 
-def test_proxy_alive(proxy,item_id, test_times):
+def test_proxy_alive(proxy, item_id, test_times):
     s_num = 0
     f_num = 0
     for i in range(test_times):
@@ -308,10 +315,11 @@ def test_proxy_alive(proxy,item_id, test_times):
                 f_num += 1
         except:
             f_num += 1
-    
+
     proxy_man.get_item(item_id).test_info = f"成功 {s_num}  失败 {f_num}"
 
     return f"成功次数 {s_num}  失败次数 {f_num}"
+
 
 class WebRequest:
     def __init__(self, cfg: Config, cache_dir=None):
