@@ -1253,7 +1253,7 @@ class LoginWindow(QMainWindow):
         main_layout = QVBoxLayout()
 
         layout = QHBoxLayout()
-        layout.addWidget(QLabel("当前版本: pre30"))
+        layout.addWidget(QLabel("当前版本: pre31"))
         self.import_data_from_old_version_btn = QPushButton("从旧版本导入数据")
         self.import_data_from_old_version_btn.clicked.connect(
             self.import_data_from_old_version_btn_clicked
