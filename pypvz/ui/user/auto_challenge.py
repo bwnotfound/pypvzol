@@ -131,10 +131,10 @@ class Challenge4Level:
         self.add_cave(
             next_sc.cave,
             self.friendMan.friends[0].id,
-            sc.difficulty,
-            sc.enabled,
-            sc.garden_layer,
-            sc.use_sand,
+            next_sc.difficulty,
+            next_sc.enabled,
+            next_sc.garden_layer,
+            next_sc.use_sand,
         )
         self.remove_cave(sc.cave, sc.garden_layer)
         return True

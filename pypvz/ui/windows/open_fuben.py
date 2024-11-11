@@ -262,7 +262,9 @@ class OpenFubenWindow(QMainWindow):
         layout.addWidget(self.end_level)
 
         self.stone_need_recover_checkbox = QCheckBox("需要回复")
-        self.stone_need_recover_checkbox.setChecked(self.usersettings.open_fuben_man.need_recover)
+        self.stone_need_recover_checkbox.setChecked(
+            self.usersettings.open_fuben_man.need_recover
+        )
         self.stone_need_recover_checkbox.stateChanged.connect(
             self.stone_need_recover_checkbox_stateChanged
         )
@@ -311,7 +313,7 @@ class OpenFubenWindow(QMainWindow):
         self.stone_need_recover_checkbox.setChecked(
             self.fuben_need_recover_checkbox.isChecked()
         )
-    
+
     def stone_need_recover_checkbox_stateChanged(self):
         self.usersettings.open_fuben_man.need_recover = (
             self.stone_need_recover_checkbox.isChecked()
@@ -323,7 +325,7 @@ class OpenFubenWindow(QMainWindow):
     def fuben_recover_threshold_input_valueChanged(self, value):
         self.usersettings.open_fuben_man.recover_threshold = value / 100
         self.stone_recover_threshold_input.setValue(value)
-    
+
     def stone_recover_threshold_input_valueChanged(self, value):
         self.usersettings.open_fuben_man.recover_threshold = value / 100
         self.fuben_recover_threshold_input.setValue(value)
@@ -665,7 +667,27 @@ class StoneChallengeThread(Thread):
         while True:
             if self.interrupt_event.is_set():
                 return False
-            result = self._challenge(layer, level, difficulty)
+            cnt, max_retry = 0, 20
+            while cnt < max_retry:
+                cnt += 1
+                try:
+                    result = self._challenge(layer, level, difficulty)
+                    break
+                except Exception as e:
+                    self.logger.log(
+                        "挑战宝石关卡{}-{}异常，置连胜次数为0，还能重试次数：{}".format(
+                            layer * 100 + level, difficulty, cnt
+                        )
+                    )
+                    self.logger.log(str(e))
+                    series_success_cnt = 0
+            else:
+                self.logger.log(
+                    "挑战宝石关卡{}-{}重试次数超过限制，视作挑战异常退出".format(
+                        layer * 100 + level, difficulty
+                    )
+                )
+                return False
             if not result["success"]:
                 self.logger.log(result["result"])
                 return False
