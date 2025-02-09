@@ -1005,6 +1005,7 @@ class TerritoryMan:
     def load(self, load_dir):
         load_data(load_dir, "auto_territory", self)
         self.team = self.team[:5]
+        self.territory_mutex_enabled = False
 
 
 class DailyMan:

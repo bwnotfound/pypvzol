@@ -133,14 +133,14 @@ class TerritorySettingWindow(QMainWindow):
         layout.addWidget(self.pool_size_combobox)
         layout5.addLayout(layout)
 
-        self.territory_mutex_checkbox = QCheckBox("开启领地互斥:")
-        self.territory_mutex_checkbox.setChecked(
-            self.usersettings.territory_man.territory_mutex_enabled
-        )
-        self.territory_mutex_checkbox.stateChanged.connect(
-            self.territory_mutex_checkbox_state_changed
-        )
-        layout5.addWidget(self.territory_mutex_checkbox)
+        # self.territory_mutex_checkbox = QCheckBox("开启领地互斥:")
+        # self.territory_mutex_checkbox.setChecked(
+        #     self.usersettings.territory_man.territory_mutex_enabled
+        # )
+        # self.territory_mutex_checkbox.stateChanged.connect(
+        #     self.territory_mutex_checkbox_state_changed
+        # )
+        # layout5.addWidget(self.territory_mutex_checkbox)
 
         warn_label = QLabel(
             "----注意----\n"
@@ -148,11 +148,11 @@ class TerritorySettingWindow(QMainWindow):
             "打完领地后会自动下植物\n"
             "智能领地只对难度四有效\n"
             "选择智能领地后将无法多并发\n"
-            "领地互斥选中就会起效\n"
-            "领地互斥是根据竞技场排名决定优先级的\n"
-            "排名高的在遇到冲突时会优先开始\n"
-            "排名低在运行时若有排名高的想要运行\n"
-            "    则会被迫停止，直到排名高的运行完毕\n"
+            # "领地互斥选中就会起效\n"
+            # "领地互斥是根据竞技场排名决定优先级的\n"
+            # "排名高的在遇到冲突时会优先开始\n"
+            # "排名低在运行时若有排名高的想要运行\n"
+            # "    则会被迫停止，直到排名高的运行完毕\n"
         )
         warn_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout5.addWidget(warn_label)
@@ -168,10 +168,10 @@ class TerritorySettingWindow(QMainWindow):
 
         self.setCentralWidget(main_widget)
 
-    def territory_mutex_checkbox_state_changed(self):
-        self.usersettings.territory_man.territory_mutex_enabled = (
-            self.territory_mutex_checkbox.isChecked()
-        )
+    # def territory_mutex_checkbox_state_changed(self):
+    #     self.usersettings.territory_man.territory_mutex_enabled = (
+    #         self.territory_mutex_checkbox.isChecked()
+    #     )
 
     def pool_size_combobox_currentIndexChanged(self):
         self.usersettings.territory_man.pool_size = int(

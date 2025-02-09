@@ -134,14 +134,20 @@ dns_cache_lock = Lock()
 
 class DNSCacheAdapter(HTTPAdapter):
     def __init__(self, *args, **kwargs):
+        self.already_logged = False
         super().__init__(*args, **kwargs)
 
     def get_connection(self, url, proxies=None):
         # 解析主机名并使用缓存的IP地址
         host = self.get_host(url)
-        with dns_cache_lock:
-            ip = dns_cache.resolve(host)
-        url = url.replace(host, ip)
+        try:
+            with dns_cache_lock:
+                ip = dns_cache.resolve(host)
+            url = url.replace(host, ip)
+        except Exception as e:
+            if not self.already_logged:
+                logging.info(f"Failed to resolve {host}. \nException: {str(e)}")
+            self.already_logged = True
         return super().get_connection(url, proxies)
 
     def get_host(self, url):

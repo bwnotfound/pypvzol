@@ -694,7 +694,7 @@ class AutoCompoundWindow(QMainWindow):
 class CompoundThread(Thread):
     def __init__(
         self,
-        auto_compound_man,
+        auto_compound_man: AutoCompoundMan,
         compound_finish_signal,
         interrupt_event: Event,
         refresh_all_signal,

@@ -94,6 +94,7 @@ class UserSettings:
         self.command_enabled = False
         self.open_fuben_man = OpenFubenMan(cfg, repo, lib, self.logger)
         self.skill_stone_man = SkillStoneMan(cfg, lib, self.logger)
+        self.open_stone_fuben_recover_threshold = 0.1
 
     def _start(self, stop_channel: Queue, close_signal, finish_signal):
         self.repo.refresh_repository(self.logger)
@@ -322,6 +323,7 @@ class UserSettings:
                 "arena_challenge_mode": self.arena_challenge_mode,
                 "daily_settings": self.daily_settings,
                 "command_enabled": self.command_enabled,
+                "open_stone_fuben_recover_threshold": self.open_stone_fuben_recover_threshold,
             },
             "mans": {
                 "cfg": self.cfg.save(),

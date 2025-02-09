@@ -184,6 +184,7 @@ class OpenFubenWindow(QMainWindow):
         layout.addWidget(self.fuben_need_recover_checkbox)
         layout1 = QHBoxLayout()
         layout1.addStretch(1)
+        layout1.addWidget(QLabel("回复阈值:"))
         # 创建正浮点数输入框，要求值在0~100之间
         self.fuben_recover_threshold_input = QSpinBox()
         self.fuben_recover_threshold_input.setMinimum(0)
@@ -237,11 +238,15 @@ class OpenFubenWindow(QMainWindow):
         self.start_layer = QComboBox()
         self.start_layer.addItems([str(i) for i in range(1, 9 + 1)])
         self.start_layer.setCurrentIndex(0)
+        self.start_layer.currentIndexChanged.connect(
+            self.start_layer_currentIndexChanged
+        )
         layout.addWidget(self.start_layer)
         layout.addWidget(QLabel("终点间:"))
         self.end_layer = QComboBox()
         self.end_layer.addItems([str(i) for i in range(1, 9 + 1)])
         self.end_layer.setCurrentIndex(0)
+        self.end_layer.currentIndexChanged.connect(self.end_layer_currentIndexChanged)
         layout.addWidget(self.end_layer)
         layout.addWidget(QLabel("连胜次数:"))
         self.series_success_amount_inputbox = QLineEdit()
@@ -254,11 +259,15 @@ class OpenFubenWindow(QMainWindow):
         self.start_level = QComboBox()
         self.start_level.addItems([str(i) for i in range(1, 12 * 6 + 1)])
         self.start_level.setCurrentIndex(0)
+        self.start_level.currentIndexChanged.connect(
+            self.start_level_currentIndexChanged
+        )
         layout.addWidget(self.start_level)
         layout.addWidget(QLabel("终点关:"))
         self.end_level = QComboBox()
         self.end_level.addItems([str(i) for i in range(1, 12 * 6 + 1)])
         self.end_level.setCurrentIndex(0)
+        self.end_level.currentIndexChanged.connect(self.end_level_currentIndexChanged)
         layout.addWidget(self.end_level)
 
         self.stone_need_recover_checkbox = QCheckBox("需要回复")
@@ -271,11 +280,14 @@ class OpenFubenWindow(QMainWindow):
         layout.addWidget(self.stone_need_recover_checkbox)
         layout1 = QHBoxLayout()
         layout1.addStretch(1)
+        layout1.addWidget(QLabel("回复阈值:"))
         # 创建正浮点数输入框，要求值在0~100之间
         self.stone_recover_threshold_input = QSpinBox()
         self.stone_recover_threshold_input.setMinimum(0)
         self.stone_recover_threshold_input.setMaximum(99)
-        self.stone_recover_threshold_input.setValue(0)
+        self.stone_recover_threshold_input.setValue(
+            int(self.usersettings.open_stone_fuben_recover_threshold * 100)
+        )
         self.stone_recover_threshold_input.valueChanged.connect(
             self.stone_recover_threshold_input_valueChanged
         )
@@ -289,6 +301,26 @@ class OpenFubenWindow(QMainWindow):
         stone_fuben_layout.addWidget(self.stone_fuben_start_btn)
 
         stone_fuben_layout.addStretch(1)
+
+    def start_layer_currentIndexChanged(self, index):
+        end_layer_index = self.end_layer.currentIndex()
+        if index > end_layer_index:
+            self.end_layer.setCurrentIndex(index)
+
+    def end_layer_currentIndexChanged(self, index):
+        start_layer_index = self.start_layer.currentIndex()
+        if index < start_layer_index:
+            self.start_layer.setCurrentIndex(index)
+
+    def start_level_currentIndexChanged(self, index):
+        end_level_index = self.end_level.currentIndex()
+        if index > end_level_index:
+            self.end_level.setCurrentIndex(index)
+
+    def end_level_currentIndexChanged(self, index):
+        start_level_index = self.start_level.currentIndex()
+        if index < start_level_index:
+            self.start_level.setCurrentIndex(index)
 
     def format_plant_info(self, plant):
         if isinstance(plant, str):
@@ -324,11 +356,11 @@ class OpenFubenWindow(QMainWindow):
 
     def fuben_recover_threshold_input_valueChanged(self, value):
         self.usersettings.open_fuben_man.recover_threshold = value / 100
-        self.stone_recover_threshold_input.setValue(value)
+        self.fuben_recover_threshold_input.setValue(value)
 
     def stone_recover_threshold_input_valueChanged(self, value):
-        self.usersettings.open_fuben_man.recover_threshold = value / 100
-        self.fuben_recover_threshold_input.setValue(value)
+        self.usersettings.open_stone_fuben_recover_threshold = value / 100
+        self.stone_recover_threshold_input.setValue(value)
 
     def recover_choice_box_currentIndexChanged(self):
         text = self.recover_choice_box.currentText()
@@ -495,7 +527,7 @@ class OpenFubenWindow(QMainWindow):
                     return
                 self.stone_fuben_start_btn.setText("暂停")
                 recover_threshold = (
-                    self.fuben_recover_threshold_input.value() / 100
+                    self.stone_recover_threshold_input.value() / 100
                     if self.fuben_need_recover_checkbox.isChecked()
                     else None
                 )
@@ -608,39 +640,46 @@ class StoneChallengeThread(Thread):
         assert len(challenge_list) > 0, "未设置挑战列表"
 
     def recover(self):
-        if self.recover_threshold is None:
-            return True
-        self.repo.refresh_repository()
-        cnt, max_retry = 0, 20
-        success_num_all = 0
-        while cnt < max_retry:
-            recover_list = []
-            for plant_id in self.plant_id_list:
-                plant = self.repo.get_plant(plant_id)
-                if plant is None:
-                    continue
-                if plant.hp_now / plant.hp_max <= self.recover_threshold:
-                    recover_list.append(plant_id)
-            if len(recover_list) == 0:
-                return True
-            success_num, fail_num = self.recover_man.recover_list(
-                recover_list, choice="高级血瓶"
-            )
-            success_num_all += success_num
-            if fail_num == 0:
-                break
-            self.logger.log(
-                "尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num)
-            )
-            self.repo.refresh_repository(logger=self.logger)
-            cnt += 1
-        else:
-            self.logger.log("尝试恢复植物血量失败，退出运行")
-            return False
-        self.repo.refresh_repository()
-        if success_num_all > 0:
-            self.logger.log("成功给{}个植物回复血量".format(success_num_all))
-        return True
+        return self.recover_man.recover_list_stable(
+            self.plant_id_list,
+            self.repo,
+            self.recover_threshold,
+            self.logger,
+            choice="高级血瓶",
+        )
+        # if self.recover_threshold is None:
+        #     return True
+        # self.repo.refresh_repository()
+        # cnt, max_retry = 0, 20
+        # success_num_all = 0
+        # while cnt < max_retry:
+        #     recover_list = []
+        #     for plant_id in self.plant_id_list:
+        #         plant = self.repo.get_plant(plant_id)
+        #         if plant is None:
+        #             continue
+        #         if plant.hp_now / plant.hp_max <= self.recover_threshold:
+        #             recover_list.append(plant_id)
+        #     if len(recover_list) == 0:
+        #         return True
+        #     success_num, fail_num = self.recover_man.recover_list(
+        #         recover_list, choice="高级血瓶"
+        #     )
+        #     success_num_all += success_num
+        #     if fail_num == 0:
+        #         break
+        #     self.logger.log(
+        #         "尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num)
+        #     )
+        #     self.repo.refresh_repository(logger=self.logger)
+        #     cnt += 1
+        # else:
+        #     self.logger.log("尝试恢复植物血量失败，退出运行")
+        #     return False
+        # self.repo.refresh_repository()
+        # if success_num_all > 0:
+        #     self.logger.log("成功给{}个植物回复血量".format(success_num_all))
+        # return True
 
     def _challenge(self, layer, level, difficulty):
         body = [float(layer * 100 + level), self.plant_id_list, float(difficulty)]

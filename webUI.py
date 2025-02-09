@@ -774,6 +774,10 @@ class CustomMainWindow(QMainWindow):
         refresh_user_info_btn.clicked.connect(self.refresh_user_info_btn_clicked)
         left_layout.addWidget(refresh_user_info_btn)
 
+        refresh_skill_cache_btn = QPushButton("刷新技能缓存")
+        refresh_skill_cache_btn.clicked.connect(self.refresh_skill_cache_btn_clicked)
+        left_layout.addWidget(refresh_skill_cache_btn)
+
         if ENABLE_GAME_WINDOW:
             open_game_window_btn = QPushButton("打开游戏窗口")
             open_game_window_btn.clicked.connect(self.open_game_window)
@@ -818,7 +822,9 @@ class CustomMainWindow(QMainWindow):
         # start_game_window_proxy()
         exe_path = os.path.join(game_window_dir, 'game_window.exe')
         if not os.path.exists(exe_path):
-            logging.error(f"找不到游戏窗口程序，可能是因为杀毒程序把对应exe删除了: {exe_path}")
+            logging.error(
+                f"找不到游戏窗口程序，可能是因为杀毒程序把对应exe删除了: {exe_path}"
+            )
         subprocess.Popen(exe_path)
 
     def refresh_user_info(self, refresh_all=False):
@@ -864,6 +870,55 @@ class CustomMainWindow(QMainWindow):
             QLabel("vip剩余天数: {}".format(futures[2].result()))
         )
         QApplication.processEvents()
+
+    def refresh_skill_cache_btn_clicked(self):
+        try:
+            wr = WebRequest(self.usersettings.cfg)
+            futures = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                futures.append(
+                    executor.submit(
+                        wr.amf_post_retry,
+                        [],
+                        "api.apiskill.getAllSkills",
+                        "/pvz/amf/",
+                        "获取专属技能信息",
+                    )
+                )
+                futures.append(
+                    executor.submit(
+                        wr.amf_post_retry,
+                        [],
+                        "api.apiskill.getSpecSkillAll",
+                        "/pvz/amf/",
+                        "获取专属技能信息",
+                    )
+                )
+
+            concurrent.futures.wait(
+                futures, return_when=concurrent.futures.ALL_COMPLETED
+            )
+
+            skills_resp = futures[0].result()
+            spec_skills_resp = futures[1].result()
+            assert skills_resp.status == 0, f"获取技能信息失败: {skills_resp}"
+            assert (
+                spec_skills_resp.status == 0
+            ), f"获取专属技能信息失败: {spec_skills_resp}"
+            skills = skills_resp.body
+            spec_skills = spec_skills_resp.body
+            with open("data/cache/pvz/skills.json", mode="w", encoding="utf-8") as f:
+                json.dump(skills, f, ensure_ascii=False)
+            self.usersettings.logger.log("刷新普通技能缓存成功")
+            with open("data/cache/pvz/spec_skills.json", mode="w", encoding="utf-8") as f:
+                json.dump(spec_skills, f, ensure_ascii=False)
+            self.usersettings.logger.log("刷新专属技能缓存成功")
+        except Exception as e:
+            self.usersettings.logger.log(f"刷新技能缓存失败: {e}")
+        else:
+            self.usersettings.logger.log(
+                "刷新普通技能和专属技能缓存成功，该刷新是全局的，每个用户共享同一缓存，只需要刷新一遍即可"
+            )
 
     def refresh_user_info_btn_clicked(self):
         self.refresh_user_info(refresh_all=True)
@@ -987,7 +1042,7 @@ class ProxyManagerWindow(QMainWindow):
         layout.addStretch(1)
         layout.setSpacing(10)
 
-        self.use_dns_cache = QCheckBox("使用DNS缓存(建议开启，可能可以解决超时问题)")
+        self.use_dns_cache = QCheckBox("使用DNS缓存")
         self.use_dns_cache.setChecked(proxy_man.use_dns_cache)
         self.use_dns_cache.stateChanged.connect(self.use_dns_cache_stateChanged)
         layout.addWidget(self.use_dns_cache)
@@ -1015,9 +1070,7 @@ class ProxyManagerWindow(QMainWindow):
         self.test_times = QLineEdit()
         self.test_times.setValidator(QtGui.QIntValidator(1, 10))
         self.test_times.setText("5")
-        self.test_times.textChanged.connect(
-            self.test_times_textChanged
-        )
+        self.test_times.textChanged.connect(self.test_times_textChanged)
         layout1.addWidget(self.test_times)
         remove_proxy_btn = QPushButton("测试已添加代理")
         remove_proxy_btn.clicked.connect(self.test_proxy)
@@ -1071,12 +1124,14 @@ class ProxyManagerWindow(QMainWindow):
     def use_dns_cache_stateChanged(self):
         proxy_man.use_dns_cache = self.use_dns_cache.isChecked()
         self.save()
+
     def test_times_textChanged(self):
         text = self.test_times.text()
         if text:
             value = int(text)
             if value < 1 or value > 10:
                 self.test_times.setText(str(max(1, min(value, 10))))
+
     def proxy_list_item_clicked(self):
         selected_item = self.proxy_list.currentItem()
         if selected_item is None:
@@ -1113,8 +1168,10 @@ class ProxyManagerWindow(QMainWindow):
 
     def test_proxy(self):
         def test_proxy_thread(proxy_item):
-            alive = test_proxy_alive(proxy_item.proxy,proxy_item.item_id, int(self.test_times.text()))
-            #logging.info("代理地址：{} {}".format(proxy_item.proxy, alive))
+            alive = test_proxy_alive(
+                proxy_item.proxy, proxy_item.item_id, int(self.test_times.text())
+            )
+            # logging.info("代理地址：{} {}".format(proxy_item.proxy, alive))
 
         threads = []
         for proxy_item in proxy_man.proxy_item_list:
@@ -1246,14 +1303,14 @@ class LoginWindow(QMainWindow):
         self.setWindowTitle("登录")
 
         screen_size = QtGui.QGuiApplication.primaryScreen().size()
-        self.resize(int(screen_size.width() * 0.3), int(screen_size.height() * 0.7))
-        self.move(int(screen_size.width() * 0.35), int(screen_size.height() * 0.13))
+        self.resize(int(screen_size.width() * 0.3), int(screen_size.height() * 0.8))
+        self.move(int(screen_size.width() * 0.35), int(screen_size.height() * 0.075))
 
         main_widget = QWidget()
         main_layout = QVBoxLayout()
 
         layout = QHBoxLayout()
-        layout.addWidget(QLabel("当前版本: pre31"))
+        layout.addWidget(QLabel("当前版本: pre32"))
         self.import_data_from_old_version_btn = QPushButton("从旧版本导入数据")
         self.import_data_from_old_version_btn.clicked.connect(
             self.import_data_from_old_version_btn_clicked
@@ -1340,9 +1397,7 @@ class LoginWindow(QMainWindow):
 
         server_layout = QVBoxLayout()
         server_layout.setSpacing(1)
-        server_layout.addWidget(
-            QLabel("----------------------------------------------")
-        )
+        server_layout.addWidget(QLabel("-" * 60))
         server_layout.addWidget(
             QLabel("浏览器访问bwnotfound.com即可配置云端助手一键挂机")
         )
@@ -1760,6 +1815,7 @@ def get_usersettings(cfg: Config, logger: IOLogger, setting_dir):
         usersettings.load()
 
     return usersettings
+
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()

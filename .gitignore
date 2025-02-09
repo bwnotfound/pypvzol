@@ -183,3 +183,6 @@ cython_debug/
 
 /information/
 /导出的用户数据
+
+/data/cache/pvz/skills.json
+/data/cache/pvz/spec_skills.json
