@@ -178,7 +178,7 @@ cython_debug/
 /dev/
 /script.py
 /scripts
-/build.py
+# /build.py
 /test.py
 
 /information/
