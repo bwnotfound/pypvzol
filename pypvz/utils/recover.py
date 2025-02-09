@@ -73,7 +73,11 @@ class RecoverMan:
         pool_size=3,
         refresh_repo_first=True,
     ):
-        if len(plant_id_list) == 0 or recover_threshold >= 1:
+        if (
+            recover_threshold is None
+            or len(plant_id_list) == 0
+            or recover_threshold >= 1
+        ):
             return True
         if refresh_repo_first:
             repo.refresh_repository()

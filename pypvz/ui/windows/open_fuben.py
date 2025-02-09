@@ -706,6 +706,9 @@ class StoneChallengeThread(Thread):
         while True:
             if self.interrupt_event.is_set():
                 return False
+            if not self.recover():
+                self.logger.log("尝试恢复植物血量失败，退出运行")
+                return False
             cnt, max_retry = 0, 20
             while cnt < max_retry:
                 cnt += 1
@@ -748,9 +751,6 @@ class StoneChallengeThread(Thread):
 
     def run(self):
         try:
-            if not self.recover():
-                self.logger.log("尝试恢复植物血量失败，退出运行")
-                return
             for layer, level, difficulty in self.challenge_list:
                 if self.interrupt_event.is_set():
                     return

@@ -1,7 +1,7 @@
 import os
 import shutil
 
-version = "pre32"
+version = "pre32_1"
 name = "植物大战僵尸ol助手_{}".format(version)
 os.system(
     "pyinstaller "

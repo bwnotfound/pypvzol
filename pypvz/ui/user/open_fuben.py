@@ -59,36 +59,43 @@ class OpenFubenMan:
         return caves
 
     def recover(self):
-        cnt, max_retry = 0, 20
-        success_num_all = 0
-        while cnt < max_retry:
-            recover_list = []
-            for plant_id in self.team:
-                plant = self.repo.get_plant(plant_id)
-                if plant is None:
-                    continue
-                if plant.hp_now / plant.hp_max <= self.recover_threshold:
-                    recover_list.append(plant_id)
-            if len(recover_list) == 0:
-                return True
-            success_num, fail_num = self.recover_man.recover_list(
-                recover_list, choice=self.recover_choice
-            )
-            success_num_all += success_num
-            if fail_num == 0:
-                break
-            self.logger.log(
-                "尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num)
-            )
-            self.repo.refresh_repository(logger=self.logger)
-            cnt += 1
-        else:
-            self.logger.log("尝试恢复植物血量失败，退出运行")
-            return False
-        self.repo.refresh_repository()
-        if success_num_all > 0:
-            self.logger.log("成功给{}个植物回复血量".format(success_num_all))
-        return True
+        return self.recover_man.recover_list_stable(
+            self.team,
+            self.repo,
+            self.recover_threshold,
+            self.logger,
+            choice=self.recover_choice,
+        )
+        # cnt, max_retry = 0, 20
+        # success_num_all = 0
+        # while cnt < max_retry:
+        #     recover_list = []
+        #     for plant_id in self.team:
+        #         plant = self.repo.get_plant(plant_id)
+        #         if plant is None:
+        #             continue
+        #         if plant.hp_now / plant.hp_max <= self.recover_threshold:
+        #             recover_list.append(plant_id)
+        #     if len(recover_list) == 0:
+        #         return True
+        #     success_num, fail_num = self.recover_man.recover_list(
+        #         recover_list, choice=self.recover_choice
+        #     )
+        #     success_num_all += success_num
+        #     if fail_num == 0:
+        #         break
+        #     self.logger.log(
+        #         "尝试恢复植物血量。成功{}，失败{}".format(success_num, fail_num)
+        #     )
+        #     self.repo.refresh_repository(logger=self.logger)
+        #     cnt += 1
+        # else:
+        #     self.logger.log("尝试恢复植物血量失败，退出运行")
+        #     return False
+        # self.repo.refresh_repository()
+        # if success_num_all > 0:
+        #     self.logger.log("成功给{}个植物回复血量".format(success_num_all))
+        # return True
 
     def get_cave_open_tools(self, target_cave: FubenCave, interrupt_event: Event):
         for open_tool in target_cave.open_tools:
